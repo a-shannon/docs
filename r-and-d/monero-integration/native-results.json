@@ -1,0 +1,313 @@
+{
+  "status": "passed_scoped_native_experiment",
+  "source_pin": "4f92268d7c16741cfb41e5bbe2aa46cc260a9ea5",
+  "events": [
+    {
+      "name": "release_bound",
+      "source_pin": "4f92268d7c16741cfb41e5bbe2aa46cc260a9ea5",
+      "archive_sha256": "cf2ae8273977697d9ef2031c7337b781e6e5936578f602444b2990a173a2437d",
+      "binaries": {
+        "monerod.exe": "e69bf239e0acad637fc1bc257ba68661133fca77727f2ff6f25c8db917cfee42",
+        "monero-wallet-rpc.exe": "f79594585ad0e094aa104c1aaa246ad5605ad256989f086712f7e9e91cf6ac1d"
+      }
+    },
+    {
+      "name": "isolated_daemon",
+      "nettype": "fakechain",
+      "offline": true,
+      "peers": 0,
+      "height": 1
+    },
+    {
+      "name": "synthetic_funding_ready",
+      "height": 101
+    },
+    {
+      "name": "native_outbound_pool",
+      "txid": "5e3e48bd6cf2b49ea0951fd5ba17ca81a3d0e16c9e6df121f39bc3fa5d4b76eb",
+      "message": {
+        "domain": "rosen-monero-experiment",
+        "version": 1,
+        "source_network": "fakechain",
+        "vault_epoch": "experiment-epoch-1",
+        "vault_address": "49HPY2hyzNF3DVBsL5iZou8xF8HeUWqzmgkmNocFXUKzZ6gGnBvynb7Cwv5BhcQQo7WxzoAsYsVBwZvbeYdTuPbfAY2X3jV",
+        "txid": "5e3e48bd6cf2b49ea0951fd5ba17ca81a3d0e16c9e6df121f39bc3fa5d4b76eb",
+        "destination_network": "ergo-testnet",
+        "destination_asset": "synthetic-rsXMR",
+        "to_address": "synthetic-ergo-recipient-A",
+        "amount": "1000000000000",
+        "bridge_fee": "100",
+        "network_fee": "20",
+        "expiry_height": 1101
+      },
+      "proof": "OutProofV2PhiQiybvngbg1KuotC271oGVDiWLfzNoKSDDX9qq2SsbBExYfhMidFk8SKqyxdhzshLXnZCYRpHw7bveH7xHmuXmKo2sK25NfQH542NV7fB5C8AN8f4MUsDMQDh9qPQRY1g2",
+      "result": {
+        "confirmations": 0,
+        "good": true,
+        "in_pool": true,
+        "received": 1000000000000
+      }
+    },
+    {
+      "name": "candidate_pool_refusal",
+      "outcome": "rejected",
+      "reason": "pool transaction"
+    },
+    {
+      "name": "native_altered_message",
+      "result": {
+        "confirmations": 0,
+        "good": false,
+        "in_pool": false,
+        "received": 0
+      }
+    },
+    {
+      "name": "native_view_only_inbound",
+      "txid": "5e3e48bd6cf2b49ea0951fd5ba17ca81a3d0e16c9e6df121f39bc3fa5d4b76eb",
+      "message": {
+        "domain": "rosen-monero-experiment",
+        "version": 1,
+        "source_network": "fakechain",
+        "vault_epoch": "experiment-epoch-1",
+        "vault_address": "49HPY2hyzNF3DVBsL5iZou8xF8HeUWqzmgkmNocFXUKzZ6gGnBvynb7Cwv5BhcQQo7WxzoAsYsVBwZvbeYdTuPbfAY2X3jV",
+        "txid": "5e3e48bd6cf2b49ea0951fd5ba17ca81a3d0e16c9e6df121f39bc3fa5d4b76eb",
+        "destination_network": "ergo-testnet",
+        "destination_asset": "synthetic-rsXMR",
+        "to_address": "synthetic-ergo-recipient-B",
+        "amount": "1000000000000",
+        "bridge_fee": "100",
+        "network_fee": "20",
+        "expiry_height": 1101
+      },
+      "proof": "InProofV2PhiQiybvngbg1KuotC271oGVDiWLfzNoKSDDX9qq2SsbTLG1SFVQXbND45zB2Rvuv4CMNpZ2sMexPKjaGG2VhZjaYiYSumvrpA4YEDPfoKV2NP9MgsXfGFSw2U7ePn6A7cUR",
+      "result": {
+        "confirmations": 0,
+        "good": true,
+        "in_pool": true,
+        "received": 1000000000000
+      }
+    },
+    {
+      "name": "native_spend_proof",
+      "result": {
+        "good": true
+      }
+    },
+    {
+      "name": "native_watch_only_spend_refusal",
+      "outcome": "rejected",
+      "error_code": -1,
+      "classification": "watch-only spend key unavailable"
+    },
+    {
+      "name": "candidate_locked_refusal",
+      "outcome": "rejected",
+      "reason": "output unavailable"
+    },
+    {
+      "name": "native_locked_receipt",
+      "receipt": {
+        "txid": "5e3e48bd6cf2b49ea0951fd5ba17ca81a3d0e16c9e6df121f39bc3fa5d4b76eb",
+        "address": "49HPY2hyzNF3DVBsL5iZou8xF8HeUWqzmgkmNocFXUKzZ6gGnBvynb7Cwv5BhcQQo7WxzoAsYsVBwZvbeYdTuPbfAY2X3jV",
+        "block_hash": "f801da69628d5ee1898107f6d1cf9e0749d2653c7086febb5a8b68628a325f45",
+        "block_height": 101,
+        "in_pool": false,
+        "outputs": [
+          {
+            "index": 1,
+            "public_key": "cd3865887502e25aac888fd13cd0a0652662586b91c0e353524565833309e4a0",
+            "amount": 1000000000000,
+            "unlocked": false,
+            "spent": false,
+            "key_occurrences": 1
+          }
+        ]
+      },
+      "result": {
+        "confirmations": 1,
+        "good": true,
+        "in_pool": false,
+        "received": 1000000000000
+      }
+    },
+    {
+      "name": "candidate_mature_acceptance",
+      "receipt": {
+        "txid": "5e3e48bd6cf2b49ea0951fd5ba17ca81a3d0e16c9e6df121f39bc3fa5d4b76eb",
+        "address": "49HPY2hyzNF3DVBsL5iZou8xF8HeUWqzmgkmNocFXUKzZ6gGnBvynb7Cwv5BhcQQo7WxzoAsYsVBwZvbeYdTuPbfAY2X3jV",
+        "block_hash": "f801da69628d5ee1898107f6d1cf9e0749d2653c7086febb5a8b68628a325f45",
+        "block_height": 101,
+        "in_pool": false,
+        "outputs": [
+          {
+            "index": 1,
+            "public_key": "cd3865887502e25aac888fd13cd0a0652662586b91c0e353524565833309e4a0",
+            "amount": 1000000000000,
+            "unlocked": true,
+            "spent": false,
+            "key_occurrences": 1
+          }
+        ]
+      },
+      "native_result": {
+        "confirmations": 11,
+        "good": true,
+        "in_pool": false,
+        "received": 1000000000000
+      },
+      "candidate": {
+        "txid": "5e3e48bd6cf2b49ea0951fd5ba17ca81a3d0e16c9e6df121f39bc3fa5d4b76eb",
+        "block_hash": "f801da69628d5ee1898107f6d1cf9e0749d2653c7086febb5a8b68628a325f45",
+        "output_key": "cd3865887502e25aac888fd13cd0a0652662586b91c0e353524565833309e4a0",
+        "output_index": 1,
+        "amount": 1000000000000,
+        "net_amount": 999999999880,
+        "recipient": "synthetic-ergo-recipient-A",
+        "intent_hash": "385a44884841f8ab37bcf613cf246353d711add9550caea7040cf40012acfa32"
+      },
+      "uniqueness_scope": "all canonical fakechain miner and regular outputs"
+    },
+    {
+      "name": "candidate_inbound_refusal",
+      "outcome": "rejected",
+      "reason": "outbound V2 required"
+    },
+    {
+      "name": "candidate_wrong_vault",
+      "outcome": "rejected",
+      "reason": "vault association"
+    },
+    {
+      "name": "candidate_amount_delta",
+      "outcome": "rejected",
+      "reason": "receipt amount mismatch"
+    },
+    {
+      "name": "candidate_output_replay",
+      "outcome": "rejected",
+      "reason": "output already credited"
+    },
+    {
+      "name": "candidate_transaction_replay",
+      "outcome": "rejected",
+      "reason": "transaction already assigned an intent"
+    },
+    {
+      "name": "native_2of4.setup",
+      "passed": true,
+      "threshold": 2,
+      "total": 4,
+      "exchange_rounds": 3,
+      "seconds": 10.202703199989628,
+      "vault_address_sha256": "487c7042a0ac88e5d58c7ccbebc97d4e41f38e9b882a10b76147b10ddbcc420f"
+    },
+    {
+      "name": "native_2of4.export",
+      "passed": true,
+      "known_outputs_per_wallet": 2,
+      "combination_groups_per_output": 3,
+      "measurements": [
+        {
+          "hex_chars": 2440,
+          "decoded_bytes": 1220,
+          "seconds": 0.03341960000398103
+        },
+        {
+          "hex_chars": 2440,
+          "decoded_bytes": 1220,
+          "seconds": 0.013967399994726293
+        },
+        {
+          "hex_chars": 2440,
+          "decoded_bytes": 1220,
+          "seconds": 0.019313500000862405
+        },
+        {
+          "hex_chars": 2440,
+          "decoded_bytes": 1220,
+          "seconds": 0.01602450000063982
+        }
+      ]
+    },
+    {
+      "name": "native_2of4.self_import",
+      "passed": true,
+      "rpc_error": {
+        "code": -1,
+        "message": "Error calling import_multisig: Wrong number of multisig sources",
+        "message_redacted": false
+      },
+      "pool_before": 0,
+      "pool_after": 0
+    },
+    {
+      "name": "native_2of4.insufficient_import",
+      "passed": true,
+      "rpc_error": {
+        "code": -33,
+        "message": "Needs multisig export info from more participants",
+        "message_redacted": false
+      },
+      "pool_before": 0,
+      "pool_after": 0
+    },
+    {
+      "name": "native_2of4.duplicate_peer_import",
+      "tested": false,
+      "reason": "At threshold two one distinct peer already suffices; tested at three-of-five"
+    },
+    {
+      "name": "native_2of4.valid_import",
+      "passed": true,
+      "participants": 4,
+      "known_outputs_per_wallet": 2,
+      "balance_atomic": 200000000000
+    },
+    {
+      "name": "native_2of4.creator_only_submit",
+      "passed": true,
+      "rpc_error": {
+        "code": -33,
+        "message": "Not enough signers signed this transaction.",
+        "message_redacted": false
+      },
+      "pool_before": 0,
+      "pool_after": 0
+    },
+    {
+      "name": "native_2of4.frozen_input_sign",
+      "passed": true,
+      "rpc_error": {
+        "code": -35,
+        "message": "Failed to sign multisig tx: Will not sign multisig tx containing frozen outputs",
+        "message_redacted": false
+      },
+      "pool_before": 0,
+      "pool_after": 0
+    },
+    {
+      "name": "native_2of4.payout",
+      "passed": true,
+      "transaction_hash": "c7fe1e2217fa7929a1c4cb377653515a86530c53f020ad1d7b685ecdbb7dadec",
+      "amount_atomic": 50000000000,
+      "fee_atomic": 1808400000,
+      "threshold": 2,
+      "independent_description": {
+        "amount_in": 100000000000,
+        "amount_out": 98191600000,
+        "change_amount": 48191600000,
+        "fee": 1808400000,
+        "ring_size": 16,
+        "unlock_time": 0
+      },
+      "selected_inputs": 1,
+      "recipient_outputs": 1,
+      "recipient_unlocked": true,
+      "pool_after": 0,
+      "construction_negative_checks_signing_submit_seconds": 0.45352419999835547
+    }
+  ],
+  "updated": "2026-09-11T11:21:55.435286+00:00",
+  "owned_processes_stopped": true
+}

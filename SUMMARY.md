@@ -27,3 +27,5 @@
 ## 🛠️ r\&d
 
 * [Bringing Monero](r-and-d/bringing-monero.md)
+* [Monero Integration: Architecture and Implementation Plan](r-and-d/monero-integration-plan.md)
+  * [Technical Basis and Evidence](r-and-d/monero-integration/technical-basis.md)
