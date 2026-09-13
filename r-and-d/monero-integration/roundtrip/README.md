@@ -2,7 +2,12 @@
 
 A. Shannon · 13 September 2026
 
-**Result: the linked roundtrip passed on both actual local nodes.** The observed
+**Latest result: the roundtrip passed with actual watcher transactions in both
+directions and four independently checking credit-guard instances.** Read the
+[watcher and guard authority report](watcher-authority.md) for the new execution,
+permanent output assignments, credit restart and post-rollback quarantine.
+
+The earlier linked roundtrip also passed on both actual local nodes. Its observed
 return uses one signing call, two original-holder contributions and one Monero
 submission. It recovers a deliberately lost submission reply and reaches durable
 settlement after the configured confirmation depth.
@@ -17,4 +22,4 @@ The experiment addresses a more demanding question than whether a multisignature
 
 Read the [technical report](technical-report.md) for the execution path, security boundaries, evidence and remaining work. The [source package](source/README.md) documents its prepared prerequisites and replay command. The [earlier preliminary study](../preliminary-study/README.md) remains the design and migration background.
 
-The scope is a local integration prototype. Source-event authority and watcher triggers use a declared local operator fixture; guards are separate local processes, and the Ergo asset is a fixture token. A successful run does not establish production watcher consensus, independently operated custody, permissionless deposit submission, full economic reconciliation or FCMP++/Carrot migration.
+The scope is a local integration prototype. The original baseline uses local operator triggers; the successor runs the pinned watcher jobs with bounded node/database ports. Four credit guards are separate instances in one JavaScript host; the four Monero holders and native source readers use separate processes. Assets are fixture tokens. A successful run does not establish full watcher-daemon integration, independently operated custody, permissionless deposit submission, full economic reconciliation or FCMP++/Carrot migration.

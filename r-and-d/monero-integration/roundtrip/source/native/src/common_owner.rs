@@ -10,6 +10,9 @@ pub(crate) mod participant_signing;
 #[cfg(feature = "participant-host")]
 #[path = "participant_source.rs"]
 pub(crate) mod participant_source;
+#[cfg(feature = "participant-host")]
+#[path = "public_source_observer.rs"]
+pub(crate) mod public_source_observer;
 use super::*;
 use crate::key_image::{LocalContext, LocalImageSession, ProofRow, VerifiedImages, VerifiedInputImage};
 use ciphersuite::{Ciphersuite, group::GroupEncoding};

@@ -2,9 +2,9 @@
 
 Author: A. Shannon
 
-This experimental source package joins an actual isolated Monero deposit and native transaction proof to durable deposit admission, a real local Ergo credit, redemption of that exact credited box, and a separate-holder Monero payout. The watcher triggers use explicitly local operator authority and fixture tokens. They do not demonstrate a production watcher quorum.
+This experimental source package joins an actual isolated Monero deposit and native transaction proof to a real local Ergo credit, redemption of that exact credited box, and a separate-holder Monero payout. The `baseline` profile retains the original local operator trigger fixture. The `watcher-authority` profile uses two independently checked observations and actual Rosen commitment/reveal transactions in both directions, plus four guard instances with separate permanent output-assignment ledgers and actual three-of-four Ergo signatures. Both profiles use isolated chains and fixture tokens.
 
-The Rust and C++ sources are retained byte-for-byte. `relocation-only-changes.json` binds every changed copied file to its original and relocated SHA-256. Changes select caller configuration, prepared dependencies, packaged source, and external runtime locations. `source-manifest.json` binds the exact file set, sizes, and ordinal aggregate. Its SHA-256 must be obtained independently from the reviewed package.
+The original signing and proof algorithms are retained. A public fixed-view native reader and the watcher/guard composition extend the baseline. `relocation-only-changes.json` records the historical baseline relocation; it does not describe these subsequent changes. `source-manifest.json` binds the current exact file set, sizes, and ordinal aggregate. Its SHA-256 must be obtained independently from the reviewed package.
 
 ## Prepared prerequisites
 
@@ -25,6 +25,7 @@ Create a caller-owned JSON configuration outside the package with these fields:
 | `rosenRoot` | Absolute prepared Rosen workspace path |
 | `runtimeDirectory` | New, absent absolute output directory outside the package and prepared inputs |
 | `nativeBinary`, `nativeSha256` | Participant executable and independent SHA-256 |
+| `observerBinary`, `observerSha256` | Additional public-source reader executable and independent SHA-256, required for `watcher-authority` |
 | `moneroDaemon`, `moneroDaemonSha256` | Daemon executable and independent SHA-256 |
 | `ergoRuntime` | Existing external prepared Ergo runtime directory |
 | `ergoRecipient` | Public address controlled by that runtime's recipient capability |
@@ -39,6 +40,23 @@ node tools/launch-roundtrip.mjs --config <absolute-config-file> --manifest-sha25
 ```
 
 The launcher verifies source and prepared input pins, copies the package into the new external work directory, attaches prepared dependencies, and runs `consumer/roundtrip.spec.ts` with `roundtrip.config.ts`. It retains raw outputs and runtime custody externally. Its console output contains only exit status and source verification information. The harness keeps original Monero holders alive while retrying the same Ergo obligation; it never admits a replacement deposit to recover a lost submission reply.
+
+For the watcher and distributed-credit successor, append `--profile watcher-authority`.
+It runs `watcherAuthority.spec.ts` with the same pinned withdrawal engine. This
+profile prepares fresh local fixture contracts and watcher identities using the
+existing isolated Ergo funding/recipient capabilities. It checks exact signed
+credit recovery against all four retained ledgers, and revalidates the return
+trigger against primary Ergo state before approving the Monero payout.
+
+The exercised participant binary remains the previously pinned baseline build;
+the observer is a separately pinned build with `scan-source` support. The
+observer uses the fixture's public view scalar and does not establish a general
+production view-key distribution scheme. Guard instances share one JS host;
+Monero holders and fresh source readers use separate native processes. The
+watcher host executes the upstream jobs with bounded SQLite/node ports, not the
+complete autonomous watcher daemon. Missing guard custody refuses reopening;
+valid old custody snapshots and safe committee rotation remain open deployment
+requirements.
 
 Use the same command with `--check-only true` for read-only pin validation. `--collect-only true` creates an external execution mirror and collects the roundtrip test without running it. These checks do not establish the complete roundtrip result.
 

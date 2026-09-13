@@ -68,6 +68,7 @@ export async function inspectParticipantDeposit(vault,{fault}={}){
     if(canonical(withoutId(reports[0]))!==canonical(withoutId(reports[1])))throw Error('Participant source disagreement');
     // Only public source data leaves the issuer. The private scalar remains a file capability for the proof helper.
     return Object.freeze({deposit:Object.freeze({...deposit}),observation:Object.freeze({...reports[0]}),
+      publicScan:Object.freeze({groupPublicKey:vault.groupKey,genesis:vault.genesis,snapshot:structuredClone(funded.snapshot),source:structuredClone(funded.source),keyImage:reports[0].keyImage}),
       donorProofKeyPath:join(state.depositDirectory,'donor-tx-key.private')});
   }catch(error){await ceremony.close();throw error;}
 }

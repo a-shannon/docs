@@ -33,7 +33,7 @@ export class Participant {
         if(this.buffer.length>65536)throw Error('Participant frame bound');
       }catch{this.fail('Participant output rejected');}
     });
-    this.child.once('close',()=>{this.closed=true;if(this.pending){const {reject,timer}=this.pending;this.pending=null;clearTimeout(timer);reject(Error('Participant closed before expected result'));}});
+    this.child.once('close',(code,signal)=>{this.closed=true;if(this.pending){const {reject,timer,phase}=this.pending;this.pending=null;clearTimeout(timer);reject(Error(`Participant ${this.id} closed during ${phase}; exit=${code}; signal=${signal}; stderrBytes=${this.stderrBytes}`));}});
   }
   fail(message){this.failure=Error(message);if(this.pending){const {reject,timer}=this.pending;this.pending=null;clearTimeout(timer);reject(this.failure);}this.child.kill();}
   next(timeoutMs=15000,phase='protocol'){
@@ -42,7 +42,7 @@ export class Participant {
     if(this.queue.length)return Promise.resolve(this.queue.shift());
     if(this.closed)return Promise.reject(Error('Participant closed'));
     if(this.pending)return Promise.reject(Error('Concurrent participant read'));
-    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.pending=null;reject(Error(`Participant ${phase} response deadline`));},timeoutMs);this.pending={resolve,reject,timer};});
+    return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.pending=null;reject(Error(`Participant ${phase} response deadline`));},timeoutMs);this.pending={resolve,reject,timer,phase};});
   }
   send(value){
     if(this.closed||this.failure)return Promise.reject(Error('Participant unavailable'));

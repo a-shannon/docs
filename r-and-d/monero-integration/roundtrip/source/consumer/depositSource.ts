@@ -92,5 +92,5 @@ export async function buildDepositSource(vault:any,node:LocalMonero,runtime:stri
   const decision=await verifyDeposit(intentBytes,generated.proof,request.receiptEvidence,{...context.configuration,snapshot,
     creditedDepositIds:new Set(),creditedOutputIds:new Set()},context.feePolicy,providers);
   if(decision.status!=='accepted')throw Error('Deposit policy '+decision.status+':'+decision.reason);
-  return {context,request,providers,decision,observation:o,deposit:d,current,proofRequest:{...proofRequest,proof:generated.proof}};
+  return {context,request,providers,decision,observation:o,deposit:d,current,publicScan:inspected.publicScan,proofRequest:{...proofRequest,proof:generated.proof}};
 }

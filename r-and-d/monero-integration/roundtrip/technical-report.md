@@ -2,6 +2,12 @@
 
 A. Shannon · 13 September 2026
 
+This is the baseline report for revision
+[`93d169f`](https://github.com/a-shannon/docs/tree/93d169f58f5d9671831a0f5f5a8a62ad959ba555/r-and-d/monero-integration/roundtrip/source).
+Its 308-file package and receipts remain historical evidence. The current
+[watcher and guard authority report](watcher-authority.md) describes the subsequent
+341-file package, actual watchers in both directions and distributed credit gate.
+
 ## Result
 
 The linked candidate execution passed in **124.7 seconds**. It credited and

@@ -385,6 +385,12 @@ pub mod participant;
 #[cfg(feature = "participant-host")]
 mod participant_envelope;
 
+/// Read-only public fixed-view observation on the isolated local fixture chain.
+#[cfg(feature = "participant-host")]
+pub fn observe_public_source(input: impl std::io::Read, output: impl std::io::Write) -> Result<(), ()> {
+    common_owner::public_source_observer::run(input, output)
+}
+
 /// Local synthetic fixture entry point. No signing, submission or production custody API.
 #[cfg(feature = "synthetic-host")]
 pub fn run_synthetic_candidate_host() -> Result<(), ()> {

@@ -1,5 +1,10 @@
 # Validation map
 
+This map records the original baseline. The subsequent
+[watcher/guard validation matrix](watcher-authority.md#recovery-return-admission-and-validation)
+and [qualification record](evidence/watcher-authority-qualification.json) cover
+the newly composed watcher, credit and return-authority boundaries.
+
 This map separates the linked node execution from component experiments and focused independent rechecks. Test sets overlap; their counts must not be added into a single bridge-security score. The [structured results](evidence/validation-results.json) retain case names, outcomes and original report digests. The [technical report](technical-report.md) states the authority and deployment limits.
 
 | Invariant | Producer → consumer | Decisive positive / negative checks | Consequence if relaxed |

@@ -6,14 +6,20 @@ import {createHash,randomUUID} from 'node:crypto';
 import {assertExternalWork,freezeInputs} from './launcher-guards.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const sha=x=>createHash('sha256').update(x).digest('hex'),ordinal=(a,b)=>a<b?-1:a>b?1:0;
-const args=Object.create(null),allowed=new Set(['config','manifest-sha256','check-only','collect-only']);
+const args=Object.create(null),allowed=new Set(['config','manifest-sha256','check-only','collect-only','profile']);
 for(let i=2;i<process.argv.length;i+=2){const key=process.argv[i]?.slice(2),value=process.argv[i+1];if(!process.argv[i]?.startsWith('--')||!allowed.has(key)||!value||Object.hasOwn(args,key))throw Error('Arguments');args[key]=value;}
 if(!args.config||!isAbsolute(args.config)||!/^[0-9a-f]{64}$/.test(args['manifest-sha256']))throw Error('Explicit config and manifest pin required');
 for(const key of ['check-only','collect-only'])if(args[key]&&args[key]!=='true')throw Error('Boolean option');
+const profile=args.profile??'baseline';if(!['baseline','watcher-authority'].includes(profile))throw Error('Unsupported profile');
+const spec=profile==='watcher-authority'?'watcherAuthority.spec.ts':'roundtrip.spec.ts';
+const testConfig=profile==='watcher-authority'?'watcherAuthority.config.ts':'roundtrip.config.ts';
 const configBytes=readFileSync(args.config),config=JSON.parse(configBytes);
 for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','ergoRuntime'])if(typeof config[key]!=='string'||!isAbsolute(config[key]))throw Error('Absolute configuration: '+key);
 const work=resolve(config.runtimeDirectory),rosen=resolve(config.rosenRoot);
+const observerFiles=profile==='watcher-authority'?[[config.observerBinary,config.observerSha256]]:[];
+for(const [file,pin] of observerFiles)if(typeof file!=='string'||!isAbsolute(file)||!/^[0-9a-f]{64}$/.test(pin)||sha(readFileSync(file))!==pin)throw Error('Observer executable pin');
 assertExternalWork(work,[root,rosen,config.ergoRuntime,config.nativeBinary,config.moneroDaemon,args.config,process.execPath]);
+if(observerFiles.length)assertExternalWork(work,observerFiles.map(([file])=>file));
 if(existsSync(work))throw Error('New external runtime directory required');
 for(const [pathKey,hashKey]of [['nativeBinary','nativeSha256'],['moneroDaemon','moneroDaemonSha256']])if(!/^[0-9a-f]{64}$/.test(config[hashKey])||sha(readFileSync(config[pathKey]))!==config[hashKey])throw Error('Executable pin: '+pathKey);
 if(typeof config.ergoRecipient!=='string'||!config.ergoRecipient||typeof config.wslDistro!=='string'||!config.wslDistro)throw Error('Prepared Ergo recipient and WSL distro required');
@@ -32,6 +38,7 @@ for(const entry of dependencies){if(!/^[A-Za-z0-9_@.\/-]+$/.test(entry.path)||en
 const declaredFiles=[...manifest.files.map(e=>({path:join(root,e.path),sha256:e.sha256})),
   {path:join(root,'source-manifest.json'),sha256:args['manifest-sha256']},{path:args.config,sha256:sha(configBytes)},
   {path:config.nativeBinary,sha256:config.nativeSha256},{path:config.moneroDaemon,sha256:config.moneroDaemonSha256},{path:process.execPath,sha256:sha(readFileSync(process.execPath))},
+  ...observerFiles.map(([path,sha256])=>({path,sha256})),
   ...['package.json','package-lock.json'].map(name=>({path:join(rosen,name),sha256:manifest.files.find(e=>e.path===name).sha256})),
   ...dependencies.map(e=>({path:join(rosen,e.path),sha256:e.sha256}))];
 const verifySourceSet=()=>{if(JSON.stringify(list(root).filter(x=>x!=='source-manifest.json').sort(ordinal))!==JSON.stringify(names))throw Error('Exact source set changed');};
@@ -55,9 +62,9 @@ const closure=freezeInputs({...frozenOptions,files:[...declaredFiles,...manifest
   paths:[...frozenOptions.paths,...[...skippedLinks].map(p=>join(fixture,p))],validateSets:()=>{verifySourceSet();if(JSON.stringify(list(fixture,'',skippedLinks).sort(ordinal))!==JSON.stringify([...names,'source-manifest.json'].sort(ordinal)))throw Error('Exact copied source set changed');}});
 const proofConfig=JSON.stringify(Object.fromEntries(['proofBinary','proofBinarySha256','proofLibrary','proofLibrarySha256'].map(k=>[k,config[k]])));
 const runId=randomUUID(),cwd=join(fixture,'consumer');
-const env={...process.env,ROUNDTRIP_CONFIG:runtimeConfig,ROUNDTRIP_PROOF_CONFIG:proofConfig,WSLENV:[process.env.WSLENV,'ROUNDTRIP_PROOF_CONFIG'].filter(Boolean).join(':'),PARTICIPANT_SHA256:config.nativeSha256,MONERO_NODE_NATIVE_SHA256:config.nativeSha256,PARTICIPANT_BIN:config.nativeBinary,W1HB_RUN_ID:runId,W1HB_TRACE_DIR:trace,W1HC_SPEC:'roundtrip.spec.ts',NODE_OPTIONS:'--experimental-vm-modules --import ./observe.mjs --import tsx --import '+pathToFileURL(join(fixture,'ergo-node/deposit-register.mjs')).href};
-const command=[join(rosen,'node_modules/vitest/vitest.mjs'),args['collect-only']?'list':'run','--config','roundtrip.config.ts',...(args['collect-only']?[]:['--reporter','verbose'])];
-writeFileSync(join(work,'execution-before.json'),JSON.stringify({runId,manifestSha256:args['manifest-sha256'],aggregateSha256:manifest.aggregateSha256,nodeSha256:sha(readFileSync(process.execPath)),nativeSha256:config.nativeSha256,moneroDaemonSha256:config.moneroDaemonSha256,command},null,2),{flag:'wx'});
+const env={...process.env,ROUNDTRIP_CONFIG:runtimeConfig,ROUNDTRIP_PROOF_CONFIG:proofConfig,WSLENV:[process.env.WSLENV,'ROUNDTRIP_PROOF_CONFIG'].filter(Boolean).join(':'),PARTICIPANT_SHA256:config.nativeSha256,MONERO_NODE_NATIVE_SHA256:config.nativeSha256,PARTICIPANT_BIN:config.nativeBinary,W1HB_RUN_ID:runId,W1HB_TRACE_DIR:trace,W1HC_SPEC:spec,NODE_OPTIONS:'--experimental-vm-modules --import ./observe.mjs --import tsx --import '+pathToFileURL(join(fixture,'ergo-node/deposit-register.mjs')).href};
+const command=[join(rosen,'node_modules/vitest/vitest.mjs'),args['collect-only']?'list':'run','--config',testConfig,...(args['collect-only']?[]:['--reporter','verbose'])];
+writeFileSync(join(work,'execution-before.json'),JSON.stringify({runId,profile,manifestSha256:args['manifest-sha256'],aggregateSha256:manifest.aggregateSha256,nodeSha256:sha(readFileSync(process.execPath)),nativeSha256:config.nativeSha256,moneroDaemonSha256:config.moneroDaemonSha256,...(observerFiles.length?{observerSha256:config.observerSha256}:{}),command},null,2),{flag:'wx'});
 const child=spawn(process.execPath,command,{cwd,env,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe']}),stdout=[],stderr=[];
 child.stdout.on('data',x=>stdout.push(Buffer.from(x)));child.stderr.on('data',x=>stderr.push(Buffer.from(x)));
 const code=await new Promise((ok,bad)=>{child.once('error',bad);child.once('close',ok);});
