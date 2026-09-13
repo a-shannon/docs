@@ -516,6 +516,63 @@ need an explicit supported resolution. If no real bridge has launched, selecting
 a new key hierarchy is an initial design decision; migrating laboratory keys
 is not a prerequisite to that choice.
 
+### Bounded Rust migration preflight
+
+A subsequent source preflight narrows the missing implementation. Its starting
+engine is monero-wallet 0.2.0 at package VCS
+`9e11f5c0f2b18ab821192efa427c863086b51379`, with the laboratory dependency set
+modular-frost 0.11.1, dkg 0.6.1, ciphersuite 0.4.2 and dalek-ff-group 0.5.0.
+Its target is monero-oxide `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
+These are research candidates, not a Rosen production-engine selection.
+
+**The share interface is promising.** The current wallet and future legacy
+algorithm use modular-frost `ThresholdKeys<Ed25519>`; target dependency ranges
+permit the relevant version families. The future algorithm computes an
+additional U-based contribution from each participant's original share during
+signing preprocessing. A source comment explains this choice instead of a
+separate preparatory interactive migration protocol. No share-format conversion
+requirement is apparent at this boundary, but exact dependency unification has
+not been compiled. This supports a threshold-preserving path at the primitive
+interface; it neither proves wallet migration nor removes signing interaction.
+[Current wallet interface](https://github.com/monero-oxide/monero-oxide/blob/9e11f5c0f2b18ab821192efa427c863086b51379/monero-oxide/wallet/src/send/multisig.rs#L79),
+[future share preprocessing](https://github.com/monero-oxide/monero-oxide/blob/31c26d96eaadbba910ffe3613ad8b4cf9c598a93/monero-oxide/ringct/fcmp%2B%2B/src/sal/legacy_multisig.rs#L119).
+
+**Restored share bytes are insufficient on their own.** dkg 0.6.1 serialization
+omits ephemeral scaling and offsets. The current wallet reapplies each output's
+offset and checks the resulting group point against its output key. A migration
+adapter must retain the opening metadata, restore the correct offset exactly
+once and preserve the future algorithm's interpolation behavior. WalletOutput
+metadata and scanning keys remain separate restoration obligations. Native
+wallet2 share import is outside this Rust-to-Rust comparison.
+[Key serialization](https://docs.rs/crate/dkg/0.6.1/source/src/lib.rs),
+[retained output data](https://github.com/monero-oxide/monero-oxide/blob/9e11f5c0f2b18ab821192efa427c863086b51379/monero-oxide/wallet/src/output.rs#L302).
+
+**The selected wallet consumer is the immediate missing component.** Its
+multisig sender is byte-identical to the captured 0.2.0 sender and finalizes
+`RctPrunable::Clsag`. Its multisig feature enables CLSAG signing. A successful
+execution of that path would therefore not test FCMP++ migration.
+[Sender finalization](https://github.com/monero-oxide/monero-oxide/blob/31c26d96eaadbba910ffe3613ad8b4cf9c598a93/monero-oxide/wallet/src/send/multisig.rs#L363),
+[wallet feature](https://github.com/monero-oxide/monero-oxide/blob/31c26d96eaadbba910ffe3613ad8b4cf9c598a93/monero-oxide/wallet/Cargo.toml#L78).
+
+The missing connection must map a retained legacy output and separately
+restored shares to `RerandomizedOutput`, original `y` and the exact signable
+transaction hash, then join spend authorization/linkability with membership
+proving and final transaction serialization. These are actual future algorithm
+[constructor inputs](https://github.com/monero-oxide/monero-oxide/blob/31c26d96eaadbba910ffe3613ad8b4cf9c598a93/monero-oxide/ringct/fcmp%2B%2B/src/sal/legacy_multisig.rs#L406),
+not an existing WalletOutput adapter. Its primitive test uses fresh
+dealer-generated keys, synthetic output components and a zero transaction hash;
+that does not demonstrate spending a retained historical reserve.
+
+The preflight ended at this source boundary without a new build or runtime
+test. Nine selected captures matched their retained sizes and SHA-256 hashes.
+The result identifies a missing wallet integration in the selected revision,
+not a fundamental impossibility or a requirement to wait for network activation.
+First identify an integrated future wallet and its owner; then run the
+historical-reserve experiment above without reconstructing the aggregate spend
+key. Incorrect opening/offset rejection and interrupted-operation recovery
+remain required. Other branches and native candidates were not re-evaluated
+by this preflight.
+
 ## 13. Work order and decision gates
 
 | Priority | Work | Completion evidence | Owner |
@@ -530,6 +587,13 @@ is not a prerequisite to that choice.
 
 Some of priorities 4 and 5 can progress alongside the missing joins. They must
 not be silently waived because a release is expected to arrive.
+
+The migration preflight makes one part of priority 1 concrete: agree the future
+wallet candidate and who owns the missing transaction integration before
+expanding engine-specific work. Continue reusable Rosen accounting and
+authorization work while qualifying that route. The decision between a
+current-protocol launch and a future-protocol launch remains with Rosen;
+neither should be treated as approved by this study.
 
 Qualifying candidate migration early informs the choice between launching
 before the fork and beginning directly on the future protocol. The former adds

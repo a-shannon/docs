@@ -26,6 +26,13 @@ records version scope, representative results and their limits. Neither test
 counts nor a successful isolated signature should be read as an end-to-end
 bridge demonstration.
 
+A bounded [migration preflight](technical-report.md#bounded-rust-migration-preflight)
+now identifies the selected Rust candidate's missing wallet connection. Existing
+threshold-share interfaces are encouraging, but that revision's wallet still
+produces CLSAG transactions. A complete FCMP++ migration experiment first needs
+an integrated future transaction path. This is a source finding, not a migration
+test result or an absence claim about every newer branch.
+
 The recent [FCMP++/Carrot beta 2.0 release](https://github.com/seraphis-migration/monero/releases/tag/v0.19.0.0-beta.2.0)
 is encouraging development evidence. It is a stressnet release dated 27 May
 2026, and explicitly lists multisig, transaction proofs and watch-only/cold

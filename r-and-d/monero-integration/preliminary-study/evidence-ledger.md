@@ -128,6 +128,28 @@ in this study. General recovery requirements and duplicate-output controls
 remain acceptance obligations rather than standalone evidence for waiting on
 the network upgrade.
 
+### Bounded migration preflight evidence
+
+The [migration preflight](technical-report.md#bounded-rust-migration-preflight)
+compares the published Rust wallet with the pinned Rust future candidate above.
+Nine selected source captures passed retained-manifest length and SHA-256
+checks: the target wallet manifest and sender; dkg 0.6.1 key implementation;
+the FCMP++ manifest, legacy multisig algorithm and its test; and the starting
+wallet's sender, output and view-pair definitions. No new build, runtime test,
+dependency-unification experiment or full migration was performed.
+
+| Deciding capture | SHA256 |
+| --- | --- |
+| Starting and target wallet multisig sender, identical captured bytes | `cbbd3766984d638f85137617df60a921b937ffd60c73312ba9c99b161427e165` |
+| Target legacy multisig algorithm | `0fe3210f34d1869c1bea0d4ce39313044dbdbf2450afbb54062a1b6aa80251ac` |
+| dkg 0.6.1 key implementation | `fad19f283b5cc10786ee2e5dee1c8f9dfb9dd82eea2b770ef8e8568dd4b96078` |
+
+The shared key interface and per-share U contribution support the proposed
+route at source level. The wallet still finalizes CLSAG, so an integrated future
+wallet consumer is a prerequisite to the full experiment. This finding is
+specific to the selected revision. Separate-agent documentary review found no
+material correction; it did not independently replay the nine-file hash check.
+
 Selected local artifact identities:
 
 | Artifact | SHA256 |
