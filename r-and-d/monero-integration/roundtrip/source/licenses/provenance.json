@@ -1,0 +1,70 @@
+{
+  "scope": "Verbatim upstream notices and attribution mapping only; no package-wide license is granted or changed",
+  "notices": [
+    {
+      "name": "rosen-guard",
+      "repository": "https://github.com/rosen-bridge/guard-service",
+      "revision": "1edc2fb982de4560c5265e04e2ed8b93d00b40df",
+      "scope": [
+        "guard-service/**",
+        "package.json",
+        "package-lock.json",
+        "tsconfig.base.json"
+      ],
+      "qualification": "Notice for upstream-origin portions of these files; locally authored additions are not assigned a new license by this mapping.",
+      "upstreamPath": "LICENSE",
+      "sourceUrl": "https://github.com/rosen-bridge/guard-service/blob/1edc2fb982de4560c5265e04e2ed8b93d00b40df/LICENSE",
+      "notice": "licenses/rosen-guard-LICENSE",
+      "bytes": 1069,
+      "sha256": "631fd05b6752788adc5cc2846e51f44c1b3cb17a72ba5cef85add98594aa8bd5"
+    },
+    {
+      "name": "rosen-watcher",
+      "repository": "https://github.com/rosen-bridge/watcher",
+      "revision": "13b4c76ee7803bdf5f052e33cdc12b66acac2db0",
+      "scope": [
+        "watcher/src/ergo/boxes.ts",
+        "watcher/src/ergo/utils.ts",
+        "watcher/src/utils/utils.ts",
+        "watcher/src/config/constants.ts"
+      ],
+      "upstreamPath": "LICENSE",
+      "sourceUrl": "https://github.com/rosen-bridge/watcher/blob/13b4c76ee7803bdf5f052e33cdc12b66acac2db0/LICENSE",
+      "notice": "licenses/rosen-watcher-LICENSE",
+      "bytes": 1068,
+      "sha256": "2cb4a2c6e9ae94c1eb80cabe25b403736ba8af3e3c4567751b8221edddda878f"
+    },
+    {
+      "name": "rosen-contract",
+      "repository": "https://github.com/rosen-bridge/contract",
+      "revision": "1b892c43f2d45eb6916f35e2edbb7560a4569f8e",
+      "scope": [
+        "ergo-node/contracts/Commitment.es",
+        "ergo-node/contracts/EventTrigger.es",
+        "ergo-node/contracts/Fraud.es",
+        "ergo-node/contracts/GuardSign.es",
+        "ergo-node/contracts/Lock.es",
+        "ergo-node/contracts/Permit.es"
+      ],
+      "upstreamPath": "LICENSE",
+      "sourceUrl": "https://github.com/rosen-bridge/contract/blob/1b892c43f2d45eb6916f35e2edbb7560a4569f8e/LICENSE",
+      "notice": "licenses/rosen-contract-LICENSE",
+      "bytes": 1069,
+      "sha256": "631fd05b6752788adc5cc2846e51f44c1b3cb17a72ba5cef85add98594aa8bd5"
+    },
+    {
+      "name": "monero-core",
+      "repository": "https://github.com/monero-project/monero",
+      "revision": "4f92268d7c16741cfb41e5bbe2aa46cc260a9ea5",
+      "scope": [
+        "proof/tx-proof.cpp"
+      ],
+      "qualification": "External Monero core headers and libraries used by this adapter. Those dependencies are not bundled. This notice does not assign Monero core licensing to the independently authored adapter.",
+      "upstreamPath": "LICENSE",
+      "sourceUrl": "https://github.com/monero-project/monero/blob/4f92268d7c16741cfb41e5bbe2aa46cc260a9ea5/LICENSE",
+      "notice": "licenses/monero-core-LICENSE",
+      "bytes": 2730,
+      "sha256": "c2fe351163f4e0cee45d38e9481f2ea60f3cb77b24f818c4a2c740383f2f4cb2"
+    }
+  ]
+}

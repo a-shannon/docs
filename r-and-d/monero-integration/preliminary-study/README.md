@@ -2,6 +2,12 @@
 
 A. Shannon · 13 September 2026
 
+**Implementation follow-up:** the [linked local roundtrip](../roundtrip/README.md)
+now demonstrates an actual Monero deposit, Ergo credit and exact-box redemption,
+then an authorized Monero payout and durable settlement. Its source package and
+report distinguish those node results from the remaining production watcher,
+custody and migration work. The study below remains the earlier decision basis.
+
 **Verdict: a technically credible, threshold-preserving integration path exists,
 supported by targeted native and Rosen experiments. Proceed to a bounded
 integration prototype. Complete bridge feasibility, production readiness and
@@ -46,6 +52,6 @@ binaries during autumn 2026, followed by activation in early March 2027. It is
 explicitly non-binding. The technical report distinguishes these targets from
 observed progress and Rosen readiness.
 
-The preliminary study is complete as a decision document. The immediate next
-technical milestone is a request and reservation backed retained Monero owner,
-followed by real Rosen approval consumption and signing.
+The preliminary study is complete as a decision document. The retained owner,
+Rosen approval consumption and local signing/settlement milestones are now
+covered by the [implementation follow-up](../roundtrip/technical-report.md).

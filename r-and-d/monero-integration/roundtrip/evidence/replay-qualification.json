@@ -1,0 +1,114 @@
+{
+  "schema": "local-roundtrip-replay-qualification-v1",
+  "scope": "Repeated fresh local campaigns using prepared dependencies and Ergo runtime, not an independent clean installation",
+  "qualifiedRun": "replay03",
+  "sourceFilesExcludingManifest": 308,
+  "sourceManifestSha256": "362021613e37f4dddbfae77d5bf0cc9611702d5e63a860d82f9d2a1f51c58558",
+  "aggregateSha256": "c7e5e747534902484d0f80ca4f88f2207369e451aad46b38662d9dbd4dfd25c1",
+  "rows": [
+    {
+      "run": "replay01",
+      "testPassed": true,
+      "testDurationSeconds": 130.702,
+      "wrapperQualified": true,
+      "manifestSha256": "a0d3dcf974e0780b761b548d372ed63b32a2bef68751afa1318b3815340ac0c6",
+      "aggregateSha256": "a6b8ac95e26fd414890193528ce5083339589319dbb576a711bd543014bbe3b7",
+      "nodeSha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "nativeSha256": "b543caef66ee0578aef62def04e350f197a259c1dd84e098f48f47d1585e7905",
+      "moneroDaemonSha256": "e69bf239e0acad637fc1bc257ba68661133fca77727f2ff6f25c8db917cfee42",
+      "finalTxId": "de6182960540cd58cbaed15bc35c1b24ad14e109ff931b8f23a843520906c6af",
+      "controls": {
+        "fourSeparateHolders": true,
+        "selected": [
+          1,
+          2
+        ],
+        "walletShares": 2,
+        "creditRetries": 0,
+        "ergoDuplicateReplayed": true,
+        "lostSubmissionReplyRecovered": true,
+        "originalProposalPreserved": true,
+        "sourceOutputSpent": true,
+        "settlement": "settled",
+        "signCalls": 1,
+        "recoveries": 5,
+        "submissions": 1,
+        "scans": 2
+      },
+      "rawBeforeSha256": "1970814851d6614a8c7f82e2d32e6c68a0336bcaa5ca5077391b83ba61e400fd",
+      "rawAfterSha256": "5a798958f242432b24fa268ad0a26d55afedd79675733249b2a92aa6834ddcc9",
+      "rawStdoutSha256": "0a8c7300357101d297b8a49027de28eee5c7455a9c9d63bcaa037dc14a162255",
+      "roundtripReceiptSha256": "2682b16991173d4cb0f25311f9b2eb38710ab3a6f683343582f465947b6c1e0e",
+      "qualificationScope": "Earlier launcher: checked source/mirror files and native/daemon binaries; not full later declared closure"
+    },
+    {
+      "run": "replay02",
+      "testPassed": true,
+      "testDurationSeconds": 157.017,
+      "wrapperQualified": false,
+      "manifestSha256": "7ff53083d6cd6e9174e3ab4924c21407e29f4c7e7a783c939ae5d8e50b24c334",
+      "aggregateSha256": "00ff7defbc6e3c0927c9488f60c9eb55aed445f57ef196fd452fdcf548177b67",
+      "nodeSha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "nativeSha256": "b543caef66ee0578aef62def04e350f197a259c1dd84e098f48f47d1585e7905",
+      "moneroDaemonSha256": "e69bf239e0acad637fc1bc257ba68661133fca77727f2ff6f25c8db917cfee42",
+      "finalTxId": "eb35cf79c2954aa914dbf2e610b98167e93054d7366d07bdb6ffcf90f103268b",
+      "controls": {
+        "fourSeparateHolders": true,
+        "selected": [
+          1,
+          2
+        ],
+        "walletShares": 2,
+        "creditRetries": 0,
+        "ergoDuplicateReplayed": true,
+        "lostSubmissionReplyRecovered": true,
+        "originalProposalPreserved": true,
+        "sourceOutputSpent": true,
+        "settlement": "settled",
+        "signCalls": 1,
+        "recoveries": 5,
+        "submissions": 1,
+        "scans": 2
+      },
+      "rawBeforeSha256": "c760b9559675a26983051a25e3b285f6af817af7ebcc6d46d18687efebeaf010",
+      "rawAfterSha256": "eb8b2f2f3924a923bf6ae14adbf43dcfdf712ffe85d1eedead0c5fa43eed42b7",
+      "rawStdoutSha256": "a854afe1ec6350e3e549f9b1a04bfd0976ca345c8475587f519297e85d445ae7",
+      "roundtripReceiptSha256": "8a46298630c47f49fd15974f60fa9b34ee7b1bffad22ecd5e204204ae4d19b4f",
+      "qualificationScope": "Actual linked test passed; closing input check failed. Original exception was discarded, so cause remains unknown. Subsequent read-only checks found no persistent drift."
+    },
+    {
+      "run": "replay03",
+      "testPassed": true,
+      "testDurationSeconds": 121.153,
+      "wrapperQualified": true,
+      "manifestSha256": "362021613e37f4dddbfae77d5bf0cc9611702d5e63a860d82f9d2a1f51c58558",
+      "aggregateSha256": "c7e5e747534902484d0f80ca4f88f2207369e451aad46b38662d9dbd4dfd25c1",
+      "nodeSha256": "3602f2bb1a10f2cbab4c36886218a33c1ab3db87290e73b033c46c77147d0237",
+      "nativeSha256": "b543caef66ee0578aef62def04e350f197a259c1dd84e098f48f47d1585e7905",
+      "moneroDaemonSha256": "e69bf239e0acad637fc1bc257ba68661133fca77727f2ff6f25c8db917cfee42",
+      "finalTxId": "43fba13433d6c42c374d45ddd53c287a18efb205b2967bd6cac2070f46549601",
+      "controls": {
+        "fourSeparateHolders": true,
+        "selected": [
+          1,
+          2
+        ],
+        "walletShares": 2,
+        "creditRetries": 0,
+        "ergoDuplicateReplayed": true,
+        "lostSubmissionReplyRecovered": true,
+        "originalProposalPreserved": true,
+        "sourceOutputSpent": true,
+        "settlement": "settled",
+        "signCalls": 1,
+        "recoveries": 5,
+        "submissions": 1,
+        "scans": 2
+      },
+      "rawBeforeSha256": "be3b998df491fc5370c014ba8b8a1663a09c568c8ace1490479d1d53eb894378",
+      "rawAfterSha256": "d48039ce0a374eee07d408253aab76d76d0444a637dbd4f62034d08b437b261f",
+      "rawStdoutSha256": "35a4c2a7d386c95b1021878c54136b9cf7d719b3138b5abc1ec1b38bd1fc648a",
+      "roundtripReceiptSha256": "831f130d2bf60373ac664ec1eaf14b864a366b68e01e535a7832ca68d6cabf31"
+    }
+  ]
+}

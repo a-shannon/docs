@@ -1,0 +1,113 @@
+{
+  "scope": "Only explicit caller configuration and source/dependency/runtime path relocation; native Rust and C++ sources unchanged",
+  "files": [
+    {
+      "path": "consumer/atomicAgreement.spec.ts",
+      "originalSha256": "2bb287e5b21cd3816d30ac13d45176fd6f6730cba84e157a4e55c96955d50f4c",
+      "relocatedSha256": "1f51846093e0eeafcd698dcbd6810f4cda012628305f6b9b92e8041675476405",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/baseline.ts",
+      "originalSha256": "07582db5533ee77e11ad286228ce37cf1e9675cf8da65c7d12ecb757d6003394",
+      "relocatedSha256": "822533641de86fac7f4d4c2595e58757805605c7fc19c48946d6486aa70c7465",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/depositSource.ts",
+      "originalSha256": "ffdd12181da037ebc0962df6cb33d2568e67eb756597737c2aa8e07dda3801fd",
+      "relocatedSha256": "1ee1c2960b5f636f5ba8e6de4c8c330fb2d42d43a9fb0293fa4b151619d4eb69",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/distributedWithdrawal.spec.ts",
+      "originalSha256": "605e9ad303ca10de1952e745959a63a71a3d50ed5e226e6f5c39d515e6475223",
+      "relocatedSha256": "c8629ba7b2fc12413d68e4f75b4823904227651f682355c279b133a5deb1e0ba",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/localMonero.ts",
+      "originalSha256": "119af2a6ae7134438fc2acb5a4638850c2c3eaaed8b456ff4a83a255d2759f5a",
+      "relocatedSha256": "dd7b525570ac8d7891681800f6b8e1e79c7d1beb88416ab913b74f981b422d5a",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/nativePin.ts",
+      "originalSha256": "6e521297af367b02fa832ad1c0ebde63337ad49703726e8c5dbfba170cf9cff8",
+      "relocatedSha256": "005639cbe3d6ceae46b6b83848233dcb24e6377de349d34ccbe3a8684b9e42c7",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/participantSigningFaults.spec.ts",
+      "originalSha256": "7b29af438451b3e3426bc0a82729fb5853751e54141f35f7342ecabf4c2629e6",
+      "relocatedSha256": "652cfb42198effb91059fca47f2412ca9afd3b91ce76c1959f4a5b7b63181019",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/roundtrip.spec.ts",
+      "originalSha256": "9fb2b478110157ae418d029495f6250ba97438b9ed91b4f20bf3c18fff01a6c0",
+      "relocatedSha256": "9cec23040ab35ecb5fd5118f5581cd48c1d6a44430d663dd8a95d056ea2c8c55",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/vitest.config.ts",
+      "originalSha256": "243f458db4b32006e1f1bfe0542f45e2c80cd58ab8adf62112430696471f4c6b",
+      "relocatedSha256": "a565badfc8d2e7521f89f6d49bde4974e8c75627c55a46fe86bbcd9746e6ae70",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "consumer/withdrawalJournal.spec.ts",
+      "originalSha256": "05d4ff2f129e73ccaa4b75a397067323be1836286d6b0184170e1f249c1f1da2",
+      "relocatedSha256": "8fe0c6456fbd8dcced027c71fa2a25363e2f00fc471ecd700041b7039ffbeeea",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "ergo-node/deposit-credit.mjs",
+      "originalSha256": "f34369f19d573eb26ee7d5a85823a9b557d25804d731c1c0498fe78b97f13d58",
+      "relocatedSha256": "0c53c31acadc3aa7d5c47256ac4e5006b9e8f0864fe192afaa7c26ccf66e0a18",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "ergo-node/deposit-credit.test.mjs",
+      "originalSha256": "349a2f23b1f46a31fe1ac85c938bae5e4c585a57d93f3c7ac5584076f3310517",
+      "relocatedSha256": "228d03ccbfd59d4f552a5e83dd5788d8c096a75ded360974f61022cece0acc93",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "ergo-node/deposit-loader.mjs",
+      "originalSha256": "5bb00ecb6991c335262ee5bd4c357ce537df050a4ce7c19ae418a99c47f6ba48",
+      "relocatedSha256": "32a865d33f3cfae98d211b040a06bc5aa18297c9f73f7203d4f4fcbdc94e0ab4",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "ergo-node/loader.mjs",
+      "originalSha256": "c46b046a95650202f4f1c407051463383acb03f829de19af896bb661954cd22a",
+      "relocatedSha256": "14d9936bd4dce7dc7fb762954206f6973a115b559a019f5157e9cf82fc3244af",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "ergo-node/rosen-node.mjs",
+      "originalSha256": "e3f00e71d6a2c9634330145baa0eeddc216ae47f71c7b1b28a328bad2d872662",
+      "relocatedSha256": "fe23ba6ae880e9a0f68ecc4dcf388d66abed8c760e25c76f77e1587226a75412",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "ergo-node/watcher-producer.mjs",
+      "originalSha256": "de0a9b09d62bb0079378b7abe4383d80008934339d107cfc31c76b9c2d50eed8",
+      "relocatedSha256": "2432a6b616efc0952a6da675b680128eda7caf0f4468c2acab002a1008bf219b",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    },
+    {
+      "path": "guard-service/tsconfig.json",
+      "originalSha256": "7b06fdb9c4ddae92f8c855b3a3d573ac6f68153afda12d523e051ad89e238980",
+      "relocatedSha256": "486550cfae6c0035732191fe28f7c6ad80ebafe434e1a87cd4b9f52145268667",
+      "reason": "Remove build-only sibling project references; execution uses pinned prepared distributions, preserving decorator compiler options"
+    },
+    {
+      "path": "proof/run.py",
+      "originalSha256": "ad6f03d8354c661a454198048174ee96f1132fcfb104716fbee581310ffb0b2b",
+      "relocatedSha256": "ed9d19ba40b18153ef74238a0ad4be45f5ac7cd5d66dcecba0363247d2523941",
+      "reason": "Caller configuration and packaged source/dependency path bindings only"
+    }
+  ]
+}

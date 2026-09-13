@@ -1,0 +1,973 @@
+{
+  "schema": "monero-tx-proof-artifact-provenance/v1",
+  "observedAtUtc": "2026-09-13T16:21:06.366959+00:00",
+  "scope": "Current artifact and source snapshot; no rebuild performed.",
+  "executable": {
+    "file": "tx-proof",
+    "bytes": 7407256,
+    "sha256": "667c8fed398197b6247081d023204e1e407e4533920fd45688428b7a21a5c237",
+    "buildId": "f8cdab1be23b202ef5e5dc430e2ebcaf1b745fc3",
+    "compilerComments": [
+      "GCC: (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0"
+    ]
+  },
+  "walletLibrary": {
+    "file": "libwallet.so",
+    "bytes": 72719112,
+    "sha256": "43a6a2796678ce0a4be2ac509a1b31f568aedebc992e55069baf90b4d84da59e",
+    "buildId": "266f928bb55420cbc274de14bf8de374361b3f53",
+    "compilerComments": [
+      "GCC: (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0"
+    ]
+  },
+  "dynamicLinkage": {
+    "method": "ldd resolved transitive dependencies at capture time",
+    "fileBackedCount": 63,
+    "libraries": [
+      {
+        "file": "ld-linux-x86-64.so.2",
+        "bytes": 240936,
+        "sha256": "41daf7836f7fce21a40ca63a00c5caf21b05a35a76ccc075d86f1716212cdf01",
+        "origin": "system",
+        "location": "ld-linux-x86-64.so.2",
+        "resolvedFile": "ld-linux-x86-64.so.2"
+      },
+      {
+        "file": "libblockchain_db.so",
+        "bytes": 7575232,
+        "sha256": "37a189cc004645d538f20de726dcfed24c2c52414c2fce561571d18fa755b5e8",
+        "origin": "monero-build",
+        "location": "monero-build/src/blockchain_db/libblockchain_db.so",
+        "resolvedFile": "libblockchain_db.so"
+      },
+      {
+        "file": "libboost_chrono.so.1.74.0",
+        "bytes": 39080,
+        "sha256": "dbc86224db88ac068e029c49500efe600744195e755b0307c0b04a69569a307e",
+        "origin": "system",
+        "location": "libboost_chrono.so.1.74.0",
+        "resolvedFile": "libboost_chrono.so.1.74.0"
+      },
+      {
+        "file": "libboost_filesystem.so.1.74.0",
+        "bytes": 125112,
+        "sha256": "545886948b178af06160dfd7590ee8be108bd1e28263bf63816e4a2c43cd0a59",
+        "origin": "system",
+        "location": "libboost_filesystem.so.1.74.0",
+        "resolvedFile": "libboost_filesystem.so.1.74.0"
+      },
+      {
+        "file": "libboost_program_options.so.1.74.0",
+        "bytes": 276664,
+        "sha256": "ea9cc5e083371770527e933345315e413dd7c460548d8f7e868004a67d88b482",
+        "origin": "system",
+        "location": "libboost_program_options.so.1.74.0",
+        "resolvedFile": "libboost_program_options.so.1.74.0"
+      },
+      {
+        "file": "libboost_regex.so.1.74.0",
+        "bytes": 989872,
+        "sha256": "e2b8b67932a6ab53544c7da1e6421fe7e75571feae5218d586b5c69d62ea1c49",
+        "origin": "system",
+        "location": "libboost_regex.so.1.74.0",
+        "resolvedFile": "libboost_regex.so.1.74.0"
+      },
+      {
+        "file": "libboost_serialization.so.1.74.0",
+        "bytes": 264536,
+        "sha256": "fc22380106a12299c1ffb7d13e1bec2db0e2bf265cf41d9b2fdde35bdae4403c",
+        "origin": "system",
+        "location": "libboost_serialization.so.1.74.0",
+        "resolvedFile": "libboost_serialization.so.1.74.0"
+      },
+      {
+        "file": "libboost_thread.so.1.74.0",
+        "bytes": 133312,
+        "sha256": "41c8fe93ef58c42bc46798ce7bb84cbb964185b7529547dec7e501f15bd8a2a0",
+        "origin": "system",
+        "location": "libboost_thread.so.1.74.0",
+        "resolvedFile": "libboost_thread.so.1.74.0"
+      },
+      {
+        "file": "libbsd.so.0",
+        "bytes": 89096,
+        "sha256": "e4ad21c203d8e8b9b7f49071311339af6b438026e1ad236403e3b379b022f23d",
+        "origin": "system",
+        "location": "libbsd.so.0",
+        "resolvedFile": "libbsd.so.0.11.5"
+      },
+      {
+        "file": "libc.so.6",
+        "bytes": 2220400,
+        "sha256": "b2cf6c33b74d2f22543b7a469a75b538911e690f769d0b238843a49465b83793",
+        "origin": "system",
+        "location": "libc.so.6",
+        "resolvedFile": "libc.so.6"
+      },
+      {
+        "file": "libcheckpoints.so",
+        "bytes": 4526360,
+        "sha256": "2c22cca2be32a17b2e0c6350161b5e5ed9c99e6718322e1a1ecb1ac07f0353fa",
+        "origin": "monero-build",
+        "location": "monero-build/src/checkpoints/libcheckpoints.so",
+        "resolvedFile": "libcheckpoints.so"
+      },
+      {
+        "file": "libcncrypto.so",
+        "bytes": 1771712,
+        "sha256": "a0a19339beddb8a46d325c09db8fc27c16af865f9ba131b5cd9f13237b54eab6",
+        "origin": "monero-build",
+        "location": "monero-build/src/crypto/libcncrypto.so",
+        "resolvedFile": "libcncrypto.so"
+      },
+      {
+        "file": "libcom_err.so.2",
+        "bytes": 18504,
+        "sha256": "f196091d8ec9790b4cd203ecdb0eab3b242d35ae8625ead7962d0a944a8fdfa5",
+        "origin": "system",
+        "location": "libcom_err.so.2",
+        "resolvedFile": "libcom_err.so.2.1"
+      },
+      {
+        "file": "libcommon.so",
+        "bytes": 17124584,
+        "sha256": "821620ea1bd1c32b8a34927a190760e2e91c56c06a51d04d7738ecf2f16b5cf5",
+        "origin": "monero-build",
+        "location": "monero-build/src/common/libcommon.so",
+        "resolvedFile": "libcommon.so"
+      },
+      {
+        "file": "libcrypto.so.3",
+        "bytes": 4455728,
+        "sha256": "7be3a37c9d754ec214b30db1d00ce329d22ccebd5654dd7c3f92010a7b1ccf07",
+        "origin": "system",
+        "location": "libcrypto.so.3",
+        "resolvedFile": "libcrypto.so.3"
+      },
+      {
+        "file": "libcryptonote_basic.so",
+        "bytes": 17448720,
+        "sha256": "6af9b4174a0aaa3a29280ce009940722c374ea5e1ad977b00f1a7b0043b9b9e1",
+        "origin": "monero-build",
+        "location": "monero-build/src/cryptonote_basic/libcryptonote_basic.so",
+        "resolvedFile": "libcryptonote_basic.so"
+      },
+      {
+        "file": "libcryptonote_core.so",
+        "bytes": 23735712,
+        "sha256": "13b2a3e46f4c6ef0ca8a9b1a46e90d2cd49defc55d0c9702ecf9fc1a8c3b266e",
+        "origin": "monero-build",
+        "location": "monero-build/src/cryptonote_core/libcryptonote_core.so",
+        "resolvedFile": "libcryptonote_core.so"
+      },
+      {
+        "file": "libcryptonote_format_utils_basic.so",
+        "bytes": 2699528,
+        "sha256": "94f608bec9df50211cf9533ec17ed44a53fb125663e5bbcc5e494267d0d1f787",
+        "origin": "monero-build",
+        "location": "monero-build/src/cryptonote_basic/libcryptonote_format_utils_basic.so",
+        "resolvedFile": "libcryptonote_format_utils_basic.so"
+      },
+      {
+        "file": "libdevice.so",
+        "bytes": 5915512,
+        "sha256": "1b0c24310cbab780bd99d54c096b66bddc382f764072bf4e2665159e660b5a89",
+        "origin": "monero-build",
+        "location": "monero-build/src/device/libdevice.so",
+        "resolvedFile": "libdevice.so"
+      },
+      {
+        "file": "libdevice_trezor.so",
+        "bytes": 33999592,
+        "sha256": "8a6833e84181c7fa30982a41ae823860890e6dd4f924fa6497cd39036c5f293a",
+        "origin": "monero-build",
+        "location": "monero-build/src/device_trezor/libdevice_trezor.so",
+        "resolvedFile": "libdevice_trezor.so"
+      },
+      {
+        "file": "libeasylogging.so",
+        "bytes": 4326712,
+        "sha256": "de128064a2279c8f5742b802d6b1d57c0ab18cc09cdc99e1e49c22e2f6a486b9",
+        "origin": "monero-build",
+        "location": "monero-build/external/easylogging++/libeasylogging.so",
+        "resolvedFile": "libeasylogging.so"
+      },
+      {
+        "file": "libepee.so",
+        "bytes": 31160488,
+        "sha256": "543b00e22177ff38f8c937938967b04d12da629be00a3716b5a6cc7691f5b338",
+        "origin": "monero-build",
+        "location": "monero-build/contrib/epee/src/libepee.so",
+        "resolvedFile": "libepee.so"
+      },
+      {
+        "file": "libevent-2.1.so.7",
+        "bytes": 338480,
+        "sha256": "eb79a3ec6eee59d4937cc3b4444654df6b7e6af4fd43cb18f670b6b565437cf3",
+        "origin": "system",
+        "location": "libevent-2.1.so.7",
+        "resolvedFile": "libevent-2.1.so.7.0.1"
+      },
+      {
+        "file": "libgcc_s.so.1",
+        "bytes": 125488,
+        "sha256": "fc9d43b2f6c20e53b009238f767c5b949d202389e20de9e202ea684b4ba3729a",
+        "origin": "system",
+        "location": "libgcc_s.so.1",
+        "resolvedFile": "libgcc_s.so.1"
+      },
+      {
+        "file": "libgmp.so.10",
+        "bytes": 526896,
+        "sha256": "4dc20a901c6951e678e216e959da2534bcef7053e6efdf1492509baf142282b0",
+        "origin": "system",
+        "location": "libgmp.so.10",
+        "resolvedFile": "libgmp.so.10.4.1"
+      },
+      {
+        "file": "libgssapi_krb5.so.2",
+        "bytes": 338648,
+        "sha256": "e367a86cae4e1e81d9bba594a9daea3b90eb50fadb62bb45e38a322184484867",
+        "origin": "system",
+        "location": "libgssapi_krb5.so.2",
+        "resolvedFile": "libgssapi_krb5.so.2.2"
+      },
+      {
+        "file": "libhardforks.so",
+        "bytes": 53040,
+        "sha256": "f9259fa4fc9d88ff57024424d30f539850218968933306ce2a1b970b74041be4",
+        "origin": "monero-build",
+        "location": "monero-build/src/hardforks/libhardforks.so",
+        "resolvedFile": "libhardforks.so"
+      },
+      {
+        "file": "libhidapi-libusb.so.0",
+        "bytes": 42136,
+        "sha256": "b3b40c255c08f537abf3d8912269ca81128c736813f8244b5691f48748c6d9fb",
+        "origin": "system",
+        "location": "libhidapi-libusb.so.0",
+        "resolvedFile": "libhidapi-libusb.so.0.0.0"
+      },
+      {
+        "file": "libhogweed.so.6",
+        "bytes": 289800,
+        "sha256": "47d56894948545036bd49aed718393bf6edb93fce222874dad30b59f085ad9ee",
+        "origin": "system",
+        "location": "libhogweed.so.6",
+        "resolvedFile": "libhogweed.so.6.4"
+      },
+      {
+        "file": "libicudata.so.70",
+        "bytes": 29476472,
+        "sha256": "c1404396288e178c8db2f30203cb8150e4d2c14cacee9a2883e0092f45399cc8",
+        "origin": "system",
+        "location": "libicudata.so.70",
+        "resolvedFile": "libicudata.so.70.1"
+      },
+      {
+        "file": "libicui18n.so.70",
+        "bytes": 3328472,
+        "sha256": "24fa78caa9b66c10c90711c51089f45273b643f132031172d54a3e98d711d48e",
+        "origin": "system",
+        "location": "libicui18n.so.70",
+        "resolvedFile": "libicui18n.so.70.1"
+      },
+      {
+        "file": "libicuuc.so.70",
+        "bytes": 2062664,
+        "sha256": "4683f3623dc47a92e862dc3c8770caff81c9f4c7e116bb672fc439737b06d88a",
+        "origin": "system",
+        "location": "libicuuc.so.70",
+        "resolvedFile": "libicuuc.so.70.1"
+      },
+      {
+        "file": "libk5crypto.so.3",
+        "bytes": 182864,
+        "sha256": "c62a2a983e0d9c1de76ab2f4cf21a4d81da007af9e0351b8c04740459d231d3f",
+        "origin": "system",
+        "location": "libk5crypto.so.3",
+        "resolvedFile": "libk5crypto.so.3.1"
+      },
+      {
+        "file": "libkeyutils.so.1",
+        "bytes": 22600,
+        "sha256": "ad20d5fb89df5297073b46373c65bfbb01f33a00b4949894055d29a7fcf00900",
+        "origin": "system",
+        "location": "libkeyutils.so.1",
+        "resolvedFile": "libkeyutils.so.1.9"
+      },
+      {
+        "file": "libkrb5.so.3",
+        "bytes": 827936,
+        "sha256": "9386cfdeb2f894869cdd0190b4f110a65ec0c257ac50ddefaefd6cbaeaab3c35",
+        "origin": "system",
+        "location": "libkrb5.so.3",
+        "resolvedFile": "libkrb5.so.3.3"
+      },
+      {
+        "file": "libkrb5support.so.0",
+        "bytes": 52016,
+        "sha256": "3160dcc37106767e1afb341ee3cb3cd25bb79246691ffd137131f37a23597288",
+        "origin": "system",
+        "location": "libkrb5support.so.0",
+        "resolvedFile": "libkrb5support.so.0.1"
+      },
+      {
+        "file": "liblmdb.so",
+        "bytes": 236912,
+        "sha256": "25f17db2c77c55e755676bdffa1f1b919f7cc79cdb9fb8e4b343956909c7bab0",
+        "origin": "monero-build",
+        "location": "monero-build/external/db_drivers/liblmdb/liblmdb.so",
+        "resolvedFile": "liblmdb.so"
+      },
+      {
+        "file": "libm.so.6",
+        "bytes": 940560,
+        "sha256": "3dd5511ae94785c9f921429b0f2b2f7aabb461b6f0e6de6dfdbef15f24bdfee6",
+        "origin": "system",
+        "location": "libm.so.6",
+        "resolvedFile": "libm.so.6"
+      },
+      {
+        "file": "libmd.so.0",
+        "bytes": 47472,
+        "sha256": "bb376813876bb214535bbbdac70f2c0c4b00baecb81557dab78a79518248df06",
+        "origin": "system",
+        "location": "libmd.so.0",
+        "resolvedFile": "libmd.so.0.0.5"
+      },
+      {
+        "file": "libmnemonics.so",
+        "bytes": 3489376,
+        "sha256": "215a5095bf9fb0bf341ffd5e779c1ab16d53a39c58100f4df5016708cc629054",
+        "origin": "monero-build",
+        "location": "monero-build/src/mnemonics/libmnemonics.so",
+        "resolvedFile": "libmnemonics.so"
+      },
+      {
+        "file": "libmultisig.so",
+        "bytes": 9775152,
+        "sha256": "d5bc66b7c89b980cea94f074917bc86997a9cc13097a53f3d878995f3a02fae4",
+        "origin": "monero-build",
+        "location": "monero-build/src/multisig/libmultisig.so",
+        "resolvedFile": "libmultisig.so"
+      },
+      {
+        "file": "libnet.so",
+        "bytes": 22278840,
+        "sha256": "595f9ecfe1ea10363b037e1a8e5df7ac64d8c663d6c7ee429e5fb0ae6df92679",
+        "origin": "monero-build",
+        "location": "monero-build/src/net/libnet.so",
+        "resolvedFile": "libnet.so"
+      },
+      {
+        "file": "libnettle.so.8",
+        "bytes": 281000,
+        "sha256": "2d3bda6cfa2d477cd91b8178843d19e081b911a124f04b4be06b6e32c9fabc73",
+        "origin": "system",
+        "location": "libnettle.so.8",
+        "resolvedFile": "libnettle.so.8.4"
+      },
+      {
+        "file": "libnorm.so.1",
+        "bytes": 497824,
+        "sha256": "cc5c631eb267f0159baee696a3fead708397ccc095ddbcde434f678582cb0481",
+        "origin": "system",
+        "location": "libnorm.so.1",
+        "resolvedFile": "libnorm.so.1"
+      },
+      {
+        "file": "libpgm-5.3.so.0",
+        "bytes": 310264,
+        "sha256": "fcc27728d8db55fff51c782a665f37f1e5c54f3a37872a272688800e962e0dda",
+        "origin": "system",
+        "location": "libpgm-5.3.so.0",
+        "resolvedFile": "libpgm-5.3.so.0.0.128"
+      },
+      {
+        "file": "libprotobuf.so.23",
+        "bytes": 2886336,
+        "sha256": "4698f37e13553d965c752239367336d048d803453a236cdbb04b683cbe42b590",
+        "origin": "system",
+        "location": "libprotobuf.so.23",
+        "resolvedFile": "libprotobuf.so.23.0.4"
+      },
+      {
+        "file": "libpthread.so.0",
+        "bytes": 21448,
+        "sha256": "fbed9505adacada2abb37c6b43be2df6de81e742712c6025694ba48de62c7e78",
+        "origin": "system",
+        "location": "libpthread.so.0",
+        "resolvedFile": "libpthread.so.0"
+      },
+      {
+        "file": "librandomx.so",
+        "bytes": 1471136,
+        "sha256": "bb71aeba0bef7bb4a0085cc77cf9f6464b1b0488923b23890d7b449ef36ef8ec",
+        "origin": "monero-build",
+        "location": "monero-build/external/randomx/librandomx.so",
+        "resolvedFile": "librandomx.so"
+      },
+      {
+        "file": "libresolv.so.2",
+        "bytes": 64456,
+        "sha256": "7230adfc1d3676f2485bec78f2d5c916d6becb15bc554ff95901f46800215194",
+        "origin": "system",
+        "location": "libresolv.so.2",
+        "resolvedFile": "libresolv.so.2"
+      },
+      {
+        "file": "libringct.so",
+        "bytes": 4098032,
+        "sha256": "36cf9e227623fb2f4e02b9c5e109e862df07b4f6310e984604101582dcb9ecb4",
+        "origin": "monero-build",
+        "location": "monero-build/src/ringct/libringct.so",
+        "resolvedFile": "libringct.so"
+      },
+      {
+        "file": "libringct_basic.so",
+        "bytes": 5135984,
+        "sha256": "78465a3f572102ab5def72f5f2a3eafa8bf87cc8d61bfb2fa34affc1dc5f9746",
+        "origin": "monero-build",
+        "location": "monero-build/src/ringct/libringct_basic.so",
+        "resolvedFile": "libringct_basic.so"
+      },
+      {
+        "file": "librpc_base.so",
+        "bytes": 5750368,
+        "sha256": "8c85e5fef57c61045dd4a38a40da2962f796ac843ee5624228b79dcc157001a7",
+        "origin": "monero-build",
+        "location": "monero-build/src/rpc/librpc_base.so",
+        "resolvedFile": "librpc_base.so"
+      },
+      {
+        "file": "libsodium.so.23",
+        "bytes": 350944,
+        "sha256": "f1e78ef8deb65b13d62873fab71546ccab06c77a0115891e55ce8fb108518f96",
+        "origin": "system",
+        "location": "libsodium.so.23",
+        "resolvedFile": "libsodium.so.23.3.0"
+      },
+      {
+        "file": "libssl.so.3",
+        "bytes": 667864,
+        "sha256": "3db6aff36baf2ced6dde3f340159edd2504f089c0d735765596ce96d2d835cb1",
+        "origin": "system",
+        "location": "libssl.so.3",
+        "resolvedFile": "libssl.so.3"
+      },
+      {
+        "file": "libstdc++.so.6",
+        "bytes": 2260296,
+        "sha256": "ff0825e113603c3866680d5d52216bc6d8eedf3a59f52a0aef67ff01994db128",
+        "origin": "system",
+        "location": "libstdc++.so.6",
+        "resolvedFile": "libstdc++.so.6.0.30"
+      },
+      {
+        "file": "libudev.so.1",
+        "bytes": 166240,
+        "sha256": "1f47ab3bd9929605e30935503e339b6f5dcceb71595f0716377be1318962561d",
+        "origin": "system",
+        "location": "libudev.so.1",
+        "resolvedFile": "libudev.so.1.7.2"
+      },
+      {
+        "file": "libunbound.so.8",
+        "bytes": 943744,
+        "sha256": "72fbbeb9c28a57af4dab091a605e35dbd2edc52d6a872845378834904707150d",
+        "origin": "system",
+        "location": "libunbound.so.8",
+        "resolvedFile": "libunbound.so.8.1.12"
+      },
+      {
+        "file": "libusb-1.0.so.0",
+        "bytes": 117736,
+        "sha256": "919e7ca7633bde351a097843638d1871c497211626e6c355140e898e61d2a84c",
+        "origin": "system",
+        "location": "libusb-1.0.so.0",
+        "resolvedFile": "libusb-1.0.so.0.3.0"
+      },
+      {
+        "file": "libversion.so",
+        "bytes": 33544,
+        "sha256": "7530063f99cb9e7febf52cbbb72f43d6d2bfb2704fd7134edd6561db5a0ee895",
+        "origin": "monero-build",
+        "location": "monero-build/src/libversion.so",
+        "resolvedFile": "libversion.so"
+      },
+      {
+        "file": "libwallet-crypto.so",
+        "bytes": 166512,
+        "sha256": "b5f33cb342c9284977831803d430c6046ad67aa60a0a7a7036d9aa2b3318b43b",
+        "origin": "monero-build",
+        "location": "monero-build/src/crypto/wallet/libwallet-crypto.so",
+        "resolvedFile": "libwallet-crypto.so"
+      },
+      {
+        "file": "libwallet.so",
+        "bytes": 72719112,
+        "sha256": "43a6a2796678ce0a4be2ac509a1b31f568aedebc992e55069baf90b4d84da59e",
+        "origin": "monero-build",
+        "location": "monero-build/src/wallet/libwallet.so",
+        "resolvedFile": "libwallet.so"
+      },
+      {
+        "file": "libz.so.1",
+        "bytes": 108936,
+        "sha256": "64c206f0146cc58bbddc4f22054436f4ff278f5a554aa3ce6921ddf7e9133370",
+        "origin": "system",
+        "location": "libz.so.1",
+        "resolvedFile": "libz.so.1.2.11"
+      },
+      {
+        "file": "libzmq.so.5",
+        "bytes": 634936,
+        "sha256": "540a8defe7b1e1494ac553843a2bea88eaf5426bf367782b5ca6a5a01360989f",
+        "origin": "system",
+        "location": "libzmq.so.5",
+        "resolvedFile": "libzmq.so.5.2.4"
+      }
+    ],
+    "virtualUnhashable": [
+      "linux-vdso.so.1"
+    ],
+    "allResolved": true
+  },
+  "source": {
+    "head": "4f92268d7c16741cfb41e5bbe2aa46cc260a9ea5",
+    "clean": false,
+    "changedFiles": [
+      {
+        "status": " M",
+        "file": "src/multisig/CMakeLists.txt",
+        "bytes": 2193,
+        "sha256": "a41d299f670db82c085d5f453e2339157f648ccc54cbe9c16f17434bf2c2cc25"
+      },
+      {
+        "status": " M",
+        "file": "src/multisig/multisig_clsag_context.cpp",
+        "bytes": 11139,
+        "sha256": "7b40d6d080f26fd7d4c8d453b078b12aea1a8dfada756e535c9f9e5d5521714d"
+      },
+      {
+        "status": " M",
+        "file": "src/multisig/multisig_clsag_context.h",
+        "bytes": 5967,
+        "sha256": "b4ae33f615f5f9ca3b62a352a60414b986e9b0fe58563e17fcf04e436cc171ca"
+      },
+      {
+        "status": " M",
+        "file": "src/multisig/multisig_tx_builder_ringct.cpp",
+        "bytes": 47181,
+        "sha256": "288ead3425c4ecf6105b6ebd6be021f2faf3c1ec95424ff5a8c4552932e50442"
+      },
+      {
+        "status": " M",
+        "file": "src/multisig/multisig_tx_builder_ringct.h",
+        "bytes": 5887,
+        "sha256": "87dde9af6fc3f245c351f3d05180b802b42f57f206cd191d3872b2be5fad7387"
+      },
+      {
+        "status": " M",
+        "file": "src/wallet/CMakeLists.txt",
+        "bytes": 3489,
+        "sha256": "508031dc24e59a306e0d1090db0b223d3b066b6a7bde40619fffaf576958d413"
+      },
+      {
+        "status": " M",
+        "file": "src/wallet/wallet2.cpp",
+        "bytes": 723106,
+        "sha256": "82066414fac89872e5f3c5c7918e100ecf3264f2b6ef2ad929ed9baf340effc1"
+      },
+      {
+        "status": " M",
+        "file": "src/wallet/wallet2.h",
+        "bytes": 131763,
+        "sha256": "e95b25c676386ffdc1bb0360b2f0250ea29e9ab1b97276076112c45b832efd52"
+      },
+      {
+        "status": " M",
+        "file": "tests/core_tests/CMakeLists.txt",
+        "bytes": 2978,
+        "sha256": "ccf78e05c20e7bffbc34ecba63b888c9dcb4c1ec04f87990d5a1838f8a12afb6"
+      },
+      {
+        "status": " M",
+        "file": "tests/core_tests/chaingen_main.cpp",
+        "bytes": 16736,
+        "sha256": "54c15f11592741030aaf67cd55c4f8c5f9bd41f427e9e4f5d9e4320221fd1713"
+      },
+      {
+        "status": " M",
+        "file": "tests/core_tests/multisig.cpp",
+        "bytes": 65231,
+        "sha256": "5fb902a5d713fbc034c2088e5671084f18c1495671eeb9f1c2ab237e62490d7b"
+      },
+      {
+        "status": " M",
+        "file": "tests/core_tests/multisig.h",
+        "bytes": 12838,
+        "sha256": "d1c8d09036ca0d97f34fdb5a218df5704bae662359763eadb42fb0e0b971dfec"
+      },
+      {
+        "status": " M",
+        "file": "tests/unit_tests/CMakeLists.txt",
+        "bytes": 4206,
+        "sha256": "7ceb071fa79ad86f2c09a4d215ce681a8c7c6489c69b951a8e68017d78f506dd"
+      },
+      {
+        "status": "??",
+        "file": "src/multisig/multisig_key_image_evidence.cpp",
+        "bytes": 9454,
+        "sha256": "47c579881b6bab7463a52adee2e5201ffe035bb411760008826575c05ba8da3f"
+      },
+      {
+        "status": "??",
+        "file": "src/multisig/multisig_key_image_evidence.h",
+        "bytes": 2917,
+        "sha256": "04bde34c2af425b687e6010c388490bad5803da75c0a8bafa6efbc5946f2e26c"
+      },
+      {
+        "status": "??",
+        "file": "src/wallet/initial_preparation_capsule.cpp",
+        "bytes": 5025,
+        "sha256": "cf0f9f7e0f65fceb1fa589f6a9dca1aed8bd3b97d904f7b787f78bb90b718fcc"
+      },
+      {
+        "status": "??",
+        "file": "src/wallet/initial_preparation_capsule.h",
+        "bytes": 1917,
+        "sha256": "18b3d1203cdd8d796f9bff4bd95933f6fb01897d54f45e46e01f5382e937fc3b"
+      },
+      {
+        "status": "??",
+        "file": "src/wallet/preparation_capsule_aead.cpp",
+        "bytes": 3416,
+        "sha256": "a82a3e5112593f4437d5daf648ba642ecf1482e98317f688e7f9713fcdebffb5"
+      },
+      {
+        "status": "??",
+        "file": "src/wallet/preparation_capsule_codec.cpp",
+        "bytes": 41183,
+        "sha256": "966748155404fbad2ed1a514b00e63466db1b22e299a5145fb7c40ecb45b0259"
+      },
+      {
+        "status": "??",
+        "file": "src/wallet/preparation_capsule_codec.h",
+        "bytes": 4465,
+        "sha256": "1841952b3db2732b45e4f4032bb129aedf22e7fb8969861d96fc8bd446b8d208"
+      },
+      {
+        "status": "??",
+        "file": "src/wallet/preparation_custody_store.cpp",
+        "bytes": 47070,
+        "sha256": "000fa9478b0a4854f98cba4b5f23aca3a4943f7d1a8c77efb9dd9498bdd58e6a"
+      },
+      {
+        "status": "??",
+        "file": "src/wallet/preparation_custody_store.h",
+        "bytes": 5669,
+        "sha256": "5ee3490e1757ff130f2cd9dcbcffb35e7f84feb69027aa6b7ebe1258dea07432"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/managed_wallet_owner.cpp",
+        "bytes": 59650,
+        "sha256": "5b4c4e83585d219f73dc92e868cc40482ffa706168721d13bbc63d09ffbb6bf1"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/managed_wallet_owner.h",
+        "bytes": 690,
+        "sha256": "67d01004f8ab8570f2ad66a1ad6b20f0e5f50efd0a0477fbb155b41fbe0968a7"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/native_deposit_provider.cpp",
+        "bytes": 47407,
+        "sha256": "613f341f3e26648e00b36d91b546d8755da4898bbe4ab3854f345266039e02c6"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/native_deposit_provider.h",
+        "bytes": 1171,
+        "sha256": "ab2383bff606cd3f83337d4f0944a37fb93fc3dafb0459623d62e57ccd667cee"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/preparation_capsule.cpp",
+        "bytes": 33412,
+        "sha256": "fb5eb6e1ba139c84cb5fd3afbeee50ff505d4650928995edb023a6e1b52022c2"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/preparation_capsule.h",
+        "bytes": 1814,
+        "sha256": "7d8e901b645e2be74001832b91cc1a7b29142d08e5e611a2015058c2e5c7d58b"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/preparation_custody.cpp",
+        "bytes": 37383,
+        "sha256": "a1f9c6ddce83732674957cc5f98c2f94f48ee51da0321d244ad67e7a0376ef02"
+      },
+      {
+        "status": "??",
+        "file": "tests/core_tests/preparation_custody.h",
+        "bytes": 326,
+        "sha256": "96f0976454ff5f16d68599894ef12f4f5d88d43248e97174b196c575e5e8e60e"
+      },
+      {
+        "status": "??",
+        "file": "tests/unit_tests/multisig_key_image_evidence.cpp",
+        "bytes": 25169,
+        "sha256": "5e097af95ef252489c1e608762c780d7e96a80342a00502b6b5b15d70dc56507"
+      },
+      {
+        "status": "??",
+        "file": "tests/unit_tests/preparation_capsule.cpp",
+        "bytes": 13370,
+        "sha256": "587c214c1bff6f671b88d4f9d166bbc54871af6c07f525970d7bdd8256752825"
+      }
+    ],
+    "walletProofMethods": [
+      {
+        "method": "get_tx_proof",
+        "overload": "txid",
+        "currentStartLine": 13054,
+        "currentEndLine": 13091,
+        "headStartLine": 12930,
+        "headEndLine": 12967,
+        "regionSha256": "dbbe97d1cf1308098674892c3cd957b76c58c6ea7e37083826a803160cec4334",
+        "byteEqualToHead": true,
+        "overlapsCurrentDiffHunks": false
+      },
+      {
+        "method": "get_tx_proof",
+        "overload": "transaction",
+        "currentStartLine": 13093,
+        "currentEndLine": 13201,
+        "headStartLine": 12969,
+        "headEndLine": 13077,
+        "regionSha256": "856961727c50380e49ad91f3da0a79335c8dcfc6624180acee914e19f5209a12",
+        "byteEqualToHead": true,
+        "overlapsCurrentDiffHunks": false
+      },
+      {
+        "method": "check_tx_proof",
+        "overload": "txid",
+        "currentStartLine": 13203,
+        "currentEndLine": 13244,
+        "headStartLine": 13079,
+        "headEndLine": 13120,
+        "regionSha256": "ab6d2259c88c16146fed500e36291540b1a8799e79ef044228bec6ebf13f1c90",
+        "byteEqualToHead": true,
+        "overlapsCurrentDiffHunks": false
+      },
+      {
+        "method": "check_tx_proof",
+        "overload": "transaction",
+        "currentStartLine": 13246,
+        "currentEndLine": 13342,
+        "headStartLine": 13122,
+        "headEndLine": 13218,
+        "regionSha256": "17297619398d023a871df0665077ab1f824261abae8e24ecbfebe343d41fd5da",
+        "byteEqualToHead": true,
+        "overlapsCurrentDiffHunks": false
+      }
+    ]
+  },
+  "buildProvenance": {
+    "recordedManifest": {
+      "adapter": {
+        "file": "tx-proof.cpp",
+        "bytes": 4274,
+        "sha256": "3234c5227de6f55a0493c817b629c232159de165231c9fd567aebb7f122bb631"
+      },
+      "executable": {
+        "file": "tx-proof",
+        "bytes": 7407256,
+        "sha256": "667c8fed398197b6247081d023204e1e407e4533920fd45688428b7a21a5c237"
+      },
+      "walletLibrary": {
+        "file": "libwallet.so",
+        "bytes": 72719112,
+        "sha256": "43a6a2796678ce0a4be2ac509a1b31f568aedebc992e55069baf90b4d84da59e"
+      },
+      "walletSource": {
+        "file": "wallet2.cpp",
+        "bytes": 723106,
+        "sha256": "82066414fac89872e5f3c5c7918e100ecf3264f2b6ef2ad929ed9baf340effc1"
+      }
+    },
+    "recordedManifestPin": {
+      "file": "proof-build/build.json",
+      "bytes": 613,
+      "sha256": "8d2f7639557583fcdb12404b9ab4c5bc5d6281b6b6232a2c2a0a076e12dc415d"
+    },
+    "recordedPinsMatchCurrent": true,
+    "adapterSource": {
+      "file": "proof/tx-proof.cpp",
+      "bytes": 4274,
+      "sha256": "3234c5227de6f55a0493c817b629c232159de165231c9fd567aebb7f122bb631"
+    },
+    "buildRecipe": {
+      "file": "proof/build.py",
+      "bytes": 1334,
+      "sha256": "1523113d9dc7cce855076a6ffffb04e3302538efd8e1a7f7efd2ec4a048622f6"
+    },
+    "recipeObservation": "Recipe compiles the adapter with generated core_tests defines/includes/flags and reuses link inputs after the core_tests output argument. Current recipe and metadata observed; the historical command invocation is not independently reconstructed.",
+    "metadata": [
+      {
+        "file": "monero-build/CMakeCache.txt",
+        "bytes": 50775,
+        "sha256": "8e02985d6380d2aeaba2374230f03c5fb8b458b5421e441ed069b54ec995915e"
+      },
+      {
+        "file": "monero-build/compile_commands.json",
+        "bytes": 694174,
+        "sha256": "c27310907f238ba69d9d8036b68d3ecd5996179d6e0b53160895be3c73970ee3"
+      },
+      {
+        "file": "monero-build/src/wallet/CMakeFiles/wallet.dir/link.txt",
+        "bytes": 3735,
+        "sha256": "1540c4cbe330acb4beb61f2b6a5ed6a5e414eb1758892ab80bd105291a62b7ff"
+      },
+      {
+        "file": "monero-build/src/wallet/CMakeFiles/wallet.dir/flags.make",
+        "bytes": 1577,
+        "sha256": "55cf6436bbeef1c2539bb053720226e30ddcaff30446a3b97dbe986715ff5ae1"
+      },
+      {
+        "file": "monero-build/tests/core_tests/CMakeFiles/core_tests.dir/link.txt",
+        "bytes": 4204,
+        "sha256": "f56a3e7cdf6185307349b7cdec1a838442d2f37409dd02e31be69b711e23571c"
+      },
+      {
+        "file": "monero-build/tests/core_tests/CMakeFiles/core_tests.dir/flags.make",
+        "bytes": 1568,
+        "sha256": "63e57a1d321dbb60436238a98ae8d74f7bf6b08476ef5b2e070d10e66d6f1c13"
+      }
+    ],
+    "cmakeSettings": {
+      "ARCH": "native",
+      "BUILD_SHARED_LIBS": "ON",
+      "BUILD_TESTS": "ON",
+      "CMAKE_BUILD_TYPE": "Debug",
+      "CMAKE_CXX_FLAGS": "",
+      "CMAKE_CXX_FLAGS_DEBUG": "-g",
+      "CMAKE_CXX_FLAGS_MINSIZEREL": "-Os -DNDEBUG",
+      "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG",
+      "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -DNDEBUG",
+      "STATIC": "OFF",
+      "CMAKE_GENERATOR": "Unix Makefiles"
+    },
+    "adapterCompilerFlags": [
+      "-pthread",
+      "-maes",
+      "-march=native",
+      "-fno-strict-aliasing",
+      "-D_GNU_SOURCE",
+      "-Wall",
+      "-Wextra",
+      "-Wpointer-arith",
+      "-Wundef",
+      "-Wvla",
+      "-Wwrite-strings",
+      "-Wno-error=extra",
+      "-Wno-error=deprecated-declarations",
+      "-Wno-unused-parameter",
+      "-Wno-error=unused-variable",
+      "-Wno-error=undef",
+      "-Wno-error=uninitialized",
+      "-Wlogical-op",
+      "-Wno-error=maybe-uninitialized",
+      "-Wno-error=cpp",
+      "-Wno-reorder",
+      "-Wno-missing-field-initializers",
+      "-fPIC",
+      "-Wformat",
+      "-Wformat-security",
+      "-fstack-protector",
+      "-fstack-protector-strong",
+      "-fcf-protection=full",
+      "-fstack-clash-protection",
+      "-Werror=switch",
+      "-Werror=return-type",
+      "-fno-strict-aliasing",
+      "-ftemplate-depth=900",
+      "-g",
+      "-g3",
+      "-std=c++14"
+    ],
+    "adapterLinkLibraryInputs": [
+      "libblockchain_db.so",
+      "libboost_chrono.so",
+      "libboost_date_time.so",
+      "libboost_filesystem.so",
+      "libboost_program_options.so",
+      "libboost_regex.so",
+      "libboost_serialization.so",
+      "libboost_thread.so",
+      "libcheckpoints.so",
+      "libcncrypto.so",
+      "libcommon.so",
+      "libcrypto.so",
+      "libcryptonote_basic.so",
+      "libcryptonote_core.so",
+      "libcryptonote_format_utils_basic.so",
+      "libdevice.so",
+      "libdevice_trezor.so",
+      "libeasylogging.so",
+      "libepee.so",
+      "libgssapi_krb5.so",
+      "libhardforks.so",
+      "libhidapi-libusb.so",
+      "liblmdb.so",
+      "libmd.so",
+      "libmnemonics.so",
+      "libmultisig.so",
+      "libnet.so",
+      "libnorm.so",
+      "libp2p.so",
+      "libpgm.so",
+      "libprotobuf.so",
+      "libprotokit.a",
+      "librandomx.so",
+      "libringct.so",
+      "libringct_basic.so",
+      "librpc_base.so",
+      "librt.a",
+      "libsodium.so",
+      "libssl.so",
+      "libunbound.so",
+      "libusb-1.0.so",
+      "libversion.so",
+      "libwallet-crypto.so",
+      "libwallet.so",
+      "libzmq.so"
+    ],
+    "currentTools": {
+      "cxxVersion": "c++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0",
+      "cxxExecutable": {
+        "file": "x86_64-linux-gnu-g++-11",
+        "bytes": 932680,
+        "sha256": "2360901d864cf10bfd6296e261cb2c14053552a80377761ab07146ec9ec9a2c0"
+      },
+      "linkerVersion": "GNU ld (GNU Binutils for Ubuntu) 2.38",
+      "linkerExecutable": {
+        "file": "x86_64-linux-gnu-ld.bfd",
+        "bytes": 1744376,
+        "sha256": "7b1bd5779623ca05667ad2f0098307841514f25d0d49deebd9d3543fa9eabc5f"
+      },
+      "cmakeVersion": "cmake version 3.22.1"
+    }
+  },
+  "limitations": [
+    "A clean reproducible build is not established.",
+    "The modified source tree and existing research libraries are pinned as observed; this does not prove that every current source file produced the corresponding binary.",
+    "The four wallet2 proof method regions equal HEAD, but modified surrounding code and transitive libraries remain part of the executable dependency closure.",
+    "Dynamic linkage is a resolver snapshot, not a loaded-process memory measurement or a record of future dlopen activity."
+  ]
+}

@@ -14,7 +14,7 @@ The proposed initial scope is **Monero ↔ Ergo**, with one active vault per con
 
 The intended outcome is a complete cycle: receive XMR, recognize and allocate the deposit, materialize the corresponding credit, accept its withdrawal, pay XMR and recover each interrupted operation without a second credit, a second payment or unsafe nonce reuse.
 
-**Current status: a supported design and primitives tested within a bounded scope. The integrated adapter, new native interfaces and their operational guarantees remain to be implemented.** The validation criteria below are work to be carried out, except where a previous result is expressly identified.
+**Update, 13 September 2026: a linked Monero → Ergo → Monero cycle now passes on isolated actual nodes.** It joins a real deposit, proof and unique allocation to an actual Ergo credit, redemption of that exact box, Rosen agreement, signing by two original distributed-key holders, and observed Monero settlement with lost-reply recovery. The [roundtrip report and source package](monero-integration/roundtrip/README.md) give the implementation, evidence and replay prerequisites. Source authority and watcher triggers remain a local operator fixture; production watcher integration, independent custody deployment, operational qualification and FCMP++/Carrot migration remain open. The design table below records the original solution basis; its initial evidence states are superseded only where the roundtrip report demonstrates the corresponding bounded implementation.
 
 ## 2. Established design solutions and their component mapping
 

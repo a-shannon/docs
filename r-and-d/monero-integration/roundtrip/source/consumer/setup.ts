@@ -1,0 +1,10 @@
+import {DefaultLogger,DummyLogger} from '@rosen-bridge/abstract-logger';
+import {beforeEach,afterEach} from 'vitest';
+import {trace} from './trace';
+DefaultLogger.init(new DummyLogger());
+trace('worker-setup',{});
+beforeEach(context=>{trace('test-start',{name:context.task.name});});
+afterEach(context=>{trace('test-end',{name:context.task.name});});
+process.on('w1hb-fault',data=>{trace('fault-observed',data as Record<string,unknown>);});
+process.on('w1hb-transport',data=>{trace('transport-received',data as Record<string,unknown>);});
+process.on('w1hb-transport-reject',data=>{trace('transport-rejected',data as Record<string,unknown>);});

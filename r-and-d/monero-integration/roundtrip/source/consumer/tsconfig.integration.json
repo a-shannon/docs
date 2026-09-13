@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.json","compilerOptions":{"experimentalDecorators":true,"emitDecoratorMetadata":true,"useUnknownInCatchVariables":false,"resolveJsonModule":true},"include":["integration.ts","integration.spec.ts"]}

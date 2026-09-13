@@ -32,3 +32,7 @@
   * [Preliminary Feasibility Findings](r-and-d/monero-integration/preliminary-study/README.md)
     * [Architecture, Findings and Remaining Work](r-and-d/monero-integration/preliminary-study/technical-report.md)
     * [Evidence Ledger](r-and-d/monero-integration/preliminary-study/evidence-ledger.md)
+  * [Linked Local Monero–Ergo Roundtrip](r-and-d/monero-integration/roundtrip/README.md)
+    * [Implementation and Results](r-and-d/monero-integration/roundtrip/technical-report.md)
+    * [Validation Map](r-and-d/monero-integration/roundtrip/validation.md)
+    * [Source and Replay](r-and-d/monero-integration/roundtrip/source/README.md)

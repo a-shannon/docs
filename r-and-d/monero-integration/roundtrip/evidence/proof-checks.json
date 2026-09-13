@@ -1,0 +1,11 @@
+{
+  "scope": "retained-public-transaction-crypto-only",
+  "sourcePin": "4f92268d7c16741cfb41e5bbe2aa46cc260a9ea5",
+  "txId": "7ba92684464625d2979a14df3828ec9780b1d538b223c48f0c4f0f9e72514de1",
+  "receivedAtomic": "500000240",
+  "validProof": true,
+  "validAsciiMessageMutationAccepted": false,
+  "signatureMutationRefused": true,
+  "txIdentityMutationRefused": true,
+  "extraFieldRefused": true
+}

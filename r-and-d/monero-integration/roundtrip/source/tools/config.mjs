@@ -1,0 +1,12 @@
+import {readFileSync} from 'node:fs';
+import {resolve,dirname,isAbsolute,join} from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+export const sourceRoot=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const file=process.env.ROUNDTRIP_CONFIG;
+if(!file||!isAbsolute(file))throw Error('Trusted absolute ROUNDTRIP_CONFIG required');
+export const config=Object.freeze(JSON.parse(readFileSync(file,'utf8')));
+for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','ergoRuntime'])if(typeof config[key]!=='string'||!isAbsolute(config[key]))throw Error('Configuration path required: '+key);
+for(const key of ['nativeSha256','moneroDaemonSha256'])if(!/^[0-9a-f]{64}$/.test(config[key]))throw Error('Configuration digest required: '+key);
+if(typeof config.wslDistro!=='string'||!config.wslDistro||!config.proofBinary||!config.proofLibrary||!config.proofBinarySha256||!config.proofLibrarySha256)throw Error('Prepared proof configuration required');
+export const rosenURL=relative=>pathToFileURL(join(config.rosenRoot,relative)).href;
+export const sourceURL=relative=>pathToFileURL(join(sourceRoot,relative)).href;

@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"Bundler","strict":true,"skipLibCheck":true,"esModuleInterop":true,"noEmit":true,"types":["node","vitest/globals"]},"include":["adapter.ts","codec.ts","nativePin.ts","resolver.ts","isolation.ts","setup.ts","trace.ts","codec.spec.ts","vitest.config.ts"]}

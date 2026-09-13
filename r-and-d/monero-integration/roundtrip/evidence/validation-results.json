@@ -1,0 +1,260 @@
+{
+  "schema": "local-roundtrip-observed-test-results-v1",
+  "scope": "Reported local executions; focused author and independent checks overlap and are not a cumulative test count",
+  "native": {
+    "passed": 52,
+    "failed": 0,
+    "ignored": 0,
+    "durationSeconds": 1241.54,
+    "rawReportSha256": "8ead3e2de62b6eaf8cb939b4a52d3ded1dbd20e47e49050354ff4ed52c573ca5",
+    "command": "cargo test --manifest-path native/Cargo.toml --locked --offline --features participant-host --lib -- --test-threads=1"
+  },
+  "tests": [
+    {
+      "name": "candidate-linked-roundtrip",
+      "rawReportSha256": "cb6066b8073d4214c184eee9e7ec010ccb377dcabc4297af904221c31fcf3624",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "links a real Monero deposit, actual Rosen Ergo credit and redemption, and separate-holder payout with durable settlement",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "registered-lifecycle-author",
+      "rawReportSha256": "54bf11fe66a891dbba1d685eedc4b42e38daceec7464d4298e03d9f77619abfd",
+      "passed": 20,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "actual registered payment processor lost submission response and restart recover and resubmit identical final bytes",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor uncertain share failure and restart never sign again or release inputs",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor canonical depth and recipient amounts atomically settle only once",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor failure between transaction and event effects rolls back the complete join",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor recovered journal corruption cannot submit or settle",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor a completed native journal survives a lost signing reply without another sign",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor restart of a prepared disposition has no signing capability and cannot replace it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy synchronous=OFF without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy journal_mode=MEMORY without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy journal_mode=OFF without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy read_uncommitted=1 without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects an actual memory-backed SQLite datasource",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor policy drift after attachment blocks the deciding write and live signer",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor policy drift during native recovery blocks the final disposition write",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor policy drift immediately after possible-signing commits prevents the live signing callback",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor stale observe response cannot regress a settlement from another SQLite connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor stale submit response cannot regress a settlement from another SQLite connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor stale recover response cannot regress a settlement from another SQLite connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor late failed signing reply cannot quarantine a final payment settled by another connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor other registered chain still follows the original sent processing branch",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "lifecycle-independent-original-finding-recheck",
+      "rawReportSha256": "b5f36d541875003013a03788dc87831462642f3542ec2f3bb4da0e4ef6924ca8",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "original weak-durability probe now rejects before signing",
+          "status": "passed"
+        },
+        {
+          "name": "original two-connection stale-observation probe now preserves completed join",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "name": "lifecycle-independent-focused-recheck",
+      "rawReportSha256": "abdfc43eb295c436b1f91a9d8d40105515c30c748e4de4be37a3526edeccc650",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 8,
+      "cases": [
+        {
+          "name": "actual registered payment processor lost submission response and restart recover and resubmit identical final bytes",
+          "status": "skipped"
+        },
+        {
+          "name": "actual registered payment processor uncertain share failure and restart never sign again or release inputs",
+          "status": "skipped"
+        },
+        {
+          "name": "actual registered payment processor canonical depth and recipient amounts atomically settle only once",
+          "status": "skipped"
+        },
+        {
+          "name": "actual registered payment processor failure between transaction and event effects rolls back the complete join",
+          "status": "skipped"
+        },
+        {
+          "name": "actual registered payment processor recovered journal corruption cannot submit or settle",
+          "status": "skipped"
+        },
+        {
+          "name": "actual registered payment processor a completed native journal survives a lost signing reply without another sign",
+          "status": "skipped"
+        },
+        {
+          "name": "actual registered payment processor restart of a prepared disposition has no signing capability and cannot replace it",
+          "status": "skipped"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy synchronous=OFF without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy journal_mode=MEMORY without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy journal_mode=OFF without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects unsafe SQLite policy read_uncommitted=1 without repairing it",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor rejects an actual memory-backed SQLite datasource",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor policy drift after attachment blocks the deciding write and live signer",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor policy drift during native recovery blocks the final disposition write",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor policy drift immediately after possible-signing commits prevents the live signing callback",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor stale observe response cannot regress a settlement from another SQLite connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor stale submit response cannot regress a settlement from another SQLite connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor stale recover response cannot regress a settlement from another SQLite connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor late failed signing reply cannot quarantine a final payment settled by another connection",
+          "status": "passed"
+        },
+        {
+          "name": "actual registered payment processor other registered chain still follows the original sent processing branch",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "name": "signing-preapproval-phase-witness",
+      "rawReportSha256": "440f46844189bd8cef4de2c1c46a163639f7bbd2994b5e612761eb5b68bdff36",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 1,
+      "cases": [
+        {
+          "name": "authenticated signing transport process faults wrong-sender retires the native recipient before approval or signing-share release",
+          "status": "passed"
+        },
+        {
+          "name": "authenticated signing transport process faults crossed-attempt retires the native recipient before approval or signing-share release",
+          "status": "passed"
+        },
+        {
+          "name": "authenticated signing transport process faults replay retires the native recipient before approval or signing-share release",
+          "status": "passed"
+        },
+        {
+          "name": "authenticated signing transport process faults selected participant interruption after real approved shares prevents common completion and missing-terminal recovery",
+          "status": "skipped"
+        }
+      ]
+    },
+    {
+      "name": "actual-event-projection-smoke",
+      "rawReportSha256": "154691a824e62b84947eeefe33c2d007265d068451f1fc9fde615ee3ccbcbd67",
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "projects the actual retained return trigger through Rosen serializer into the strict payout order",
+          "status": "passed"
+        }
+      ]
+    }
+  ]
+}

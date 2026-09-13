@@ -1,0 +1,42 @@
+{
+  "schema": "participant-signing-faults/v1",
+  "binarySha256": "b543caef66ee0578aef62def04e350f197a259c1dd84e098f48f47d1585e7905",
+  "cases": [
+    {
+      "fault": "wrong-sender",
+      "refused": true,
+      "participants": 4,
+      "round5Responses": 2,
+      "nativeRecipientExit": 1,
+      "approvalCommands": 0,
+      "walletSignEntries": 0,
+      "signatureShares": 0,
+      "consumedMarkers": 0,
+      "terminalRecords": 0
+    },
+    {
+      "fault": "crossed-attempt",
+      "refused": true,
+      "participants": 4,
+      "round5Responses": 2,
+      "nativeRecipientExit": 1,
+      "approvalCommands": 0,
+      "walletSignEntries": 0,
+      "signatureShares": 0,
+      "consumedMarkers": 0,
+      "terminalRecords": 0
+    },
+    {
+      "fault": "replay",
+      "refused": true,
+      "participants": 4,
+      "round5Responses": 2,
+      "nativeRecipientExit": 1,
+      "approvalCommands": 0,
+      "walletSignEntries": 0,
+      "signatureShares": 0,
+      "consumedMarkers": 0,
+      "terminalRecords": 0
+    }
+  ]
+}
