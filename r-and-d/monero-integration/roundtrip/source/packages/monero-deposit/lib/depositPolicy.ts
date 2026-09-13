@@ -17,6 +17,7 @@ import {
 } from './intentCodec.js';
 
 export interface AcceptedOutput {
+  keyOccurrences?: bigint;
   outputIndex: bigint;
   publicKey: string;
   amount: bigint;
@@ -25,6 +26,7 @@ export interface AcceptedOutput {
 }
 
 export interface AcceptedDeposit {
+  outputHistoryPolicy?: 'authenticated-backing-v1';
   status: 'accepted';
   authority: 'stateless-candidate';
   evidenceMode: 'fixture' | 'independent';
@@ -194,6 +196,9 @@ export async function verifyDeposit(
     const feePolicy = structuredClone(inputFeePolicy);
     const receiptInput = structuredClone(receiptEvidence);
     const snapshot = config.snapshot;
+    requireEvidence(config.outputHistoryPolicy === undefined ||
+      (config.outputHistoryPolicy === 'authenticated-backing-v1' && config.version === 2),
+      'config:output-history-policy', 'indeterminate');
     try {
       network(config.sourceNetwork);
       hex32(snapshot.txid, 'snapshot_txid');
@@ -475,7 +480,9 @@ export async function verifyDeposit(
         );
         requireEvidence(output.spent === 'unspent', 'output:spent');
         requireEvidence(
-          uint64(output.keyOccurrences, 'key_occurrences') === 1n,
+          config.outputHistoryPolicy === 'authenticated-backing-v1'
+            ? uint64(output.keyOccurrences, 'key_occurrences') >= 1n
+            : uint64(output.keyOccurrences, 'key_occurrences') === 1n,
           'output:canonical-key-duplicate',
         );
         const value = uint64(output.amount, 'output_amount');
@@ -492,6 +499,7 @@ export async function verifyDeposit(
           amount: value,
           locator: outputLocator(config.sourceNetwork, intent.txid, index),
           economicId,
+          ...(config.outputHistoryPolicy ? {keyOccurrences: output.keyOccurrences} : {}),
         });
       })
       .sort((left, right) => (left.outputIndex < right.outputIndex ? -1 : 1));
@@ -524,6 +532,7 @@ export async function verifyDeposit(
     const result: AcceptedDeposit = Object.freeze({
       status: 'accepted',
       authority: 'stateless-candidate',
+      ...(config.outputHistoryPolicy ? {outputHistoryPolicy: config.outputHistoryPolicy} : {}),
       evidenceMode: identities.some((identity) => identity.kind === 'fixture')
         ? 'fixture'
         : 'independent',

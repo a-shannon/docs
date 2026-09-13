@@ -172,7 +172,7 @@ export async function launchDistributedNative(vault:unknown,request:unknown,setu
     admitted.set(s.json,s);retireCurrent=close;
     const transaction=new NativePayment(s);snapshot(transaction);
     return Object.freeze({transaction,close,approve:held.approve,sign:held.sign,
-      reservationId:held.reservationId,anchor:held.anchor,disposition:held.disposition,directories:held.directories,counts:held.counts});
+      reservationId:held.reservationId,anchor:held.anchor,disposition:held.disposition,backingClaim:held.backingClaim,directories:held.directories,counts:held.counts});
   }catch(error){await close();throw error;}
 }
 function freezeRow(row:Record<string,{extra:object}>){for(const token of Object.values(row)){Object.freeze(token.extra);Object.freeze(token);}Object.freeze(row);}

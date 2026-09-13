@@ -18,6 +18,7 @@ export interface WithdrawalJournalAnchor {
   readonly expectationDigest: string;
   readonly hostGeneration: string;
   readonly reservationGeneration: string;
+  readonly backingDigest?: string;
 }
 export interface FinalWithdrawalRecord {
   readonly expectationDigest: string;
@@ -57,6 +58,7 @@ const noDelete = `CREATE TRIGGER IF NOT EXISTS monero_withdrawal_journal_no_dele
   BEGIN SELECT RAISE(ABORT, 'retained signing custody'); END`;
 function captureAnchor(value: WithdrawalJournalAnchor): Readonly<WithdrawalJournalAnchor> {
   const x = ownData(value), keys = ['reservation', 'requestDigest', 'nativeDirectory', 'descriptorDigest', 'bindingDigest', 'expectationDigest', 'hostGeneration', 'reservationGeneration'];
+  if (Object.hasOwn(x, 'backingDigest')) { keys.push('backingDigest'); hex(x.backingDigest as string, 32, 32); }
   if (Object.keys(x).length !== keys.length || keys.some(k => !Object.hasOwn(x, k))) throw Error('journal:anchor-schema');
   for (const k of ['requestDigest', 'descriptorDigest', 'bindingDigest', 'expectationDigest']) hex(x[k] as string, 32, 32);
   positive(x.hostGeneration as string); positive(x.reservationGeneration as string);

@@ -48,8 +48,25 @@ existing isolated Ergo funding/recipient capabilities. It checks exact signed
 credit recovery against all four retained ledgers, and revalidates the return
 trigger against primary Ergo state before approving the Monero payout.
 
-The exercised participant binary remains the previously pinned baseline build;
-the observer is a separately pinned build with `scan-source` support. The
+The authenticated-backing successor uses a rebuilt participant/observer with
+`scan-source` support. Its explicit profile reports raw key multiplicity while
+retaining exact native source and unspent checks. The credit committee reserves
+the authenticated occurrence and its key-image class permanently; the same
+claim and settlement must reach selection, approval, signing, recovery and
+submission. The legacy inspection profile still rejects duplicate raw keys.
+Version-1 assignment databases are rejected, without implicit migration.
+
+The optional `collisionExperiment` setting accepts `raw-before-credit`,
+`decodable-before-credit`, `raw-after-credit` or `decodable-after-credit`.
+These cases additionally require `collisionBinary` and `collisionSha256`, built
+from the separate `test-fixtures/public-copy` package. Its patched wallet is
+exclusive to the test generator; the participant build retains its original
+dependency. The generator funds its own local wallet and receives only public
+deposit facts. Before-credit source inspection takes a fresh snapshot which
+both original holders and the public readers independently validate. The
+launcher binds the additional executable before and after execution.
+
+The
 observer uses the fixture's public view scalar and does not establish a general
 production view-key distribution scheme. Guard instances share one JS host;
 Monero holders and fresh source readers use separate native processes. The

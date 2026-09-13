@@ -1,18 +1,18 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 341,
-  "aggregateSha256": "2f7d21b4d892dea82092e4768dd1b9955a95d1aac3a4f929b8f95185aebaf918",
+  "fileCount": 379,
+  "aggregateSha256": "16d0ecd2d1a9ee3a4cdaf60675a27d5bdcbf989326d9f5a85bf5b8d1e99a25f0",
   "files": [
     {
       "path": "README.md",
-      "bytes": 6384,
-      "sha256": "beb4f09b0599aa7a08e785437d5de4f6317abb922a355de0f6d7a20c4aa0bf29"
+      "bytes": 7448,
+      "sha256": "3aab3547b72ec7e502e9d0f194f8fed2c14b3643f71bf09c52aabccc864d0a5b"
     },
     {
       "path": "consumer/adapter.ts",
-      "bytes": 14749,
-      "sha256": "9f96ea3f5ed329d60faf31f7f231b618b2138b04964108e6c30266f80698d5ad"
+      "bytes": 14780,
+      "sha256": "59aac30d9f8d9a983eb53886e799cd0d951a6510b496902527f89cd84713598d"
     },
     {
       "path": "consumer/agreement.config.ts",
@@ -65,9 +65,19 @@
       "sha256": "1f51846093e0eeafcd698dcbd6810f4cda012628305f6b9b92e8041675476405"
     },
     {
+      "path": "consumer/authenticatedDepositSource.mjs",
+      "bytes": 13236,
+      "sha256": "9e33cce76c3da20ffa3e6a9202a3dcb8a808d65dc2b089b3132339972eb8359d"
+    },
+    {
+      "path": "consumer/authenticatedDepositSource.test.mjs",
+      "bytes": 9334,
+      "sha256": "3b70bab07822bb4d07d7624773ae2fa5b5651cf1d3b0268c463451aaca9959e3"
+    },
+    {
       "path": "consumer/authorityRoundtrip.ts",
-      "bytes": 6358,
-      "sha256": "88310129d0162340042a0f699fde97de3c75dd661083883dc2be9dc416e37a76"
+      "bytes": 6547,
+      "sha256": "7692307f938aab5a60df202bcc5d5be6b4ea754fdeac699df3ae7ebacd8cfe18"
     },
     {
       "path": "consumer/authorizedAgreement.spec.ts",
@@ -85,6 +95,21 @@
       "sha256": "c9d0d94b78675521ed02df7c50c031797e1e08f64954306c7ddfa5b150a13af7"
     },
     {
+      "path": "consumer/backingClaim.mjs",
+      "bytes": 3512,
+      "sha256": "c121f90ae7b4389631f276c6c71acf8035a405457dd44848b40af8f459f261ad"
+    },
+    {
+      "path": "consumer/backingClaim.test.mjs",
+      "bytes": 8351,
+      "sha256": "42dcff2ea9c396b94e2b902f29fd3d8c7f8a59c94c78e48044b76d75afcf2c75"
+    },
+    {
+      "path": "consumer/backingConsumer.spec.ts",
+      "bytes": 9198,
+      "sha256": "728ac887159bc09fcfc3a51d1618f3112facfb1338adbf2599cd0cc5afcb0c68"
+    },
+    {
       "path": "consumer/baseline.ts",
       "bytes": 269,
       "sha256": "822533641de86fac7f4d4c2595e58757805605c7fc19c48946d6486aa70c7465"
@@ -100,14 +125,19 @@
       "sha256": "e0433f686f53ab24b534fa1cddc5305477d6757685024c3f20b8550d1f2d54ba"
     },
     {
+      "path": "consumer/collisionFixture.mjs",
+      "bytes": 2534,
+      "sha256": "831212d439c9df9ea1e6fb83981a5f7b47bb5ff72dd532e5dad896d01f1535ef"
+    },
+    {
       "path": "consumer/depositSource.ts",
-      "bytes": 8759,
-      "sha256": "fbabdb84f4e6ca208ea9c8e8e6148f9f51a5036a8d7eaa7eb6128c9b2ff35256"
+      "bytes": 9679,
+      "sha256": "208bc3e440fd326b56073a148f13d8b4a48e7fa33e28508865584794811589fa"
     },
     {
       "path": "consumer/distributedIssuer.ts",
-      "bytes": 8883,
-      "sha256": "3c5cdf3b143c9525fa6b5b4c017a5e14deeb5e3670e2dc23eafc0ed46825e967"
+      "bytes": 10728,
+      "sha256": "ff323602ac379d94ae5b1b4448f577bce7fca93f224a6aa149197c988ede8790"
     },
     {
       "path": "consumer/distributedWithdrawal.spec.ts",
@@ -136,13 +166,13 @@
     },
     {
       "path": "consumer/independentDepositSource.mjs",
-      "bytes": 9785,
-      "sha256": "bf00e570263f96fb0f6e51deb0c2e56700412b12a39fd9fe2ae683ed10251a96"
+      "bytes": 11080,
+      "sha256": "01c9c90515aeff33ed2c7bf281147f65af7a585c9b0097b095217762cb5288ac"
     },
     {
       "path": "consumer/independentDepositSource.test.mjs",
-      "bytes": 3768,
-      "sha256": "45ae3a0e0af66e375a5cea4edda315be03dbb3451b12f26de0179592c314512d"
+      "bytes": 5079,
+      "sha256": "286a8354ed55d296371f3c4a3706eb98133a42e03de59922f8e7ee3210ed8d07"
     },
     {
       "path": "consumer/integration.spec.ts",
@@ -215,6 +245,16 @@
       "sha256": "a90fc33418afa2b9cbf4768524b021135b965ecdf993457505bfae3ac44a8428"
     },
     {
+      "path": "consumer/participantAuthority.mjs",
+      "bytes": 501,
+      "sha256": "24c6a547109db798f1f5d80c86ac24411499f703245d5301d8a904966940f446"
+    },
+    {
+      "path": "consumer/participantAuthority.test.mjs",
+      "bytes": 1569,
+      "sha256": "9257b3222caab37eadc9a3f06d0dd321c9d03b02c944451ab1b7582323f8a9b8"
+    },
+    {
       "path": "consumer/participantHarness.mjs",
       "bytes": 7903,
       "sha256": "34343bdcf2232a58afc6e1d33cbfe12e3fe55e58d820ca3e9e950e84168379da"
@@ -226,8 +266,8 @@
     },
     {
       "path": "consumer/participantSigning.mjs",
-      "bytes": 10612,
-      "sha256": "7a93ec8138cf4a2216a633c042cd49094362e0b6dbd62dfa46f0ebf1c7f4f750"
+      "bytes": 13008,
+      "sha256": "49ef2fa77def0bfb92435daf2e363e74e5536fb4e6dc1a6f32559870a4e0993b"
     },
     {
       "path": "consumer/participantSigningFaults.spec.ts",
@@ -271,8 +311,8 @@
     },
     {
       "path": "consumer/retainedIssuer.ts",
-      "bytes": 26148,
-      "sha256": "9c82ea5bcff540a22d1b3856203643e26e908205f3e98b24a4ae5a008a211c38"
+      "bytes": 26296,
+      "sha256": "1fc59d472f2c8b75021dfa9f4961908f6ab889952077a9190b1c9c7d09c0499d"
     },
     {
       "path": "consumer/rosenVoteVectors.mjs",
@@ -291,8 +331,8 @@
     },
     {
       "path": "consumer/roundtripPayment.ts",
-      "bytes": 6479,
-      "sha256": "e4b4ce025f13aed6e1ee25d2bdec1512671a029702863b3d565d5ba8a115a796"
+      "bytes": 6971,
+      "sha256": "e9318dda7c8ecc08197652bd52f2c6a9a4bca205c8fb03327c0a9651850f635d"
     },
     {
       "path": "consumer/rpcTiming.mjs",
@@ -356,8 +396,8 @@
     },
     {
       "path": "consumer/watcherAuthority.spec.ts",
-      "bytes": 6900,
-      "sha256": "1abba54ce6e5f7c58e1ff20cac9ceaff96eac5b08fd0bd764743c885e9000e92"
+      "bytes": 8073,
+      "sha256": "1eeeb0e985de312b028aa013311fc2f00ceb950ccddcbcc7dc83f75e46df42a1"
     },
     {
       "path": "consumer/watcherSource.config.ts",
@@ -376,8 +416,8 @@
     },
     {
       "path": "consumer/withdrawalJournal.ts",
-      "bytes": 16670,
-      "sha256": "7018760fc540abff8076172acbcd9baeed83605a660b8d6a4d2352d0945c0251"
+      "bytes": 16818,
+      "sha256": "1a940e88f24811f596cf842d94f68968d47e71079725c4d35b414d6575cce626"
     },
     {
       "path": "ergo-node/authority-fixture.mjs",
@@ -396,8 +436,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 13257,
-      "sha256": "165f768106aa076e280dced8d4d93fa6117b01b87a48255b218bd30f02caa497"
+      "bytes": 14028,
+      "sha256": "f7d651ea2e58e09769df99892919f3172708d817624252e028eab21f778fd93e"
     },
     {
       "path": "ergo-node/contracts/Commitment.es",
@@ -431,8 +471,8 @@
     },
     {
       "path": "ergo-node/credit-committee.mjs",
-      "bytes": 9707,
-      "sha256": "c813704fa4046da4125cc184423dae241b32c0fc494111e6e290c92c3000a7a5"
+      "bytes": 10988,
+      "sha256": "6cacba512a451aca01a029238a515d5d97e2aa476da578a08fb4b504fa839f20"
     },
     {
       "path": "ergo-node/credit-committee.test.mjs",
@@ -528,6 +568,11 @@
       "path": "ergo-node/watcher-setup.mjs",
       "bytes": 1468,
       "sha256": "502ff447427d0b789def0052a86ad7537530f7377940d26b262362d83b1b9dfd"
+    },
+    {
+      "path": "evidence/rosen-vote-vectors.json",
+      "bytes": 3631,
+      "sha256": "c9d171a4b41caa6afe5599059196ac6cdf92ff0d8240e7a9381a7d83681e4792"
     },
     {
       "path": "guard-service/package.json",
@@ -1061,13 +1106,13 @@
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.mjs",
-      "bytes": 11924,
-      "sha256": "f72fda98dfa40280c7cabbe69e83c32a71c16e7cb94b275f4bf9db84b6590b07"
+      "bytes": 17741,
+      "sha256": "bd92fea600c1d2de1af3adb69dcfe854022f4f32058938540e405544d14fcd84"
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.test.mjs",
-      "bytes": 9682,
-      "sha256": "80ee0c907d13fa5634a9af730c0b58d6bf5c29bf3e2c27cfcf7377fe2cfff6c2"
+      "bytes": 19868,
+      "sha256": "a89db0f0cb4d4ced2f4de35927151c547b205d343b24e989fddd355506b8fc53"
     },
     {
       "path": "guard-service/src/db/moneroWithdrawalReservation.ts",
@@ -1496,8 +1541,8 @@
     },
     {
       "path": "native/src/node_funding.rs",
-      "bytes": 39553,
-      "sha256": "cef67efc77424a345a1e40d3b03e4fecc1c2cc8d1d84b85717a7aad4a562578c"
+      "bytes": 39908,
+      "sha256": "164528c86ba06c2295f5d9417e4cf16aceeae689fa29746dcdf976f8a393a100"
     },
     {
       "path": "native/src/participant.rs",
@@ -1516,13 +1561,13 @@
     },
     {
       "path": "native/src/participant_source.rs",
-      "bytes": 6423,
-      "sha256": "7cbd4d74c4c85df34759e2eb4473bcfe272b405440a9d534f1d121b82f6e849a"
+      "bytes": 6708,
+      "sha256": "283a64da5dff3d3022c6dff5f614b518a2ba8184d49e3f6fd8a743cfd61b14ef"
     },
     {
       "path": "native/src/public_source_observer.rs",
-      "bytes": 7350,
-      "sha256": "034c894b512333bcf518d2c4b74e2be5ee709bd68a7c5d25d1255fd24762e587"
+      "bytes": 8123,
+      "sha256": "84548c87018612b96dd3a3c62a0e9c0646b25c5989bb7c4ae537373a0b2cfc09"
     },
     {
       "path": "native/src/retained_host.rs",
@@ -1566,13 +1611,13 @@
     },
     {
       "path": "packages/monero-deposit/lib/depositPolicy.ts",
-      "bytes": 19992,
-      "sha256": "6e680523692003631de8c4abf7f7d64b9fa58696ed044a86637d7b4eb60697ee"
+      "bytes": 20609,
+      "sha256": "a3bda9049408ead9b24d1ffeaa0aa0c47a794a985b74f384a3e39a18e15c4716"
     },
     {
       "path": "packages/monero-deposit/lib/evidence.ts",
-      "bytes": 3434,
-      "sha256": "6aed90708d67687a6da2164539509bea9851c6189d34d165bb997ee61081d7ed"
+      "bytes": 3572,
+      "sha256": "229a68d9e750cebb47ced035d6bd258031ae6f3eb780942451e6977e08ce7894"
     },
     {
       "path": "packages/monero-deposit/lib/index.ts",
@@ -1591,8 +1636,8 @@
     },
     {
       "path": "packages/monero-deposit/tests/depositPolicy.spec.ts",
-      "bytes": 23110,
-      "sha256": "a65d32b9f5b7bcdc148ddb8292db45e45b80f9f6671fa4085d588886cbc4f281"
+      "bytes": 24554,
+      "sha256": "1c56377c142fcc45fdcb661b107f144d9123e98e3499016c0a74d3cef18de806"
     },
     {
       "path": "packages/monero-deposit/tests/fixtures.ts",
@@ -1650,14 +1695,159 @@
       "sha256": "d65ed0208c63eb58a2409845112905e69564c1f6a1bba98f19f3e6257d8103dc"
     },
     {
+      "path": "test-fixtures/public-copy/Cargo.lock",
+      "bytes": 30890,
+      "sha256": "db76c229187e9063aa6c6f6ccf002199ff68a4de07d017cbca1946bc4f0ff9cc"
+    },
+    {
+      "path": "test-fixtures/public-copy/Cargo.toml",
+      "bytes": 934,
+      "sha256": "1703673e902f4fbb2d0ac4ab8a03c856a8d7e23a644030f5db0235138dcc4f2d"
+    },
+    {
+      "path": "test-fixtures/public-copy/README.md",
+      "bytes": 1978,
+      "sha256": "d109747e6dae82e03ca97c52f9ab7d7cf2bc81a92fe42bd02d914cabf00638b4"
+    },
+    {
+      "path": "test-fixtures/public-copy/src/main.rs",
+      "bytes": 18203,
+      "sha256": "8d8e3a27adf19437e44fcc6b6be9c56de72f1fd9671603456db6388a2264a1e0"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/Cargo.toml",
+      "bytes": 5778,
+      "sha256": "5e1e2b5d2df62d071583986a6a994869d4c9d2ddc55e1652b4ce2c337d92ae34"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/LICENSE",
+      "bytes": 1121,
+      "sha256": "41b1346008f3a37747707f25105e717020167c06c447b6db709406c238af4f87"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/README.md",
+      "bytes": 2524,
+      "sha256": "1e8328a626447aaad5773a977f150d8b377cb44214c7f8e9600365aca772d7ba"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/decoys.rs",
+      "bytes": 14880,
+      "sha256": "cfba8328ae85aa541be818ac70b821a2e46f10251f2fc1c424507887bef71eea"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/extra.rs",
+      "bytes": 16730,
+      "sha256": "97b4ae78240407cb394b01041eba21d9456a085175a2a9192401111f03de1b6e"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/lib.rs",
+      "bytes": 5166,
+      "sha256": "873ba046cc99ea6dd4eeeb769faf8e0a8ad235e3004032868dd72f05e5388b7e"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/output.rs",
+      "bytes": 15301,
+      "sha256": "ddf4cf49d84442c3c6459d11e699f7bc656ea4e9c0a719585a6a401d2e0c0164"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/scan.rs",
+      "bytes": 15356,
+      "sha256": "0a56ee63c17b08dfb2734fb4b1a1550f5a23ebf9eee817f5cd5277c5211fcb81"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/send/eventuality.rs",
+      "bytes": 5676,
+      "sha256": "995a8051c5319dde49a8c8ca1dd2acce197451591be33a2802dd04d42ee4e023"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/send/mod.rs",
+      "bytes": 27190,
+      "sha256": "7c71fd3478b4ab905ab11cf55e7195f61f6cf312fb0c9095a5c23629261f1f2c"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/send/multisig.rs",
+      "bytes": 13263,
+      "sha256": "cbbd3766984d638f85137617df60a921b937ffd60c73312ba9c99b161427e165"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/send/tx.rs",
+      "bytes": 14624,
+      "sha256": "e52c1c2cd6705fbea376a9c900910330a5cd18202f48d897e98ae92afb8e58d0"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/send/tx_keys.rs",
+      "bytes": 12814,
+      "sha256": "6e9486d27e1410c61c01384ce87c5762ecdd045ccff8bafff5c1d5deeb0a1021"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/tests/extra.rs",
+      "bytes": 8739,
+      "sha256": "67cf17dd8dad31e2a47c894fe0265f84a58d7cf3efafacd6ffbd88e8e5e271a6"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/tests/mod.rs",
+      "bytes": 21,
+      "sha256": "8e57a6c4d670606e8df8065c401b8b9dcb39650187b587aa1646d5e832360d42"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/tests/scan.rs",
+      "bytes": 6565,
+      "sha256": "88c6a192f923c7b67dac21c5002a66ee0e52479e10702d7c815e25a6a6af844d"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/src/view_pair.rs",
+      "bytes": 5113,
+      "sha256": "0ccc0942a4e2b5f4ce1e80e1fe4663be4358afc32fe3971cfa52cf9cc3038882"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/add_data.rs",
+      "bytes": 2704,
+      "sha256": "6e6dff3cf06054e6b94a357026ca09a3a1289da7cbe86fe4def22e3c3ba6a6de"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/decoys.rs",
+      "bytes": 5501,
+      "sha256": "cb264684a5339d91b8d45e950d233c91f80358dad610ad1d8ae25b32fafbe006"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/eventuality.rs",
+      "bytes": 2543,
+      "sha256": "44455d0ce00b818d0064b506f039592e988d30dbc5871431b05498ee353334c8"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/runner/builder.rs",
+      "bytes": 1985,
+      "sha256": "e6dd1a84d8a92c232eea32a2ccb67e96abf171afc4d895ed89d1cb9ba98beb5e"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/runner/mod.rs",
+      "bytes": 13916,
+      "sha256": "504129bf59cd597afad7f365667070acd5d43cc963cb96c79ba525d3f1c53efa"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/scan.rs",
+      "bytes": 5784,
+      "sha256": "532c8a48e293cfe3e1a25f1f2f886beae7f261da9192ac511e08300a0abc87b1"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/send.rs",
+      "bytes": 14211,
+      "sha256": "4e0f0b5e8e0f9468385ebebf05f93a05134380c94244c3f5e44a8af15abaa380"
+    },
+    {
+      "path": "test-fixtures/public-copy/wallet/tests/wallet2_compatibility.rs",
+      "bytes": 12293,
+      "sha256": "4b328a7e4bb2e597c5030d11d0f4aee2063cde9c4784f3a99869b948d967efd8"
+    },
+    {
       "path": "tools/config.mjs",
       "bytes": 1155,
       "sha256": "769e4cceea9aef909f9241710a8cf01198217f2bacb0ad58d5dace9ff851db23"
     },
     {
       "path": "tools/launch-roundtrip.mjs",
-      "bytes": 10962,
-      "sha256": "676ac303c4600a35e58e66ba8a8df7e2d8fba518f52cd790b648eddf77513b71"
+      "bytes": 11402,
+      "sha256": "231117405fdf80630e8d6185f894a62e4ed35e5d65cf1add50b51d9a854650d9"
     },
     {
       "path": "tools/launcher-guards.mjs",

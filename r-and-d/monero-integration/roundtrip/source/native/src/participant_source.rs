@@ -24,19 +24,11 @@ impl SourceInspection {
         config: Value,
         identity: &SigningKey,
     ) -> R<(Self, Value)> {
-        w::fields(
-            &config,
-            &[
-                "type",
-                "ceremony",
-                "epoch",
-                "rosterDigest",
-                "genesis",
-                "inspection",
-                "snapshot",
-                "source",
-            ],
-        )?;
+        let opted=config.get("sourcePolicy").is_some();
+        if opted && w::string(&config,"sourcePolicy")?!="authenticated-backing-v1" {return Err(())}
+        let mut fields=vec!["type","ceremony","epoch","rosterDigest","genesis","inspection","snapshot","source"];
+        if opted {fields.push("sourcePolicy");}
+        w::fields(&config,&fields)?;
         if id == 0
             || id > 2
             || u16::from(key.params().i()) != id
@@ -151,17 +143,18 @@ impl SourceInspection {
             return Err(());
         }
         let image = certificates[0].image();
-        let occurrences = host::node::participant_unspent_history(
+        let history=if self.config.get("sourcePolicy").is_some(){host::node::participant_unspent_occurrences}else{host::node::participant_unspent_history};
+        let occurrences = history(
             hash32(&self.config, "genesis")?,
             &self.config["snapshot"],
             self.output.key().compress().to_bytes(),
             image,
         )?;
         let deposit = &self.config["source"]["deposit"];
-        Ok(
-            json!({"type":"source-verified","id":self.id,"ceremony":self.config["ceremony"],"epoch":self.config["epoch"],"rosterDigest":self.config["rosterDigest"],"genesis":self.config["genesis"],"inspection":self.config["inspection"],"snapshot":self.config["snapshot"],
+        let mut result=json!({"type":"source-verified","id":self.id,"ceremony":self.config["ceremony"],"epoch":self.config["epoch"],"rosterDigest":self.config["rosterDigest"],"genesis":self.config["genesis"],"inspection":self.config["inspection"],"snapshot":self.config["snapshot"],
             "txId":w::hex(&self.output.transaction()),"blockHeight":deposit["blockHeight"],"blockHash":deposit["blockHash"],"outputKey":w::hex(&self.output.key().compress().to_bytes()),"outputIndex":self.output.index_in_transaction(),"chainIndex":self.output.index_on_blockchain(),
-            "amountAtomic":self.output.commitment().amount.to_string(),"keyImage":w::hex(&image),"spentStatus":0,"historyOccurrences":occurrences,"walletSigns":0}),
-        )
+            "amountAtomic":self.output.commitment().amount.to_string(),"keyImage":w::hex(&image),"spentStatus":0,"historyOccurrences":occurrences,"walletSigns":0});
+        if let Some(policy)=self.config.get("sourcePolicy"){result["sourcePolicy"]=policy.clone();}
+        Ok(result)
     }
 }

@@ -23,6 +23,7 @@ export interface RetainedWithdrawalSetup {
 export interface AuthorizedWithdrawalSetup extends RetainedWithdrawalSetup {
   readonly authority: WithdrawalAuthorityProfile;
   readonly journalFault?: JournalFault;
+  readonly backingClaim?: object;
 }
 type RetainedSnapshot = Readonly<ReturnType<typeof frame> & {
   json: string; recipient: string; payment: bigint; input: bigint; change: bigint;
@@ -38,8 +39,9 @@ type RetainedOwner = Readonly<{
 /** Captures trusted own-data setup synchronously, before adapter's first await. */
 export function prepareAuthorizedWithdrawal(setup: AuthorizedWithdrawalSetup) {
   const captured = ownData(setup);
-  const allowed = ['database', 'clock', 'leaseDuration', 'monotonicNow', 'fault', 'authority', 'journalFault'];
+  const allowed = ['database', 'clock', 'leaseDuration', 'monotonicNow', 'fault', 'authority', 'journalFault', 'backingClaim'];
   if (Object.keys(captured).some(k => !allowed.includes(k)) || ['database', 'clock', 'leaseDuration', 'authority'].some(k => !Object.hasOwn(captured, k))) throw Error('authority:setup-schema');
+  if (captured.backingClaim !== undefined) throw Error('authority:backing-requires-distributed');
   const profile = captureAuthority(captured.authority);
   if (captured.journalFault !== undefined && typeof captured.journalFault !== 'function') throw Error('authority:journal-fault');
   const profileJson = JSON.stringify(profile);

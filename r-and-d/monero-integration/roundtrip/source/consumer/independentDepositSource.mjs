@@ -4,6 +4,7 @@ import {readFileSync,statSync} from 'node:fs';
 import {isAbsolute} from 'node:path';
 import {spawn} from 'node:child_process';
 import {canonical} from './participantHarness.mjs';
+import {captureAuthenticatedDepositSource} from './authenticatedDepositSource.mjs';
 
 const MAX_FRAME=65536;
 const fields=(value,expected)=>{assert(value!==null&&typeof value==='object'&&!Array.isArray(value),'Observer object');assert.deepEqual(Object.keys(value).sort(),[...expected].sort(),'Observer closed schema');};
@@ -11,7 +12,8 @@ const hex32=value=>assert(typeof value==='string'&&/^[0-9a-f]{64}$/.test(value)&
 const integer=value=>assert(Number.isSafeInteger(value)&&value>=0&&value<=0xffffffff,'Observer bounded integer');
 const decimal=value=>assert(typeof value==='string'&&/^(0|[1-9][0-9]{0,19})$/.test(value)&&BigInt(value)<=0xffffffffffffffffn,'Observer canonical amount');
 export function observerRequest(publicScan,observerNonce){
-  fields(publicScan,['groupPublicKey','genesis','snapshot','source','keyImage']);hex32(observerNonce);for(const key of ['groupPublicKey','genesis','keyImage'])hex32(publicScan[key]);
+  const opted=Object.hasOwn(publicScan,'sourcePolicy');if(opted)assert.equal(publicScan.sourcePolicy,'authenticated-backing-v1','Observer source policy');
+  fields(publicScan,['groupPublicKey','genesis','snapshot','source','keyImage',...(opted?['sourcePolicy']:[])]);hex32(observerNonce);for(const key of ['groupPublicKey','genesis','keyImage'])hex32(publicScan[key]);
   fields(publicScan.snapshot,['height','hash']);integer(publicScan.snapshot.height);assert(publicScan.snapshot.height>0&&publicScan.snapshot.height<=4096);hex32(publicScan.snapshot.hash);
   const source=publicScan.source;fields(source,['kind','startHeight','blockHashes','ringIndices','outputIds','deposit']);assert.equal(source.kind,'deposit');integer(source.startHeight);assert(source.startHeight+18<=publicScan.snapshot.height);
   assert(Array.isArray(source.blockHashes)&&source.blockHashes.length===18);source.blockHashes.forEach(hex32);assert(Array.isArray(source.ringIndices)&&source.ringIndices.length===16);source.ringIndices.forEach(integer);assert(Array.isArray(source.outputIds)&&source.outputIds.length===2);
@@ -22,11 +24,14 @@ export function observerRequest(publicScan,observerNonce){
 export function observerRequestDigest(request){return createHash('sha256').update('rosen-monero/public-source-observer/v1').update(Buffer.from([0])).update(canonical(request)).digest('hex');}
 export function validateObserverResult(frame,request){
   const bytes=Buffer.isBuffer(frame)?frame:Buffer.from(frame);assert(bytes.length<=MAX_FRAME&&bytes.at(-1)===10&&!bytes.some(b=>b>127),'Observer output frame bound');const text=bytes.subarray(0,-1).toString('ascii'),result=JSON.parse(text);assert.equal(canonical(result),text,'Observer canonical output');
-  fields(result,['type','observerNonce','observerKind','genesis','snapshot','vaultAddress','sourceRequestDigest','outputs','suppliedKeyImage','suppliedKeyImageSpentStatus','imageAssociationVerified']);
+  const opted=Object.hasOwn(request,'sourcePolicy');if(opted)assert.equal(request.sourcePolicy,'authenticated-backing-v1','Observer source policy');
+  fields(result,['type','observerNonce','observerKind','genesis','snapshot','vaultAddress','sourceRequestDigest','outputs','suppliedKeyImage','suppliedKeyImageSpentStatus','imageAssociationVerified',...(opted?['sourcePolicy']:[])]);
+  if(opted)assert.equal(result.sourcePolicy,request.sourcePolicy,'Observer policy binding');
   assert.equal(result.type,'public-source-observation');assert.equal(result.observerKind,'local-fixture-fixed-view-v1');assert.equal(result.observerNonce,request.observerNonce,'Observer nonce binding');assert.equal(result.sourceRequestDigest,observerRequestDigest(request),'Observer exact source request binding');assert.equal(result.genesis,request.genesis);assert.deepEqual(result.snapshot,request.snapshot);assert.equal(result.suppliedKeyImage,request.keyImage);assert.equal(result.suppliedKeyImageSpentStatus,0);assert.equal(result.imageAssociationVerified,false,'Public reader cannot attest image association');
   assert(typeof result.vaultAddress==='string'&&/^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{95}$/.test(result.vaultAddress),'Observer vault address');assert(Array.isArray(result.outputs)&&result.outputs.length===1,'Observer qualifying output count');
   const output=result.outputs[0],deposit=request.source.deposit;fields(output,['txId','blockHash','blockHeight','publicKey','outputIndex','chainIndex','amountAtomic','feeAtomic','owned','maturity','historyOccurrences']);
-  for(const field of ['txId','blockHash','blockHeight','outputIndex','chainIndex','amountAtomic','feeAtomic'])assert.equal(output[field],deposit[field],'Observer deposit '+field);assert.equal(output.publicKey,deposit.outputKey,'Observer output key');assert.equal(output.owned,true);assert.equal(output.maturity,'unlocked');assert.equal(output.historyOccurrences,1,'Observer full-history output uniqueness');return Object.freeze(result);
+  for(const field of ['txId','blockHash','blockHeight','outputIndex','chainIndex','amountAtomic','feeAtomic'])assert.equal(output[field],deposit[field],'Observer deposit '+field);assert.equal(output.publicKey,deposit.outputKey,'Observer output key');assert.equal(output.owned,true);assert.equal(output.maturity,'unlocked');
+  if(opted){integer(output.historyOccurrences);assert(output.historyOccurrences>0,'Observer positive occurrence count');}else assert.equal(output.historyOccurrences,1,'Observer full-history output uniqueness');return Object.freeze(result);
 }
 
 /** A fresh process reconstructs public fixed-view source evidence for every call. */
@@ -46,13 +51,15 @@ export async function independentlyVerifyDeposit({binary,sha256,publicScan,runti
 
 /** Keeps actual fresh proof/address ports and replaces the prior cached receipt port. */
 export function makeIndependentDepositProviders({source,publicScan=source.publicScan,binary,sha256,runtimeDirectory,observerId}){
+  const authenticated=()=>{if(source.context?.configuration?.outputHistoryPolicy!==undefined||publicScan?.sourcePolicy!==undefined){captureAuthenticatedDepositSource(source);assert.equal(source.context.configuration.outputHistoryPolicy,'authenticated-backing-v1');assert.equal(publicScan.sourcePolicy,'authenticated-backing-v1');assert.equal(source.publicScan.sourcePolicy,publicScan.sourcePolicy);}};
+  authenticated();
   assert(source?.providers&&typeof source.current==='function');const scan=structuredClone(publicScan),receipts=[],counts={proofCalls:0,receiptCalls:0,addressCalls:0};
   observerRequest(scan,'01'.repeat(32));assert.deepEqual(scan.source.deposit,source.deposit,'Independent source seed binding');assert.equal(scan.genesis,source.publicScan.genesis);assert.equal(scan.keyImage,source.observation.keyImage,'Original-holder supplied image binding');
   const providers={
-    proof:{identity:source.providers.proof.identity,async verify(request){counts.proofCalls++;return source.providers.proof.verify(request);}},
+    proof:{identity:source.providers.proof.identity,async verify(request){authenticated();counts.proofCalls++;return source.providers.proof.verify(request);}},
     addresses:{identity:source.providers.addresses.identity,async verify(request){counts.addressCalls++;return source.providers.addresses.verify(request);}},
     receipt:{identity:{kind:'independent',id:'fresh-local-fixed-view-'+observerId,sourcePin:source.providers.receipt.identity.sourcePin},async reconstruct(intent,_evidence,snapshot){
-      counts.receiptCalls++;await source.current();const result=await independentlyVerifyDeposit({binary,sha256,publicScan:scan,runtimeDirectory,observerId});await source.current();
+      authenticated();counts.receiptCalls++;await source.current();const result=await independentlyVerifyDeposit({binary,sha256,publicScan:scan,runtimeDirectory,observerId});await source.current();authenticated();
       const deposit=scan.source.deposit;assert.equal(intent.txid,deposit.txId);assert.equal(intent.vault_address,result.vaultAddress);assert.equal(result.vaultAddress,source.context.configuration.vaultAddress);assert.equal(snapshot.id,source.context.snapshot.id);assert.equal(snapshot.network,'mainnet');assert.equal(snapshot.txid,deposit.txId);assert.equal(snapshot.blockHash,deposit.blockHash);assert.equal(snapshot.blockHeight,BigInt(deposit.blockHeight));assert.equal(snapshot.chainHeight,BigInt(scan.snapshot.height));
       receipts.push(result);return {status:'verified',value:{network:'mainnet',txid:deposit.txId,vaultAddress:result.vaultAddress,blockHash:deposit.blockHash,blockHeight:BigInt(deposit.blockHeight),snapshotId:snapshot.id,inPool:false,outputs:result.outputs.map(output=>({index:BigInt(output.outputIndex),publicKey:output.publicKey,amount:BigInt(output.amountAtomic),owned:output.owned,maturity:output.maturity,spent:'unspent',keyOccurrences:BigInt(output.historyOccurrences)}))}};
     }}
@@ -62,6 +69,7 @@ export function makeIndependentDepositProviders({source,publicScan=source.public
 
 /** Each watcher or guard invokes policy again on the exact raw supplied request. */
 export async function independentlyDecideDeposit({source,rawRequest,providers}){
+  if(source.context?.configuration?.outputHistoryPolicy!==undefined||source.publicScan?.sourcePolicy!==undefined)captureAuthenticatedDepositSource(source);
   const {verifyDeposit}=await import('../packages/monero-deposit/lib/depositPolicy.ts');
   return verifyDeposit(rawRequest.intentBytes,rawRequest.proof,rawRequest.receiptEvidence,{...source.context.configuration,snapshot:source.context.snapshot,creditedDepositIds:new Set(),creditedOutputIds:new Set()},source.context.feePolicy,providers);
 }

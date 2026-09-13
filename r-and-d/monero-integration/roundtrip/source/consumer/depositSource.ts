@@ -8,6 +8,7 @@ import {encodeIntent} from '../packages/monero-deposit/lib/intentCodec';
 import {verifyDeposit} from '../packages/monero-deposit/lib/depositPolicy';
 import {NATIVE_SOURCE_PIN,type VerificationProviders} from '../packages/monero-deposit/lib/evidence';
 import {inspectParticipantDeposit} from './participantSigning.mjs';
+import {registerAuthenticatedDepositSource} from './authenticatedDepositSource.mjs';
 import type {LocalMonero} from './localMonero';
 import type {DepositContext} from '../guard-service/src/deposit/depositAdmission';
 
@@ -37,14 +38,21 @@ export async function nativeProof(mode:'produce'|'verify',request:any,runtime:st
 }
 
 /** Fresh local-chain composition: fixed snapshot, native ownership and actual OutProofV2. */
-export async function buildDepositSource(vault:any,node:LocalMonero,runtime:string,recipient:string,asset:string){
-  const inspected=await inspectParticipantDeposit(vault),d=inspected.deposit,o=inspected.observation;
+export async function buildDepositSource(vault:any,node:LocalMonero,runtime:string,recipient:string,asset:string,{sourcePolicy}: {sourcePolicy?:'authenticated-backing-v1'}={}){
+  let inspectionSnapshot;
+  if(sourcePolicy){
+    const info=await node.isolated(),genesis=await node.rpc('get_block_header_by_height',{height:0}),tip=await node.rpc('get_block_header_by_height',{height:info.height-1});
+    if(genesis.block_header.hash!==vault.genesis||(await node.isolated()).height!==info.height)throw Error('Deposit inspection snapshot changed');
+    inspectionSnapshot={height:info.height,hash:tip.block_header.hash};
+  }
+  // Original holders independently validate this fresh snapshot and the exact source occurrence.
+  const inspected=await inspectParticipantDeposit(vault,{sourcePolicy,snapshot:inspectionSnapshot}),d=inspected.deposit,o=inspected.observation;
   if(wasm.Address.from_base58(recipient).to_base58(wasm.NetworkPrefix.Testnet)!==recipient||!/^[0-9a-f]{64}$/.test(asset))throw Error('Ergo source configuration');
   const snapshot={id:createHash('sha256').update(vault.genesis+o.snapshot.hash).digest('hex'),network:'mainnet' as const,
     txid:d.txId,blockHash:d.blockHash,blockHeight:BigInt(d.blockHeight),chainHeight:BigInt(o.snapshot.height),minConfirmations:2n};
-  const context:DepositContext={id:'local-roundtrip-'+vault.genesis,revision:1n,configurationRevision:'local-protocol16-v1',
+  const context:DepositContext={id:'local-roundtrip-'+vault.genesis,revision:1n,configurationRevision:sourcePolicy?'local-protocol16-backed-v1':'local-protocol16-v1',
     configuration:{version:2,domain:'rosen-monero-deposit',sourceNetwork:'mainnet',vaultEpoch:'1',vaultAddress:vault.vaultAddress,
-      destinationNetwork:'ergo-testnet',destinationAsset:asset,nativeSourcePin:NATIVE_SOURCE_PIN},
+      destinationNetwork:'ergo-testnet',destinationAsset:asset,nativeSourcePin:NATIVE_SOURCE_PIN,...(sourcePolicy?{outputHistoryPolicy:sourcePolicy}:{})},
     feePolicy:{bridgeFee:'100',networkFee:'20',sourceDecimals:12,destinationDecimals:12,remainder:'reject'},snapshot};
   const intentBytes=encodeIntent({version:2,domain:context.configuration.domain,source_network:'mainnet',vault_epoch:'1',vault_address:vault.vaultAddress,
     destination_network:'ergo-testnet',destination_asset:asset,bridge_fee:'100',network_fee:'20',txid:d.txId,to_address:recipient,
@@ -92,5 +100,6 @@ export async function buildDepositSource(vault:any,node:LocalMonero,runtime:stri
   const decision=await verifyDeposit(intentBytes,generated.proof,request.receiptEvidence,{...context.configuration,snapshot,
     creditedDepositIds:new Set(),creditedOutputIds:new Set()},context.feePolicy,providers);
   if(decision.status!=='accepted')throw Error('Deposit policy '+decision.status+':'+decision.reason);
-  return {context,request,providers,decision,observation:o,deposit:d,current,publicScan:inspected.publicScan,proofRequest:{...proofRequest,proof:generated.proof}};
+  return registerAuthenticatedDepositSource({context,request,providers,decision,observation:o,deposit:d,current,publicScan:inspected.publicScan,
+    proofRequest:{...proofRequest,proof:generated.proof}},{genesis:vault.genesis,vaultSpend:vault.groupKey});
 }

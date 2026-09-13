@@ -3,6 +3,8 @@ import {createHash,randomBytes} from 'node:crypto';
 import {mkdtempSync,mkdirSync,readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
+import {captureBackingClaim} from './backingClaim.mjs';
+import {guardParticipantIO} from './participantAuthority.mjs';
 
 const hex32=()=>randomBytes(32).toString('hex');
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -33,13 +35,26 @@ export async function openParticipantVault({binary,sha256,runtime,mode='coinbase
 }
 
 /** Original holders scan the ordinary deposit without creating signing machines. */
-export async function inspectParticipantDeposit(vault,{fault}={}){
+export function captureParticipantDeposit(vault){
+  const state=liveVaults.get(vault);
+  if(!state||state.used||state.funded.source.kind!=='deposit')throw Error('Participant deposit unavailable');
+  return structuredClone(state.funded.source.deposit);
+}
+
+export async function inspectParticipantDeposit(vault,{fault,sourcePolicy,snapshot}={}){
+  if(sourcePolicy!==undefined&&sourcePolicy!=='authenticated-backing-v1')throw Error('Participant source policy');
   const state=liveVaults.get(vault);
   if(!state||state.used||state.inspected||state.funded.source.kind!=='deposit')throw Error('Participant inspection unavailable');
-  state.inspected=true;
+  if(snapshot!==undefined && sourcePolicy!=='authenticated-backing-v1')throw Error('Participant snapshot profile');
+  const selectedSnapshot=snapshot??state.funded.snapshot,properties=Object.getOwnPropertyDescriptors(selectedSnapshot);
+  if(Object.getPrototypeOf(selectedSnapshot)!==Object.prototype || Reflect.ownKeys(selectedSnapshot).length!==2 ||
+    !['height','hash'].every(key=>properties[key]?.enumerable&&Object.hasOwn(properties[key],'value')) ||
+    !Number.isSafeInteger(selectedSnapshot.height)||selectedSnapshot.height<=0||!/^[0-9a-f]{64}$/.test(selectedSnapshot.hash))throw Error('Participant snapshot schema');
+  const capturedSnapshot=Object.freeze({...selectedSnapshot});
+  state.inspected=true;state.inspectionPolicy=sourcePolicy;
   const {ceremony,funded}=state,actors=ceremony.actors.slice(0,2),inspection=hex32();
   const shared={type:'inspect-source',ceremony:ceremony.init.ceremony,epoch:ceremony.init.epoch,
-    rosterDigest:vault.rosterDigest,genesis:vault.genesis,inspection,snapshot:funded.snapshot,source:funded.source};
+    rosterDigest:vault.rosterDigest,genesis:vault.genesis,inspection,snapshot:capturedSnapshot,source:funded.source,...(sourcePolicy?{sourcePolicy}:{})};
   if(fault==='genesis')shared.genesis=hex32();
   if(fault==='snapshot')shared.snapshot={...shared.snapshot,hash:hex32()};
   try{
@@ -59,24 +74,35 @@ export async function inspectParticipantDeposit(vault,{fault}={}){
     for(let i=0;i<2;i++){
       const r=reports[i];
       if(r.type!=='source-verified'||r.id!==i+1||r.inspection!==inspection||r.ceremony!==shared.ceremony||r.epoch!==shared.epoch||
-        r.genesis!==shared.genesis||r.rosterDigest!==shared.rosterDigest||canonical(r.snapshot)!==canonical(funded.snapshot)||
+        r.genesis!==shared.genesis||r.rosterDigest!==shared.rosterDigest||canonical(r.snapshot)!==canonical(capturedSnapshot)||
         r.txId!==deposit.txId||r.blockHash!==deposit.blockHash||r.blockHeight!==deposit.blockHeight||r.outputKey!==deposit.outputKey||
         r.outputIndex!==deposit.outputIndex||r.chainIndex!==deposit.chainIndex||r.amountAtomic!==deposit.amountAtomic||
-        !/^[0-9a-f]{64}$/.test(r.keyImage)||r.spentStatus!==0||r.historyOccurrences!==1||r.walletSigns!==0)throw Error('Participant source observation');
+        !/^[0-9a-f]{64}$/.test(r.keyImage)||r.spentStatus!==0||r.sourcePolicy!==sourcePolicy||
+        (sourcePolicy?(!Number.isSafeInteger(r.historyOccurrences)||r.historyOccurrences<1||r.historyOccurrences>0xffffffff):r.historyOccurrences!==1)||r.walletSigns!==0)throw Error('Participant source observation');
     }
     const withoutId=({id,...report})=>report;
     if(canonical(withoutId(reports[0]))!==canonical(withoutId(reports[1])))throw Error('Participant source disagreement');
     // Only public source data leaves the issuer. The private scalar remains a file capability for the proof helper.
     return Object.freeze({deposit:Object.freeze({...deposit}),observation:Object.freeze({...reports[0]}),
-      publicScan:Object.freeze({groupPublicKey:vault.groupKey,genesis:vault.genesis,snapshot:structuredClone(funded.snapshot),source:structuredClone(funded.source),keyImage:reports[0].keyImage}),
+      publicScan:Object.freeze({groupPublicKey:vault.groupKey,genesis:vault.genesis,snapshot:structuredClone(capturedSnapshot),source:structuredClone(funded.source),keyImage:reports[0].keyImage,...(sourcePolicy?{sourcePolicy}:{})}),
       donorProofKeyPath:join(state.depositDirectory,'donor-tx-key.private')});
   }catch(error){await ceremony.close();throw error;}
 }
 
 /** The object registry admits only a vault created by this issuer's pinned processes. */
-export async function prepareParticipantSigning(vault,{request,rosenKeys,timestamp,fault}){
-  const state=liveVaults.get(vault);if(!state||state.used)throw Error('Participant vault unavailable');state.used=true;
-  const {ceremony,funded,runtime}=state,actors=ceremony.actors.slice(0,2);
+export async function prepareParticipantSigning(vault,{request,rosenKeys,timestamp,fault,backingClaim}){
+  const state=liveVaults.get(vault);if(!state||state.used)throw Error('Participant vault unavailable');
+  if(state.inspectionPolicy==='authenticated-backing-v1'){
+    const {request:claimRequest}=captureBackingClaim(backingClaim),backing=claimRequest.backing,deposit=state.funded.source.deposit;
+    if(backing.genesis!==vault.genesis||backing.vaultSpend!==vault.groupKey||backing.txid!==deposit.txId||
+      backing.outputIndex!==String(deposit.outputIndex)||backing.globalIndex!==String(deposit.chainIndex)||
+      backing.publicKey!==deposit.outputKey||backing.amountAtomic!==deposit.amountAtomic)throw Error('Participant backing claim mismatch');
+  }
+  state.used=true;
+  const {ceremony,funded,runtime}=state;
+  let approvalCurrent=()=>{};
+  const current=()=>{if(backingClaim!==undefined)captureBackingClaim(backingClaim);approvalCurrent();};
+  const actors=guardParticipantIO(ceremony.actors.slice(0,2),current);
   const attempt=hex32(),seed=hex32(),directory=mkdtempSync(join(runtime,'participant-attempt-'));
   const directories=[1,2].map(id=>{const path=join(directory,String(id));mkdirSync(path);return path;});
   const shared={type:'configure',ceremony:ceremony.init.ceremony,epoch:ceremony.init.epoch,rosterDigest:vault.rosterDigest,
@@ -109,10 +135,12 @@ export async function prepareParticipantSigning(vault,{request,rosenKeys,timesta
     const candidate=candidates[0];let consumed=false;
     return Object.freeze({candidate:Object.freeze({...candidate}),directories:Object.freeze([...directories]),
       counts:()=>Object.freeze({...counts}),
-      sign:async certificate=>{
+      sign:async(certificate,assertApprovalCurrent=()=>{})=>{
         if(consumed)throw Error('Participant attempt already consumed');consumed=true;
+        if(typeof assertApprovalCurrent!=='function')throw Error('Participant approval authority required');
+        approvalCurrent=assertApprovalCurrent;
         try{
-          await Promise.all(actors.map(a=>a.send({type:'approve',expectationDigest:candidate.expectationDigest,certificate})));
+          for(const actor of actors)await actor.send({type:'approve',expectationDigest:candidate.expectationDigest,certificate});
           await exchange(8);
           const outputs=await Promise.all(actors.map(a=>a.next()));
           for(let i=0;i<2;i++)if(outputs[i].type!=='final'||outputs[i].id!==i+1||outputs[i].walletSigns!==1)throw Error('Participant final owner');

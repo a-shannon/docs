@@ -20,6 +20,26 @@ const call = (f: Fixture) =>
   );
 
 describe('stateless deposit policy', () => {
+  it('requires explicit V2 policy and retains truthful multiplicity only as a candidate', async () => {
+    const f=multiFixture();f.receipt.outputs[0].keyOccurrences=2n;
+    expect((await call(f)).status).toBe('rejected');
+    f.config.outputHistoryPolicy='authenticated-backing-v1';
+    const accepted=await call(f);
+    expect(accepted.status).toBe('accepted');
+    if(accepted.status==='accepted'){
+      expect(accepted.authority).toBe('stateless-candidate');
+      expect(accepted.outputHistoryPolicy).toBe('authenticated-backing-v1');
+      expect(accepted.outputs[0].keyOccurrences).toBe(2n);
+    }
+    f.receipt.outputs[0].keyOccurrences=0n;expect((await call(f)).status).toBe('rejected');
+    f.receipt.outputs[0].keyOccurrences=2n;f.native.good=false;expect((await call(f)).status).toBe('rejected');
+    const legacy=fixture();legacy.config.outputHistoryPolicy='authenticated-backing-v1';
+    expect(await call(legacy)).toEqual({status:'indeterminate',reason:'config:output-history-policy'});
+    const unknown=fixture();(unknown.config as any).outputHistoryPolicy='unknown';
+    expect(await call(unknown)).toEqual({status:'indeterminate',reason:'config:output-history-policy'});
+    const ordinary=await call(fixture());expect(ordinary.status).toBe('accepted');
+    if(ordinary.status==='accepted'){expect(ordinary).not.toHaveProperty('outputHistoryPolicy');expect(ordinary.outputs[0]).not.toHaveProperty('keyOccurrences');}
+  });
   const providerFields = [
     [
       'proof',

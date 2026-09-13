@@ -4,16 +4,24 @@ import { createECDH } from 'node:crypto';
 import { MoneroCreditAssignment, canonicalAssignment, committeeConfigDigest, assignmentConfigDigest } from '../guard-service/src/db/moneroCreditAssignment.mjs';
 import { createMoneroCreditSigner, snapshotCreditSigning } from '../guard-service/src/deposit/moneroCreditSigner.mjs';
 
+const committeeCustody=new WeakMap();
+/** Only an actual committee handle can expose its retained claim operations. */
+export function captureCreditCommittee(handle){
+  const custody=committeeCustody.get(handle);
+  if(!custody)throw Error('backing:committee-unissued');
+  custody.current();return custody;
+}
+
 /** Fixed four-member local transport. Source verification remains guard-owned;
  * persistent assignments are never released by timeout or transport cleanup. */
 export async function createCreditCommittee({ directory, deployment, verifyForGuard, getStateContext,
-    policyDigest, activationId, custodyDomain, policyEpoch='1', timeoutMs=60000 }) {
+    policyDigest, activationId, custodyDomain, policyEpoch='1', backingPolicy, timeoutMs=60000 }) {
   if (!isAbsolute(directory ?? '') || typeof verifyForGuard!=='function' || typeof getStateContext!=='function' ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs<100 || timeoutMs>60000 || deployment?.threshold!==3 ||
       !Array.isArray(deployment.guardPublicKeys) || deployment.guardPublicKeys.length!==4 ||
       !Array.isArray(deployment.guardSecrets) || deployment.guardSecrets.length!==4) throw Error('credit-committee:composition');
   const keys=[...deployment.guardPublicKeys];
-  const configs=keys.map(guardKey=>({custodyDomain,guardKey,committeeKeys:[...keys],quorum:3,maxFaults:1,activationId,policyEpoch,policyDigest}));
+  const configs=keys.map(guardKey=>({custodyDomain,guardKey,committeeKeys:[...keys],quorum:3,maxFaults:1,activationId,policyEpoch,policyDigest,...(backingPolicy===undefined?{}:{backingPolicy})}));
   configs.forEach(assignmentConfigDigest);
   const secrets=[...deployment.guardSecrets];
   for (let i=0;i<4;i++) {
@@ -129,7 +137,7 @@ export async function createCreditCommittee({ directory, deployment, verifyForGu
     });
     requests.set(snapshot.txId,{digest:snapshot.digest,promise});return promise;
   };
-  return Object.freeze({sign,isInSign:async txId=>(await Promise.all(facades.map(f=>f.isInSign(txId)))).some(Boolean),
+  const handle=Object.freeze({sign,isInSign:async txId=>(await Promise.all(facades.map(f=>f.isInSign(txId)))).some(Boolean),
     configurations:()=>structuredClone(configs),committeeDigest:committeeConfigDigest(configs[0]),
     get counts(){return structuredClone(counts);},checkpoints:()=>ledgers.map(l=>l.checkpoint()),
     assertAssigned:request=>ledgers.map(l=>l.assertAssigned(request)),
@@ -141,4 +149,19 @@ export async function createCreditCommittee({ directory, deployment, verifyForGu
       // cannot obtain a later contribution from a closed guard.
       ledgers.forEach(l=>l.close());if(drain)await drain;
     }});
+  const current=()=>{if(closed)throw Error('backing:committee-closed');};
+  const retained=(method,request,settlement)=>{
+    current();
+    const rows=ledgers.map(ledger=>settlement===undefined?ledger[method](request):ledger[method](request,settlement));
+    current();
+    if(rows.length!==4 || new Set(rows.map(row=>row.requestDigest)).size!==1 ||
+      (settlement!==undefined && new Set(rows.map(row=>row.settlementDigest)).size!==1))throw Error('backing:committee-disagreement');
+    return rows;
+  };
+  committeeCustody.set(handle,Object.freeze({current,backingPolicy,
+    committeeDigest:committeeConfigDigest(configs[0]),
+    assertAssigned:request=>retained('assertAssigned',request),
+    reserveSettlement:(request,settlement)=>retained('reserveSettlement',request,settlement),
+    assertSettlement:(request,settlement)=>retained('assertSettlement',request,settlement)}));
+  return handle;
 }

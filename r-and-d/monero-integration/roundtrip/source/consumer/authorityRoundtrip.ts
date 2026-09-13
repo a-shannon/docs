@@ -17,7 +17,7 @@ import {setFixtureChain} from './resolver';
 import {verifyReturnAuthority} from '../ergo-node/return-authority.mjs';
 
 /** Same reviewed withdrawal owner/lifecycle; its input is the actual two-watcher return. */
-export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment}:any){
+export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment,backingClaim}:any){
   const verifySource=()=>verifyReturnAuthority({returnReceipt,redemption,deployment,terms:returnTerms});
   const trusted=await verifySource(),returnTx=trusted.transaction,returnBox=trusted.trigger,event=trusted.event;
   assert.equal(event.WIDsCount,2);
@@ -33,7 +33,8 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
   try{
     const timestamp=Math.floor(Date.now()/1000),database=join(directory,'withdrawal.sqlite');
     const authority={epoch:'1',publicKeys:state.keys,requiredSign:3,nativeParticipants:[1,2,3,4],nativeThreshold:2,nativeSelected:[1,2]};
-    const owner=await launchDistributedNative(vault,request,{database,clock:()=>1000n,leaseDuration:1000000n,authority},timestamp);
+    const beforeConstruction=await verifySource();assert.deepEqual(beforeConstruction.event,event);assert.equal(beforeConstruction.trigger.boxId,returnBox.boxId);
+    const owner=await launchDistributedNative(vault,request,{database,clock:()=>1000n,leaseDuration:1000000n,authority,backingClaim},timestamp);
     assert(owner.disposition.inputReferences.includes(source.deposit.outputKey));assert.equal(owner.disposition.recipientAtomic,'500000000');assert(await verify(owner.transaction));
     const agreement=new FixtureAgreement();await agreement.prepare();const signatures=await votes(owner.transaction,timestamp);
     const current=await verifySource();assert.deepEqual(current.event,event);assert.equal(current.trigger.boxId,returnBox.boxId);

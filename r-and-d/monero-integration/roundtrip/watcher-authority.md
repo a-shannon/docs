@@ -2,6 +2,11 @@
 
 A. Shannon — 13 September 2026
 
+This report records the baseline published at
+`9cfa50e73707627f594b28f70337bdaf6eea8b69`. Relative source links now show its
+successor; the [authenticated backing report](admission-backing.md) describes
+that increment and its separate qualification evidence.
+
 **The full local roundtrip passed with actual watcher commitment/reveal transactions in both directions and distributed credit authorization.** The frozen successor to revision `93d169f58f5d9671831a0f5f5a8a62ad959ba555` completed its linked test in 153.1 seconds. Its launcher verified the declared source, dependency, executable and configuration inputs before and after execution with no changes.
 
 The [full receipt](evidence/watcher-authority-roundtrip.json) records the following local-chain transactions; they are not public explorer identifiers:
@@ -53,7 +58,7 @@ The focused suites record 85 passing tests across the following boundaries. They
 | Watcher jobs → return admission | Two distinct commitments, exact redemption and primary trigger | 4 watcher + 4 return + 5 return-authority checks |
 | Launcher/diagnostic ports → owned runtime | Scoped execution, exact framing and bounded telemetry | 18 launcher + 4 proxy checks |
 
-The successful combined replay is pinned to the [341-file manifest](source/source-manifest.json), SHA-256 `295620fd3591ff89fb29805b6963d18360d13a99931b9916ba5f0c82b32ef835`, aggregate source digest `2f7d21b4d892dea82092e4768dd1b9955a95d1aac3a4f929b8f95185aebaf918`. The [qualification record](evidence/watcher-authority-qualification.json) binds the run and component-source pins. The unchanged original native signing and withdrawal suites remain prior evidence; their new composed input path is exercised here.
+The successful combined replay is pinned to the [341-file historical manifest](https://github.com/a-shannon/docs/blob/9cfa50e73707627f594b28f70337bdaf6eea8b69/r-and-d/monero-integration/roundtrip/source/source-manifest.json), SHA-256 `295620fd3591ff89fb29805b6963d18360d13a99931b9916ba5f0c82b32ef835`, aggregate source digest `2f7d21b4d892dea82092e4768dd1b9955a95d1aac3a4f929b8f95185aebaf918`. The [qualification record](evidence/watcher-authority-qualification.json) binds the run and component-source pins. The unchanged original native signing and withdrawal suites remain prior evidence; their new composed input path is exercised here.
 
 ## Remaining qualification
 

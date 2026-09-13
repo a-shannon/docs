@@ -20,7 +20,11 @@ fn decimal(v: &Value, field: &str) -> R<()> {
 struct Request { value: Value, group: [u8;32], genesis: [u8;32], image: [u8;32] }
 fn parse(frame: &[u8]) -> R<Request> {
     let value = w::parse(frame)?;
-    w::fields(&value, &["observerNonce","groupPublicKey","genesis","snapshot","source","keyImage"])?;
+    let opted=value.get("sourcePolicy").is_some();
+    if opted && w::string(&value,"sourcePolicy")?!="authenticated-backing-v1" {return Err(())}
+    let mut fields=vec!["observerNonce","groupPublicKey","genesis","snapshot","source","keyImage"];
+    if opted {fields.push("sourcePolicy");}
+    w::fields(&value,&fields)?;
     hash32(&value,"observerNonce")?;
     let group=hash32(&value,"groupPublicKey")?;
     let genesis=hash32(&value,"genesis")?;
@@ -62,9 +66,10 @@ fn observe(request: Request) -> R<Value> {
     let public_key=output.key().compress().to_bytes();
     // This checks only the supplied image's status. Its association with P needs
     // the separately verified original-holder threshold image attestation.
-    let occurrences=node::participant_unspent_history(request.genesis,&v["snapshot"],public_key,request.image)?;
+    let history=if v.get("sourcePolicy").is_some(){node::participant_unspent_occurrences}else{node::participant_unspent_history};
+    let occurrences=history(request.genesis,&v["snapshot"],public_key,request.image)?;
     node::participant_snapshot(request.genesis,&v["snapshot"])?;
-    Ok(json!({"type":"public-source-observation","observerNonce":v["observerNonce"],
+    let mut result=json!({"type":"public-source-observation","observerNonce":v["observerNonce"],
         "observerKind":"local-fixture-fixed-view-v1","genesis":v["genesis"],"snapshot":v["snapshot"],
         "vaultAddress":vault.legacy_address(monero_wallet::address::Network::Mainnet).to_string(),
         "sourceRequestDigest":w::hex(&w::digest(b"rosen-monero/public-source-observer/v1",&w::bytes(v))),
@@ -73,7 +78,9 @@ fn observe(request: Request) -> R<Value> {
           "outputIndex":output.index_in_transaction(),"chainIndex":output.index_on_blockchain(),
           "amountAtomic":output.commitment().amount.to_string(),"feeAtomic":v["source"]["deposit"]["feeAtomic"],
           "owned":true,"maturity":"unlocked","historyOccurrences":occurrences}],
-        "suppliedKeyImage":w::hex(&request.image),"suppliedKeyImageSpentStatus":0,"imageAssociationVerified":false}))
+        "suppliedKeyImage":w::hex(&request.image),"suppliedKeyImageSpentStatus":0,"imageAssociationVerified":false});
+    if let Some(policy)=v.get("sourcePolicy"){result["sourcePolicy"]=policy.clone();}
+    Ok(result)
 }
 pub(crate) fn run(mut input: impl Read, mut output: impl Write) -> R<()> {
     let mut frame=Vec::new();
@@ -97,6 +104,13 @@ mod tests {
     }
     fn frame(v:&Value)->Vec<u8>{let mut b=w::bytes(v);b.push(b'\n');b}
     #[test] fn public_source_observer_schema_positive() {assert!(parse(&frame(&value())).is_ok());}
+    #[test] fn public_source_observer_explicit_policy() {
+        let mut v=value();v["sourcePolicy"]=json!("authenticated-backing-v1");
+        assert!(parse(&frame(&v)).is_ok());
+        for invalid in [json!(null),json!("unknown"),json!(1)]{
+            v["sourcePolicy"]=invalid;assert!(parse(&frame(&v)).is_err());
+        }
+    }
     #[test] fn public_source_observer_single_faults() {
         for path in ["observerNonce","groupPublicKey","genesis","keyImage"] {
             let mut v=value();v[path]=json!("00".repeat(32));assert!(parse(&frame(&v)).is_err());

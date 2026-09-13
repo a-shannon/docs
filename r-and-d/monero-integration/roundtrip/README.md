@@ -1,11 +1,15 @@
 # Monero → Ergo → Monero: local integration experiment
 
-A. Shannon · 13 September 2026
+A. Shannon · 14 September 2026
 
-**Latest result: the roundtrip passed with actual watcher transactions in both
-directions and four independently checking credit-guard instances.** Read the
-[watcher and guard authority report](watcher-authority.md) for the new execution,
-permanent output assignments, credit restart and post-rollback quarantine.
+**Latest increment: authenticated deposit backing despite copied output keys.**
+Read the [admission and backing report](admission-backing.md) for the mitigation,
+the qualification matrix and the distinction between complete bridge runs and
+Monero-only copy-first tests.
+
+The [watcher and guard authority report](watcher-authority.md) records the earlier
+roundtrip with actual watcher transactions in both directions, four independently
+checking credit-guard instances, credit restart and post-rollback quarantine.
 
 The earlier linked roundtrip also passed on both actual local nodes. Its observed
 return uses one signing call, two original-holder contributions and one Monero

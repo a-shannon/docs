@@ -17,6 +17,10 @@ const configBytes=readFileSync(args.config),config=JSON.parse(configBytes);
 for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','ergoRuntime'])if(typeof config[key]!=='string'||!isAbsolute(config[key]))throw Error('Absolute configuration: '+key);
 const work=resolve(config.runtimeDirectory),rosen=resolve(config.rosenRoot);
 const observerFiles=profile==='watcher-authority'?[[config.observerBinary,config.observerSha256]]:[];
+if(config.collisionExperiment!==undefined){
+  if(profile!=='watcher-authority'||!['raw-before-credit','decodable-before-credit','raw-after-credit','decodable-after-credit'].includes(config.collisionExperiment))throw Error('Collision profile');
+  observerFiles.push([config.collisionBinary,config.collisionSha256]);
+}
 for(const [file,pin] of observerFiles)if(typeof file!=='string'||!isAbsolute(file)||!/^[0-9a-f]{64}$/.test(pin)||sha(readFileSync(file))!==pin)throw Error('Observer executable pin');
 assertExternalWork(work,[root,rosen,config.ergoRuntime,config.nativeBinary,config.moneroDaemon,args.config,process.execPath]);
 if(observerFiles.length)assertExternalWork(work,observerFiles.map(([file])=>file));
@@ -64,7 +68,7 @@ const proofConfig=JSON.stringify(Object.fromEntries(['proofBinary','proofBinaryS
 const runId=randomUUID(),cwd=join(fixture,'consumer');
 const env={...process.env,ROUNDTRIP_CONFIG:runtimeConfig,ROUNDTRIP_PROOF_CONFIG:proofConfig,WSLENV:[process.env.WSLENV,'ROUNDTRIP_PROOF_CONFIG'].filter(Boolean).join(':'),PARTICIPANT_SHA256:config.nativeSha256,MONERO_NODE_NATIVE_SHA256:config.nativeSha256,PARTICIPANT_BIN:config.nativeBinary,W1HB_RUN_ID:runId,W1HB_TRACE_DIR:trace,W1HC_SPEC:spec,NODE_OPTIONS:'--experimental-vm-modules --import ./observe.mjs --import tsx --import '+pathToFileURL(join(fixture,'ergo-node/deposit-register.mjs')).href};
 const command=[join(rosen,'node_modules/vitest/vitest.mjs'),args['collect-only']?'list':'run','--config',testConfig,...(args['collect-only']?[]:['--reporter','verbose'])];
-writeFileSync(join(work,'execution-before.json'),JSON.stringify({runId,profile,manifestSha256:args['manifest-sha256'],aggregateSha256:manifest.aggregateSha256,nodeSha256:sha(readFileSync(process.execPath)),nativeSha256:config.nativeSha256,moneroDaemonSha256:config.moneroDaemonSha256,...(observerFiles.length?{observerSha256:config.observerSha256}:{}),command},null,2),{flag:'wx'});
+writeFileSync(join(work,'execution-before.json'),JSON.stringify({runId,profile,manifestSha256:args['manifest-sha256'],aggregateSha256:manifest.aggregateSha256,nodeSha256:sha(readFileSync(process.execPath)),nativeSha256:config.nativeSha256,moneroDaemonSha256:config.moneroDaemonSha256,...(observerFiles.length?{observerSha256:config.observerSha256}:{}),...(config.collisionExperiment?{collisionExperiment:config.collisionExperiment,collisionSha256:config.collisionSha256}:{}),command},null,2),{flag:'wx'});
 const child=spawn(process.execPath,command,{cwd,env,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe']}),stdout=[],stderr=[];
 child.stdout.on('data',x=>stdout.push(Buffer.from(x)));child.stderr.on('data',x=>stderr.push(Buffer.from(x)));
 const code=await new Promise((ok,bad)=>{child.once('error',bad);child.once('close',ok);});

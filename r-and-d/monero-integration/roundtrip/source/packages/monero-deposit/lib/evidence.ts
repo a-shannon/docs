@@ -105,6 +105,8 @@ export interface VerificationProviders {
 }
 
 export interface DepositConfig {
+  /** Stateless reporting policy; persistent backing authority is a separate gate. */
+  outputHistoryPolicy?: 'authenticated-backing-v1';
   version: 1 | 2;
   domain: string;
   sourceNetwork: MoneroNetwork;

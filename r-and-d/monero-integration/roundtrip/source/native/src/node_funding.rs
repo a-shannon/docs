@@ -274,6 +274,11 @@ pub(in crate::common_owner) fn participant_snapshot(expected_genesis:[u8;32],sna
 }
 #[cfg(feature="participant-host")]
 pub(in crate::common_owner) fn participant_unspent_history(expected_genesis:[u8;32],snapshot:&Value,output_key:[u8;32],key_image:[u8;32])->HostResult<usize>{
+    let occurrences=participant_unspent_occurrences(expected_genesis,snapshot,output_key,key_image)?;
+    if occurrences!=1{return Err(())} Ok(occurrences)
+}
+#[cfg(feature="participant-host")]
+pub(in crate::common_owner) fn participant_unspent_occurrences(expected_genesis:[u8;32],snapshot:&Value,output_key:[u8;32],key_image:[u8;32])->HostResult<usize>{
     participant_snapshot(expected_genesis,snapshot)?;let rpc=Rpc::connect()?;let height=number(snapshot,"height")?;
     let mut occurrences=0usize;
     // Full bounded chain traversal includes miner and ordinary outputs. Genesis
@@ -291,7 +296,7 @@ pub(in crate::common_owner) fn participant_unspent_history(expected_genesis:[u8;
             occurrences+=tx.prefix().outputs.iter().filter(|o|o.key.to_bytes()==output_key).count();
         }
     }
-    if occurrences!=1{return Err(())}
+    if occurrences==0{return Err(())}
     let spent=rpc.call("/is_key_image_spent",json!({"key_images":[hex(&key_image)]}))?;
     if spent.get("spent_status")!=Some(&json!([0])){return Err(())}
     participant_snapshot(expected_genesis,snapshot)?;Ok(occurrences)
