@@ -111,6 +111,8 @@ qualifications are necessary to preserve what was really tested.
 | Previously inspected future staging | [8836273dcb7ffc661ebddbbd2c3f3f6c9558897b](https://github.com/seraphis-migration/monero/tree/8836273dcb7ffc661ebddbbd2c3f3f6c9558897b) |
 | Native future multisig candidate | [89067f94e36b093b9a301004a986ea6a466698e1](https://github.com/UkoeHB/monero/tree/89067f94e36b093b9a301004a986ea6a466698e1) |
 | Rust future signing primitives | [31c26d96eaadbba910ffe3613ad8b4cf9c598a93](https://github.com/monero-oxide/monero-oxide/tree/31c26d96eaadbba910ffe3613ad8b4cf9c598a93) |
+| Developer schedule, revised 21 August 2026 | [85c4998f96233b47031d231a27f7e76cc2d9cdf0](https://github.com/jeffro256/fcmp-carrot-plan/tree/85c4998f96233b47031d231a27f7e76cc2d9cdf0); explicitly non-binding forecast |
+| Subsequent developer status | [MRL meeting, 9 September 2026](https://libera.monerologs.net/monero-research-lab/20260909); phase 2 PR review readiness, hot/cold progress and audit quote evaluation |
 
 These future branch pins are not a single compatible dependency closure. The
 native future candidate uses its own Rust dependency, rather than automatically
@@ -118,6 +120,13 @@ using the separately listed Rust branch. Its previously observed API compilation
 failure is a candidate-specific limitation, not an assertion that every newer
 multisig implementation fails. The beta release was rechecked for this report;
 the earlier branch investigations are retained at their exact historical pins.
+
+The schedule and later status observations add planning context, not execution
+evidence. Candidate migration can be tested before network activation; the
+exact old-share/new-wallet restoration and redemption path remains unexecuted
+in this study. General recovery requirements and duplicate-output controls
+remain acceptance obligations rather than standalone evidence for waiting on
+the network upgrade.
 
 Selected local artifact identities:
 
@@ -148,6 +157,8 @@ The native build toolchain was Rust/Cargo 1.98.1; final B Node execution was
 | Is there a focused answer to duplicate-output accounting? | Yes, conservative identity/exclusion policy and native fixture refusals | Canonical history, post-credit conflict and reorg reconciliation |
 | Does experimental multisig prove impossibility? | No | Select and qualify exact implementation against service requirements |
 | Is post-fork support already demonstrated? | No; concrete candidate mechanisms exist | Compatible wallet/proof release and historical-reserve redemption at threshold |
+| Must integration wait for network activation? | No such requirement is established by the inspected evidence | Complete integration acceptance and a qualified continuity strategy before creating real obligations |
+| Can exact migration compatibility be assessed before activation? | Yes, against pinned candidate versions; fundamental incompatibility has not been identified | Actual old-share restoration, selected historical reserves and threshold redemption/recovery; requalification after relevant changes |
 | Does this justify publishing research now? | Yes, as a bounded preliminary study | Portable fixture release/replay would strengthen public reproducibility |
 | Is the complete bridge ready? | No | Integrated roundtrip, recovery, economics, migration and deployment review |
 

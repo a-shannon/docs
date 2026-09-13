@@ -34,6 +34,14 @@ The candidate engine deserves further work, with FCMP++/Carrot compatibility
 treated as a first-class selection criterion. No monetary launch cap, timeline,
 production committee size or assurance certification follows from this study.
 
+The inspected evidence does not establish a need to wait for FCMP++/Carrot
+activation before implementing the bridge. Duplicate-output accounting and
+general custody/recovery obligations do not, by themselves, justify waiting.
+The exact engine's migration compatibility can be investigated and tested on
+candidate versions before activation. A pre-fork launch remains conditional
+on the bridge's complete acceptance criteria and continued redemption; it is
+an engineering and operating decision, not a demonstrated protocol impossibility.
+
 ## 2. What the original proposal establishes, and what it misses
 
 Rosen's article identifies a useful direction: threshold vault custody and an
@@ -213,6 +221,12 @@ It is still not an exhaustive live-chain scan or a complete reorg/solvency
 demonstration. Armeanio's warning is therefore a substantive accounting
 requirement, not proof that a bridge is impossible.
 
+The exclusion rule is straightforward; its persistent integration must handle
+the post-credit and canonical-history cases above. This is a scoped accounting
+obligation with targeted test evidence, not an identified need for a new
+cryptographic construction. Carrot may simplify part of that work, but the
+burning issue alone is not an established reason to defer integration.
+
 Use an accounting invariant such as `usable reserves >= outstanding obligations
 + required fee cover`, with mutually exclusive categories. An in-flight payout
 must be represented once: either within outstanding redemption liability or
@@ -347,6 +361,15 @@ candidate JSON, agreement messages or diagnostic logs.
 
 ## 10. Durable execution and economic recovery
 
+Custody, authorization, interrupted signing and uncertain settlement are general
+bridge obligations. Rosen already has distributed ECDSA/EdDSA signing and sign
+status handling. Its applicable approval and operational mechanisms should be
+reused. Monero adds a different wallet/signing engine, private output and spent
+state, and engine-specific persistence contracts; an existing signer's state
+or nonce recovery cannot simply be assumed compatible. These adaptations need
+qualification under either protocol version.
+[Rosen guard-service releases](https://github.com/rosen-bridge/guard-service/releases).
+
 The investigation separately exercised native nonce/capsule persistence,
 SQLite reservations, local credit delivery and completed-transaction custody.
 These results reduce uncertainty about specific failure boundaries. They do
@@ -410,13 +433,35 @@ replacement for the chosen deposit contract.
 [Multisig sync PR291](https://github.com/seraphis-migration/monero/pull/291),
 [knowledge-proof PR270](https://github.com/seraphis-migration/monero/pull/270).
 
-Kushti's expectation that multisig should precede rollout is compatible with a
-release that does not yet include it. This study did not verify a committed
-minimum lead time between multisig availability and activation. Roadmap intention,
-candidate code, integrated release and Rosen qualification are separate facts.
-The relevant decision is whether one selected release supports the required
-custody and proof path before Rosen creates real obligations. The upstream
-hard-fork milestone has no due date in the inspected listing.
+There is a public developer forecast. Jeffro256's working plan, revised on
+21 August 2026 at `85c4998f96233b47031d231a27f7e76cc2d9cdf0`, gives the following
+targets. They are scheduled tasks, not observed completions or committed dates.
+
+| Planned milestone | Target in the 21 August plan |
+| --- | --- |
+| Finish multisig development / merge | 22 / 23 September 2026 |
+| First fork-compatible binary release | 14–21 October 2026 |
+| Fully featured binary release | 2–9 December 2026 |
+| Network activation | 3–4 March 2027 |
+
+The author explicitly describes the plan as a non-binding working draft.
+[Pinned schedule](https://github.com/jeffro256/fcmp-carrot-plan/blob/85c4998f96233b47031d231a27f7e76cc2d9cdf0/fcmp%2B%2B-carrot.planner),
+[plan scope](https://github.com/jeffro256/fcmp-carrot-plan/blob/85c4998f96233b47031d231a27f7e76cc2d9cdf0/README.md).
+
+Actual progress must be checked separately. At the 9 September MRL meeting,
+jberman reported phase 2 integration PRs ready for review, hot/cold wallet work
+nearly complete, and ongoing evaluation of circuit/gadgets/fcmp-plus-plus audit
+quotes. The `carrot_core` PR remained open when checked on 13 September, despite
+the plan's 1 September merge target. These observations show active work and
+calendar slippage; they do not establish a replacement activation date.
+[9 September meeting](https://libera.monerologs.net/monero-research-lab/20260909),
+[carrot_core PR](https://github.com/monero-project/monero/pull/9559).
+
+The upstream hard-fork milestone has no due date; that does not mean no estimate
+exists. The developer forecast supports Kushti's expectation that multisig
+precedes activation, without guaranteeing a minimum lead time. An integrated
+release and qualification for Rosen remain separate milestones. The dates
+above are not an ETA for launching the Rosen integration.
 [FCMP++ milestone](https://github.com/monero-project/monero/milestone/1).
 
 Armeanio's optimism and earlier concerns can therefore both be correct. The
@@ -444,6 +489,17 @@ output is eligible or every old signed blob remains valid. The previously
 inspected hard-fork table used mock activation values. Use actual adopted rules
 and selected outputs before relying on a transition window.
 [Pinned staging hard-fork source](https://github.com/seraphis-migration/monero/blob/8836273dcb7ffc661ebddbbd2c3f3f6c9558897b/src/hardforks/hardforks.cpp).
+
+The inspected transaction builder has a historical-output spending path, and
+the Rust candidate contains threshold signing for the legacy path. These are
+positive compatibility evidence; no inspected result establishes a fundamental
+cryptographic incompatibility preventing threshold migration. They do not yet
+prove that the chosen old shares and metadata restore correctly into the chosen
+new wallet. That exact integration can be analyzed and exercised before mainnet
+activation, with engine adaptation where needed. Relevant later changes require
+renewed qualification of the affected parts.
+[Historical-output builder](https://github.com/seraphis-migration/monero/blob/8836273dcb7ffc661ebddbbd2c3f3f6c9558897b/src/wallet/tx_builder.cpp),
+[legacy threshold algorithm](https://github.com/monero-oxide/monero-oxide/blob/31c26d96eaadbba910ffe3613ad8b4cf9c598a93/monero-oxide/ringct/fcmp%2B%2B/src/sal/legacy_multisig.rs).
 
 The decisive migration test starts from a disposable vault created by the old
 engine, with separately held shares, historical reserves and an outstanding
@@ -474,6 +530,12 @@ is not a prerequisite to that choice.
 
 Some of priorities 4 and 5 can progress alongside the missing joins. They must
 not be silently waived because a release is expected to arrive.
+
+Qualifying candidate migration early informs the choice between launching
+before the fork and beginning directly on the future protocol. The former adds
+an obligation to preserve existing reserves and claims across the transition;
+the latter avoids creating those pre-fork obligations. Neither option requires
+waiting for mainnet activation to conduct the integration experiments.
 
 Stop or redesign if the selected engine requires reconstruction of a complete
 spend key, cannot meet the accepted availability model, cannot preserve obligations

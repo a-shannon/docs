@@ -7,6 +7,12 @@ supported by targeted native and Rosen experiments. Proceed to a bounded
 integration prototype. Complete bridge feasibility, production readiness and
 FCMP++/Carrot redemption continuity have not been demonstrated.**
 
+The study does not establish that waiting for FCMP++/Carrot activation is
+necessary. Current-protocol integration can proceed while compatibility with
+the future engine is investigated and tested on candidate versions. Choosing
+when to launch requires both the remaining validations and an assessment of
+the operating and migration work involved.
+
 This study follows the [original Rosen proposal](https://docs.rosen.tech/rosen/r-and-d/bringing-monero)
 and the [architecture RFC](https://github.com/rosen-bridge/docs/pull/1). Its main
 contribution is identifying which pieces can actually be composed, testing
@@ -26,6 +32,12 @@ is encouraging development evidence. It is a stressnet release dated 27 May
 wallets as nonfunctional in that release. Separate candidate branches already
 contain future signing work. This distinction supports continued engineering,
 while leaving the compatible wallet and migration gates open.
+
+A [developer working plan](https://github.com/jeffro256/fcmp-carrot-plan/blob/85c4998f96233b47031d231a27f7e76cc2d9cdf0/README.md),
+revised on 21 August 2026, targets multisig integration and initial compatible
+binaries during autumn 2026, followed by activation in early March 2027. It is
+explicitly non-binding. The technical report distinguishes these targets from
+observed progress and Rosen readiness.
 
 The preliminary study is complete as a decision document. The immediate next
 technical milestone is a request and reservation backed retained Monero owner,
