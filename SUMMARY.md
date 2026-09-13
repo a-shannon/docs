@@ -29,3 +29,6 @@
 * [Bringing Monero](r-and-d/bringing-monero.md)
 * [Monero Integration: Architecture and Implementation Plan](r-and-d/monero-integration-plan.md)
   * [Technical Basis and Evidence](r-and-d/monero-integration/technical-basis.md)
+  * [Preliminary Feasibility Findings](r-and-d/monero-integration/preliminary-study/README.md)
+    * [Architecture, Findings and Remaining Work](r-and-d/monero-integration/preliminary-study/technical-report.md)
+    * [Evidence Ledger](r-and-d/monero-integration/preliminary-study/evidence-ledger.md)
