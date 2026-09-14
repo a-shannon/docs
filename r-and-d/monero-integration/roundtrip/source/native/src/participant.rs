@@ -39,6 +39,7 @@ struct Actor {
     roster_digest: String,
     signing: Option<crate::common_owner::participant_signing::ActorSigning>,
     funded: bool,
+    deposit: Option<crate::common_owner::participant_signing::PendingDeposit>,
     inspection: Option<crate::common_owner::participant_source::SourceInspection>,
     inspected: bool,
 }
@@ -64,6 +65,7 @@ impl Actor {
             roster_digest: String::new(),
             signing: None,
             funded: false,
+            deposit: None,
             inspection: None,
             inspected: false,
         })
@@ -127,6 +129,7 @@ impl Actor {
             self.phase = Phase::Retired;
             self.keys = None;
             self.signing = None;
+            self.deposit = None;
             self.inspection = None;
             self.inbox.clear();
         }
@@ -139,9 +142,15 @@ impl Actor {
             self.phase = Phase::Retired;
             self.keys = None;
             self.signing = None;
+            self.deposit = None;
             self.inspection = None;
             self.inbox.clear();
             return Ok(vec![]);
+        }
+        // Taking the opaque capability consumes it before request validation or
+        // any node effect. Every other command while pending retires the actor.
+        if let Some(deposit) = self.deposit.take() {
+            return Ok(vec![deposit.submit(v)?]);
         }
         if let Some(signing) = &mut self.signing {
             return signing.accept(v, &self.identity, &self.peers);
@@ -167,7 +176,7 @@ impl Actor {
             self.inspection = Some(inspection);
             return Ok(vec![out]);
         }
-        if matches!(self.phase, Phase::Ready) && matches!(kind, "fund" | "fund-deposit") {
+        if matches!(self.phase, Phase::Ready) && matches!(kind, "fund" | "fund-deposit" | "prepare-deposit") {
             if kind == "fund" {
                 wire::fields(v, &["type"])?
             } else {
@@ -178,6 +187,14 @@ impl Actor {
             }
             self.funded = true;
             let group = self.keys.as_ref().ok_or(())?.group_key().to_bytes();
+            if kind == "prepare-deposit" {
+                let (pending, frame) = crate::common_owner::participant_signing::prepare_deposit(
+                    group,
+                    std::path::Path::new(wire::string(v, "runtimeDirectory")?),
+                )?;
+                self.deposit = Some(pending);
+                return Ok(vec![frame]);
+            }
             return Ok(vec![if kind == "fund" {
                 crate::common_owner::participant_signing::fund(group)?
             } else {

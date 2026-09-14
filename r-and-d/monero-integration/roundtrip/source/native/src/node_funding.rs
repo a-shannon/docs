@@ -161,17 +161,51 @@ fn scan_deposit(rpc:&Rpc,vault:&ViewPair,deposit:&Value,height:u64)->HostResult<
     Ok(output)
 }
 #[cfg(feature="participant-host")]
-pub(in crate::common_owner) fn participant_fund_deposit(group:[u8;32],directory:&Path)->HostResult<Value>{
+pub(in crate::common_owner) struct PreparedDeposit {
+    vault:ViewPair, genesis:[u8;32], start:u64, hashes:Vec<String>, reserves:Vec<WalletOutput>,
+    snapshot_height:u64, snapshot_hash:[u8;32], txid:[u8;32], raw:Vec<u8>, deposit:Value,
+}
+#[cfg(feature="participant-host")]
+impl PreparedDeposit {
+    pub(in crate::common_owner) fn public_frame(&self)->Value {
+        json!({"type":"deposit-prepared","id":1,"genesis":hex(&self.genesis),
+            "vaultAddress":self.vault.legacy_address(Network::Mainnet).to_string(),"deposit":self.deposit})
+    }
+    pub(in crate::common_owner) fn txid(&self)->[u8;32]{self.txid}
+    fn check(&self,rpc:&Rpc)->HostResult<()> {
+        // Extensions are allowed. The original tip and source blocks must still
+        // be canonical; a newer tip never substitutes for the retained anchor.
+        check_deposit_anchor(self.genesis,self.snapshot_height,self.snapshot_hash,
+            genesis(rpc)?,rpc.check()?,rpc.block(self.snapshot_height-1)?.block.hash())?;
+        for (offset,hash) in self.hashes.iter().enumerate(){
+            if hex(&rpc.block(self.start+offset as u64)?.block.hash())!=*hash{return Err(())}
+        }
+        rpc.check()?;if genesis(rpc)?!=self.genesis{return Err(())}
+        Ok(())
+    }
+}
+#[cfg(feature="participant-host")]
+fn check_deposit_anchor(expected_genesis:[u8;32],height:u64,hash:[u8;32],actual_genesis:[u8;32],tip:u64,actual_hash:[u8;32])->HostResult<()> {
+    if height==0||tip<height||actual_genesis!=expected_genesis||actual_hash!=hash{return Err(())}Ok(())
+}
+#[cfg(feature="participant-host")]
+fn deposit_mine(rpc:&Rpc,expected_genesis:[u8;32],address:String,count:u64)->HostResult<()> {
+    if genesis(rpc)?!=expected_genesis{return Err(())}rpc.mine(address,count)?;
+    if genesis(rpc)?!=expected_genesis{return Err(())}Ok(())
+}
+#[cfg(feature="participant-host")]
+pub(in crate::common_owner) fn participant_prepare_deposit(group:[u8;32],directory:&Path)->HostResult<PreparedDeposit>{
+    let rpc=Rpc::connect()?;let original_genesis=genesis(&rpc)?;let donor_start=rpc.check()?;
     if !directory.is_absolute(){return Err(())}std::fs::create_dir_all(directory).map_err(|_|())?;
     if std::fs::read_dir(directory).map_err(|_|())?.next().is_some(){return Err(())}
     let guard=directory.join("donor-session.private");let mut guard_file=OpenOptions::new().write(true).create_new(true).open(&guard).map_err(|_|())?;
     guard_file.write_all(b"WMDONOR1\n").map_err(|_|())?;guard_file.sync_all().map_err(|_|())?;
-    let rpc=Rpc::connect()?;let original_genesis=genesis(&rpc)?;let donor_start=rpc.check()?;
     let donor=recipient()?;let vault=public_vault(group)?;
-    rpc.mine(donor.legacy_address(Network::Mainnet).to_string(),18)?;
-    let start=rpc.check()?;rpc.mine(vault.legacy_address(Network::Mainnet).to_string(),18)?;
-    rpc.mine(donor.legacy_address(Network::Mainnet).to_string(),60)?;
-    let height=rpc.check()?;let mut donor_scanner=Scanner::new(donor.clone());let mut donor_outputs=Vec::new();
+    deposit_mine(&rpc,original_genesis,donor.legacy_address(Network::Mainnet).to_string(),18)?;
+    let start=rpc.check()?;deposit_mine(&rpc,original_genesis,vault.legacy_address(Network::Mainnet).to_string(),18)?;
+    deposit_mine(&rpc,original_genesis,donor.legacy_address(Network::Mainnet).to_string(),60)?;
+    let height=rpc.check()?;let snapshot_hash=rpc.block(height.checked_sub(1).ok_or(())?)?.block.hash();
+    let mut donor_scanner=Scanner::new(donor.clone());let mut donor_outputs=Vec::new();
     for n in donor_start..donor_start+18{donor_outputs.extend(donor_scanner.scan(rpc.block(n)?).map_err(|_|())?.additional_timelock_satisfied_by(height as usize,0));}
     if donor_outputs.len()!=18{return Err(())}
     let mut donor_indices=donor_outputs.iter().map(WalletOutput::index_on_blockchain).collect::<Vec<_>>();donor_indices.sort_unstable();donor_indices.truncate(16);
@@ -194,23 +228,45 @@ pub(in crate::common_owner) fn participant_fund_deposit(group:[u8;32],directory:
     let key_path=directory.join("donor-tx-key.private");let mut key_file=OpenOptions::new().write(true).create_new(true).open(&key_path).map_err(|_|())?;
     key_file.write_all(&private).map_err(|_|())?;key_file.sync_all().map_err(|_|())?;
     let readback=Zeroizing::new(std::fs::read(&key_path).map_err(|_|())?);if *readback!=*private||readback.len()!=32{return Err(())}
-    let txid=tx.hash();let raw=tx.serialize();rpc.check()?;
-    let submitted=rpc.call("/send_raw_transaction",json!({"tx_as_hex":hex(&raw),"do_not_relay":false}))?;
-    for flag in ["double_spend","fee_too_low","invalid_input","invalid_output","low_mixin","not_rct","overspend","too_big","too_few_outputs"]{if submitted.get(flag)==Some(&Value::Bool(true)){return Err(())}}
-    let admission_height=rpc.check()?;rpc.mine(donor.legacy_address(Network::Mainnet).to_string(),1)?;
-    rpc.mine(donor.legacy_address(Network::Mainnet).to_string(),60)?;let height=rpc.check()?;
-    let admission=rpc.block(admission_height)?;
-    if admission.block.transactions.iter().filter(|id|**id==txid).count()!=1{return Err(())}
-    let deposit_outputs=Scanner::new(vault.clone()).scan(admission.clone()).map_err(|_|())?.not_additionally_locked().into_iter().filter(|o|o.transaction()==txid).collect::<Vec<_>>();
-    if deposit_outputs.len()!=1{return Err(())}let deposit_output=&deposit_outputs[0];
+    let txid=tx.hash();let raw=tx.serialize();
     let Transaction::V2{proofs:Some(ref proofs),..}=tx else{return Err(())};
-    let deposit=json!({"txId":hex(&txid),"txBytes":hex(&raw),"blockHash":hex(&admission.block.hash()),"blockHeight":admission_height,
-        "outputKey":hex(&deposit_output.key().compress().to_bytes()),"outputIndex":deposit_output.index_in_transaction(),"chainIndex":deposit_output.index_on_blockchain(),
-        "amountAtomic":deposit_output.commitment().amount.to_string(),"feeAtomic":proofs.base.fee.to_string()});
-    let ordinary=scan_deposit(&rpc,&vault,&deposit,height)?;
+    let fee=proofs.base.fee;
+    // Scanner requires a block-shaped container. This local projection supplies
+    // only output identity and amount, never inclusion or a global output index.
+    let mut container=rpc.block(start)?;container.block.transactions=vec![txid];
+    container.transactions=vec![Transaction::<Pruned>::from(tx)];
+    let outputs=Scanner::new(vault.clone()).scan(container).map_err(|_|())?.not_additionally_locked().into_iter().filter(|o|o.transaction()==txid).collect::<Vec<_>>();
+    if outputs.len()!=1||outputs[0].commitment().amount!=500_000_240{return Err(())}
+    let deposit=json!({"txId":hex(&txid),"txBytes":hex(&raw),"outputKey":hex(&outputs[0].key().compress().to_bytes()),
+        "outputIndex":outputs[0].index_in_transaction(),"amountAtomic":outputs[0].commitment().amount.to_string(),"feeAtomic":fee.to_string()});
     let mut scanner=Scanner::new(vault.clone());let mut reserves=Vec::new();let mut hashes=Vec::new();
     for n in start..start+18{let block=rpc.block(n)?;hashes.push(hex(&block.block.hash()));reserves.extend(scanner.scan(block).map_err(|_|())?.additional_timelock_satisfied_by(height as usize,0));}
-    if reserves.len()!=18||genesis(&rpc)?!=original_genesis{return Err(())}
+    if reserves.len()!=18{return Err(())}
+    let snapshot_height=height;
+    let pending=PreparedDeposit{vault,genesis:original_genesis,start,hashes,reserves,snapshot_height,snapshot_hash,txid,raw,deposit};
+    pending.check(&rpc)?;Ok(pending)
+}
+#[cfg(feature="participant-host")]
+pub(in crate::common_owner) fn participant_submit_deposit(pending:PreparedDeposit)->HostResult<Value>{
+    let rpc=Rpc::connect()?;pending.check(&rpc)?;
+    let donor=recipient()?;
+    let submitted=rpc.call("/send_raw_transaction",json!({"tx_as_hex":hex(&pending.raw),"do_not_relay":false}))?;
+    for flag in ["double_spend","fee_too_low","invalid_input","invalid_output","low_mixin","not_rct","overspend","too_big","too_few_outputs"]{if submitted.get(flag)==Some(&Value::Bool(true)){return Err(())}}
+    pending.check(&rpc)?;deposit_mine(&rpc,pending.genesis,donor.legacy_address(Network::Mainnet).to_string(),1)?;
+    pending.check(&rpc)?;deposit_mine(&rpc,pending.genesis,donor.legacy_address(Network::Mainnet).to_string(),60)?;let height=rpc.check()?;
+    let txid=pending.txid;let row=rpc.tx(txid)?;
+    if bytes(string(&row,"as_hex")?,MAX_RPC/2)?!=pending.raw{return Err(())}
+    let admission_height=number(&row,"block_height")?;
+    if admission_height>=height{return Err(())}
+    let admission=rpc.block(admission_height)?;
+    if admission.block.transactions.iter().filter(|id|**id==txid).count()!=1{return Err(())}
+    let deposit_outputs=Scanner::new(pending.vault.clone()).scan(admission.clone()).map_err(|_|())?.not_additionally_locked().into_iter().filter(|o|o.transaction()==txid).collect::<Vec<_>>();
+    if deposit_outputs.len()!=1{return Err(())}let deposit_output=&deposit_outputs[0];
+    let mut deposit=pending.deposit.clone();deposit["blockHash"]=json!(hex(&admission.block.hash()));deposit["blockHeight"]=json!(admission_height);
+    deposit["chainIndex"]=json!(deposit_output.index_on_blockchain());
+    let ordinary=scan_deposit(&rpc,&pending.vault,&deposit,height)?;
+    pending.check(&rpc)?;
+    let PreparedDeposit{vault,genesis:original_genesis,start,hashes,reserves,..}=pending;
     let mut indices=reserves.iter().map(WalletOutput::index_on_blockchain).collect::<Vec<_>>();indices.sort_unstable();indices.truncate(15);indices.push(ordinary.index_on_blockchain());indices.sort_unstable();
     let ids=[&reserves[0],&ordinary].iter().map(|o|json!({"transaction":hex(&o.transaction()),"index":o.index_in_transaction(),"chainIndex":o.index_on_blockchain()})).collect::<Vec<_>>();
     Ok(json!({"type":"funded","id":1,"genesis":hex(&original_genesis),"source":{"kind":"deposit","startHeight":start,"blockHashes":hashes,"ringIndices":indices,"outputIds":ids,"deposit":deposit},"vaultAddress":vault.legacy_address(Network::Mainnet).to_string(),"snapshot":{"height":height,"hash":hex(&rpc.block(height-1)?.block.hash())}}))
@@ -421,6 +477,15 @@ pub(super) fn observe(mut args:impl Iterator<Item=std::ffi::OsString>)->HostResu
 
 #[cfg(test)]mod tests {
     use super::*;
+    #[cfg(feature="participant-host")]
+    #[test]fn deposit_anchor_allows_extension_but_rejects_independent_drift(){
+        assert!(check_deposit_anchor([1;32],100,[2;32],[1;32],100,[2;32]).is_ok());
+        assert!(check_deposit_anchor([1;32],100,[2;32],[1;32],161,[2;32]).is_ok());
+        assert!(check_deposit_anchor([1;32],100,[2;32],[3;32],100,[2;32]).is_err());
+        assert!(check_deposit_anchor([1;32],100,[2;32],[1;32],99,[2;32]).is_err());
+        assert!(check_deposit_anchor([1;32],100,[2;32],[1;32],100,[3;32]).is_err());
+        assert!(check_deposit_anchor([1;32],0,[2;32],[1;32],100,[2;32]).is_err());
+    }
     #[cfg(feature="participant-host")]
     #[test]fn observation_genesis_before_and_after_reads_prevents_delivery(){
         use std::cell::Cell;

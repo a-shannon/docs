@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 379,
-  "aggregateSha256": "16d0ecd2d1a9ee3a4cdaf60675a27d5bdcbf989326d9f5a85bf5b8d1e99a25f0",
+  "fileCount": 393,
+  "aggregateSha256": "fe77d63f99927a43a63dfc6dc21c771156928ec3ca323c3f13dcb6dc7b789a82",
   "files": [
     {
       "path": "README.md",
-      "bytes": 7448,
-      "sha256": "3aab3547b72ec7e502e9d0f194f8fed2c14b3643f71bf09c52aabccc864d0a5b"
+      "bytes": 8413,
+      "sha256": "4312d41a503f0ec72981765df560c883ecfb5a69ae86eea2dcc034299a389a47"
     },
     {
       "path": "consumer/adapter.ts",
@@ -126,8 +126,13 @@
     },
     {
       "path": "consumer/collisionFixture.mjs",
-      "bytes": 2534,
-      "sha256": "831212d439c9df9ea1e6fb83981a5f7b47bb5ff72dd532e5dad896d01f1535ef"
+      "bytes": 3120,
+      "sha256": "1655e4d9a3cf3fe88c0817d2625b052e439b005dbc9caac4e50271b03ab6e502"
+    },
+    {
+      "path": "consumer/collisionFixture.test.mjs",
+      "bytes": 630,
+      "sha256": "1f472daf1df384f5647701d21ba4f2d87cbf1d512a0597ae375776348c885120"
     },
     {
       "path": "consumer/depositSource.ts",
@@ -255,6 +260,26 @@
       "sha256": "9257b3222caab37eadc9a3f06d0dd321c9d03b02c944451ab1b7582323f8a9b8"
     },
     {
+      "path": "consumer/participantDeposit.config.ts",
+      "bytes": 381,
+      "sha256": "64e731eb812caa540729afba97044a04c9066c605033b1557358c41addb09867"
+    },
+    {
+      "path": "consumer/participantDeposit.spec.ts",
+      "bytes": 8564,
+      "sha256": "50db237869dae98b0520313256d3cf0ae08dcf98d552ee6fe63de8f3e977f90c"
+    },
+    {
+      "path": "consumer/participantDepositFunding.mjs",
+      "bytes": 2217,
+      "sha256": "f0406d5f0b0bfb244b619f9554e040425dee40dbd0e4b715f1016911e7e4f21f"
+    },
+    {
+      "path": "consumer/participantDepositFunding.test.mjs",
+      "bytes": 3570,
+      "sha256": "c83948835f2937489d784201bf30af91a395a2efe729c8dbeffa17c55901b6d1"
+    },
+    {
       "path": "consumer/participantHarness.mjs",
       "bytes": 7903,
       "sha256": "34343bdcf2232a58afc6e1d33cbfe12e3fe55e58d820ca3e9e950e84168379da"
@@ -266,8 +291,8 @@
     },
     {
       "path": "consumer/participantSigning.mjs",
-      "bytes": 13008,
-      "sha256": "49ef2fa77def0bfb92435daf2e363e74e5536fb4e6dc1a6f32559870a4e0993b"
+      "bytes": 13425,
+      "sha256": "8778098d518d95b7775c82dc6544554f6db8b5c37ea8c30113991a4d7b7614f3"
     },
     {
       "path": "consumer/participantSigningFaults.spec.ts",
@@ -396,8 +421,8 @@
     },
     {
       "path": "consumer/watcherAuthority.spec.ts",
-      "bytes": 8073,
-      "sha256": "1eeeb0e985de312b028aa013311fc2f00ceb950ccddcbcc7dc83f75e46df42a1"
+      "bytes": 9237,
+      "sha256": "9705db47145fe6d9e0d0e1418ef1eae626a30633c7f681348eeaa0d9416416c2"
     },
     {
       "path": "consumer/watcherSource.config.ts",
@@ -438,6 +463,16 @@
       "path": "ergo-node/authorized-credit.mjs",
       "bytes": 14028,
       "sha256": "f7d651ea2e58e09769df99892919f3172708d817624252e028eab21f778fd93e"
+    },
+    {
+      "path": "ergo-node/bootstrap-devnet.mjs",
+      "bytes": 16933,
+      "sha256": "db6983d6aa1c0e706c1f4500ff311ebe86e15ab67e4c5afc301a4f3f10f4a3bc"
+    },
+    {
+      "path": "ergo-node/bootstrap-devnet.test.mjs",
+      "bytes": 7347,
+      "sha256": "66b62831c6614c9f54868d7fb72534508a45e12216d38863c71cf7001030e5ec"
     },
     {
       "path": "ergo-node/contracts/Commitment.es",
@@ -1541,13 +1576,13 @@
     },
     {
       "path": "native/src/node_funding.rs",
-      "bytes": 39908,
-      "sha256": "164528c86ba06c2295f5d9417e4cf16aceeae689fa29746dcdf976f8a393a100"
+      "bytes": 44017,
+      "sha256": "9f0c293f875e6a02a71fb1f661d587eab83ca7aa534b4d92578395d73633a8ac"
     },
     {
       "path": "native/src/participant.rs",
-      "bytes": 21773,
-      "sha256": "044fafdbf925a15d8dd85b9275bad8c558a256ae16ae7bd765f02e20bf8dd042"
+      "bytes": 22607,
+      "sha256": "87f047477c95adc10dd5ef808e8319d188df6804c722d3f15cf1d8a8e960bc3c"
     },
     {
       "path": "native/src/participant_envelope.rs",
@@ -1556,8 +1591,8 @@
     },
     {
       "path": "native/src/participant_signing.rs",
-      "bytes": 25215,
-      "sha256": "36721ad7274cf5baf7dc115d933e69059d3f517916ced9c09a40e1d38908dbe7"
+      "bytes": 27633,
+      "sha256": "72f636aff9cdc7be20e730db7e91f86a04563af2b83250289507a42a01ff054a"
     },
     {
       "path": "native/src/participant_source.rs",
@@ -1671,13 +1706,28 @@
     },
     {
       "path": "prepared-dependencies.json",
-      "bytes": 61325,
-      "sha256": "90d1b8a96a0ae438acd0cfbece54ccb2f0e2b69c1ca30580ae9d3aee5ca91e4b"
+      "bytes": 61609,
+      "sha256": "0f386a5eefe49ce5a7dcc34f18a82e7a1216ec12dd74fa57352827c43ee27f31"
+    },
+    {
+      "path": "proof/README.md",
+      "bytes": 3237,
+      "sha256": "63ba7b7d2b01fbd3d74e6a58f0886b5ee4cbda747b6d749072dac81b8b3d65ae"
+    },
+    {
+      "path": "proof/build-wsl.sh",
+      "bytes": 6491,
+      "sha256": "5102ddb5d5b51407786a82165998abfdbe95c58b75a797bd57fdc8be5ee4396d"
     },
     {
       "path": "proof/run.py",
-      "bytes": 1054,
-      "sha256": "ed9d19ba40b18153ef74238a0ad4be45f5ac7cd5d66dcecba0363247d2523941"
+      "bytes": 5251,
+      "sha256": "46545e960656fb0b9fbba0664f018455e14d10ad529d4bcfea037592ea9bee4e"
+    },
+    {
+      "path": "proof/test_run.py",
+      "bytes": 5913,
+      "sha256": "e4ed136c5078598603e0d0f2e4a1a849ae200ecdb705d6501d60d76fcd08d4c0"
     },
     {
       "path": "proof/tx-proof.cpp",
@@ -1711,8 +1761,8 @@
     },
     {
       "path": "test-fixtures/public-copy/src/main.rs",
-      "bytes": 18203,
-      "sha256": "8d8e3a27adf19437e44fcc6b6be9c56de72f1fd9671603456db6388a2264a1e0"
+      "bytes": 19885,
+      "sha256": "288422ba9907b9123e3037f3970f60377abaa3ce0f322f12bc169dd52667fc55"
     },
     {
       "path": "test-fixtures/public-copy/wallet/Cargo.toml",
@@ -1846,8 +1896,8 @@
     },
     {
       "path": "tools/launch-roundtrip.mjs",
-      "bytes": 11402,
-      "sha256": "231117405fdf80630e8d6185f894a62e4ed35e5d65cf1add50b51d9a854650d9"
+      "bytes": 11313,
+      "sha256": "6c9e7b363943b2f5c71480c0ec46fa5d1eba4192d2250cbd0001554b4cf5325a"
     },
     {
       "path": "tools/launcher-guards.mjs",
@@ -1858,6 +1908,26 @@
       "path": "tools/launcher-guards.test.mjs",
       "bytes": 4703,
       "sha256": "7d0a3e90bfdc83ac57bc3521ce7129c5491d7b6acc6013c632b4a92b0d605fa6"
+    },
+    {
+      "path": "tools/prepare-windows.ps1",
+      "bytes": 14776,
+      "sha256": "93debbc29ead01e090e13e38fffd8dcb3450ff580252708800ee9734b7eaaace"
+    },
+    {
+      "path": "tools/proof-pins.mjs",
+      "bytes": 1729,
+      "sha256": "94ba29ea99bb96a577a88b42dcd23d1228ffda6c1926878eecd442201543c2f7"
+    },
+    {
+      "path": "tools/proof-pins.test.mjs",
+      "bytes": 2220,
+      "sha256": "f7d922fdf26baef7deebf6beab8323667f4710bc1767482854a7d33cf28a5471"
+    },
+    {
+      "path": "tools/reproduction-prerequisites.md",
+      "bytes": 6922,
+      "sha256": "5262b34cfa0cb43b2bec6c626b5dbb22d9c11d4989502cdf89b21e39aeb27b1f"
     },
     {
       "path": "tsconfig.base.json",

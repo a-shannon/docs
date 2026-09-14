@@ -151,8 +151,28 @@ pub(crate) struct ActorSigning {
 pub(crate) fn fund(group: [u8; 32]) -> R<Value> {
     host::node::participant_fund(group)
 }
+pub(crate) struct PendingDeposit(host::node::PreparedDeposit);
+pub(crate) fn prepare_deposit(group: [u8; 32], directory: &Path) -> R<(PendingDeposit, Value)> {
+    let pending = host::node::participant_prepare_deposit(group, directory)?;
+    let frame = pending.public_frame();
+    Ok((PendingDeposit(pending), frame))
+}
+fn deposit_submit_request(v: &Value, expected: [u8; 32]) -> R<()> {
+    w::fields(v, &["type", "txId"])?;
+    if w::string(v, "type")? != "submit-deposit" || hash32(v, "txId")? != expected {
+        return Err(());
+    }
+    Ok(())
+}
+impl PendingDeposit {
+    pub(crate) fn submit(self, request: &Value) -> R<Value> {
+        deposit_submit_request(request, self.0.txid())?;
+        host::node::participant_submit_deposit(self.0)
+    }
+}
 pub(crate) fn fund_deposit(group: [u8; 32], directory: &Path) -> R<Value> {
-    host::node::participant_fund_deposit(group, directory)
+    let (pending, frame) = prepare_deposit(group, directory)?;
+    pending.submit(&json!({"type":"submit-deposit","txId":frame["deposit"]["txId"]}))
 }
 pub(crate) fn recover(directory: &Path, expected: [u8; 32]) -> R<Value> {
     let final_value = terminal::recover(directory, expected).map_err(|_| ())?;
@@ -499,6 +519,33 @@ impl ActorSigning {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn deposit_submit_exact_command_and_cached_identity() {
+        let good = json!({"type":"submit-deposit","txId":"11".repeat(32)});
+        assert!(deposit_submit_request(&good, [0x11;32]).is_ok());
+        let mut wrong = good.clone();wrong["txId"] = json!("22".repeat(32));
+        assert!(deposit_submit_request(&wrong, [0x11;32]).is_err());
+        for kind in ["configure", "inspect-source", "fund", "fund-deposit", "prepare-deposit"] {
+            let mut wrong = good.clone();wrong["type"] = json!(kind);
+            assert!(deposit_submit_request(&wrong, [0x11;32]).is_err());
+        }
+        for key in ["type", "txId"] {
+            let mut wrong = good.clone();wrong.as_object_mut().unwrap().remove(key);
+            assert!(deposit_submit_request(&wrong, [0x11;32]).is_err());
+        }
+        for extra in ["txBytes", "runtimeDirectory", "blockHeight", "chainIndex"] {
+            let mut wrong = good.clone();wrong[extra] = json!(0);
+            assert!(deposit_submit_request(&wrong, [0x11;32]).is_err());
+        }
+        for id in ["11".repeat(31), "11".repeat(33)] {
+            let mut wrong = good.clone();wrong["txId"] = json!(id);
+            assert!(deposit_submit_request(&wrong, [0x11;32]).is_err());
+        }
+        let lowercase = json!({"type":"submit-deposit","txId":"aa".repeat(32)});
+        assert!(deposit_submit_request(&lowercase, [0xaa;32]).is_ok());
+        let uppercase = json!({"type":"submit-deposit","txId":"AA".repeat(32)});
+        assert!(deposit_submit_request(&uppercase, [0xaa;32]).is_err());
+    }
     #[test]
     fn observation_projection_requires_exact_independent_anchor_and_profile() {
         // Projection-only fixture. Real observe first calls terminal::recover,

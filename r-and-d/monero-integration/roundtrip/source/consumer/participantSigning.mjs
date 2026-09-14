@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {spawn} from 'node:child_process';
 import {captureBackingClaim} from './backingClaim.mjs';
 import {guardParticipantIO} from './participantAuthority.mjs';
+import {fundPreparedDeposit} from './participantDepositFunding.mjs';
 
 const hex32=()=>randomBytes(32).toString('hex');
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -19,13 +20,16 @@ function checkFinal(frame){
 }
 
 /** Opens actual actors and funds their public vault on the already-owned daemon. */
-export async function openParticipantVault({binary,sha256,runtime,mode='coinbase'}){
+export async function openParticipantVault({binary,sha256,runtime,mode='coinbase',beforeDepositSubmit}){
   if(!['coinbase','deposit'].includes(mode))throw Error('Participant funding mode');
+  if(beforeDepositSubmit!==undefined&&(mode!=='deposit'||typeof beforeDepositSubmit!=='function'))throw Error('Participant deposit preparation mode');
   const ceremony=await runCeremony({binary,sha256,keepAlive:true});
   try{
     const depositDirectory=mode==='deposit'?mkdtempSync(join(runtime,'donor-')):undefined;
-    await ceremony.actors[0].send(mode==='deposit'?{type:'fund-deposit',runtimeDirectory:depositDirectory}:{type:'fund'});
-    const funded=await ceremony.actors[0].next(mode==='deposit'?180000:60000,'funding');
+    let funded;
+    if(beforeDepositSubmit!==undefined){funded=await fundPreparedDeposit(ceremony.actors[0],depositDirectory,ceremony.ready[0].groupKey,beforeDepositSubmit);}
+    else{await ceremony.actors[0].send(mode==='deposit'?{type:'fund-deposit',runtimeDirectory:depositDirectory}:{type:'fund'});
+      funded=await ceremony.actors[0].next(mode==='deposit'?180000:60000,'funding');}
     if(funded.type!=='funded'||funded.id!==1||!/^[0-9a-f]{64}$/.test(funded.genesis)||funded.source?.kind!==mode)throw Error('Participant funding response');
     const handle=Object.freeze({groupKey:ceremony.ready[0].groupKey,rosterDigest:ceremony.summary.rosterDigest,
       genesis:funded.genesis,vaultAddress:funded.vaultAddress,close:ceremony.close});

@@ -2,7 +2,11 @@
 
 A. Shannon · 14 September 2026
 
-**Latest increment: authenticated deposit backing despite copied output keys.**
+**Latest increment: complete copy-first bridge tests and fresh public preparation.**
+Read the [copy-first and reproduction report](copy-first-reproduction.md) for the
+new ordering tests and the public preparation recipe.
+
+**Authenticated deposit backing despite copied output keys:**
 Read the [admission and backing report](admission-backing.md) for the mitigation,
 the qualification matrix and the distinction between complete bridge runs and
 Monero-only copy-first tests.

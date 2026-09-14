@@ -13,6 +13,7 @@ fn num(v:&Value,k:&str)->u64{v[k].as_u64().unwrap()}
 fn strv<'a>(v:&'a Value,k:&str)->&'a str{v[k].as_str().unwrap()}
 fn dig(s:&str)->[u8;32]{unhex(s).try_into().unwrap()}
 struct Rpc {port:u16,genesis:Option<[u8;32]>}
+fn absent_result(r:&Value,id:[u8;32]){assert_eq!(r["status"],"OK");if let Some(rows)=r.get("txs"){assert!(rows.as_array().unwrap().is_empty(),"honest candidate must be absent from chain and pool");}assert_eq!(r["missed_tx"],json!([hex(&id)]));}
 impl Rpc{
  fn call(&self,path:&str,payload:Value)->Value {
   // All mutating calls are gated here, even if a caller bypasses mine/submit.
@@ -30,6 +31,7 @@ impl Rpc{
  fn check(&self)->u64{let v=self.json("get_info",json!({}));assert_eq!(v["status"],"OK");assert_eq!(v["nettype"],"fakechain");assert_eq!(v["offline"],true);for k in ["mainnet","testnet","stagenet"]{assert_eq!(v[k],false);}for k in ["incoming_connections_count","outgoing_connections_count"]{assert_eq!(v[k],0);}assert_eq!(self.json("hard_fork_info",json!({}))["version"],16);if let Some(genesis)=self.genesis{let header=self.json("get_block_header_by_height",json!({"height":0}));assert_eq!(header["status"],"OK");assert_eq!(dig(strv(&header["block_header"],"hash")),genesis);}num(&v,"height")}
  fn mine(&self,v:&ViewPair,n:u64){assert!(n>0&&n<=60);self.check();let r=self.json("generateblocks",json!({"wallet_address":v.legacy_address(Network::Mainnet).to_string(),"amount_of_blocks":n}));assert_eq!(r["status"],"OK");assert_eq!(r["blocks"].as_array().unwrap().len(),n as usize);}
  fn tx(&self,id:[u8;32])->Value{let r=self.call("/get_transactions",json!({"txs_hashes":[hex(&id)],"decode_as_json":false,"prune":false}));assert_eq!(r["status"],"OK");let rows=r["txs"].as_array().unwrap();assert_eq!(rows.len(),1);assert_eq!(dig(strv(&rows[0],"tx_hash")),id);assert_eq!(rows[0]["in_pool"],false);rows[0].clone()}
+ fn absent(&self,id:[u8;32]){let r=self.call("/get_transactions",json!({"txs_hashes":[hex(&id)],"decode_as_json":false,"prune":false}));absent_result(&r,id);}
  fn block(&self,h:u64)->ScannableBlock{
   self.check();let v=self.json("get_block",json!({"height":h}));assert_eq!(v["status"],"OK");let blob=unhex(strv(&v,"blob"));let mut read=blob.as_slice();let b=Block::read(&mut read).unwrap();assert!(read.is_empty());assert_eq!(b.hash(),dig(strv(&v["block_header"],"hash")));assert_eq!(num(&v["block_header"],"height"),h);assert_eq!(v["block_header"]["orphan_status"],false);assert_eq!(b.header.hardfork_version,if h==0{1}else{16});
   // Genesis has a V1 miner transaction and no RingCT global output index.
@@ -66,7 +68,7 @@ fn copy_tx(rpc:&Rpc,public_honest:&Transaction,attacker:&ViewPair,attacker_secre
 }
 // This entry accepts public data only. Funding and the single spend use a newly
 // generated copier scalar; the vault is a view-only B + scalar-ONE descriptor.
-fn copy_existing(file:&str){
+fn copy_existing(file:&str,prepared:bool){
  clear();let bytes=std::fs::read(file).unwrap();assert!(!bytes.is_empty()&&bytes.len()<=1_000_000);let input:Value=serde_json::from_slice(&bytes).unwrap();
  let object=input.as_object().unwrap();let mut keys=object.keys().map(String::as_str).collect::<Vec<_>>();keys.sort_unstable();assert_eq!(keys,["mode","outputIndex","port","txHex","txid","vaultSpend"]);
  let mode=strv(&input,"mode");assert!(["raw","decodable"].contains(&mode));let port:u16=num(&input,"port").try_into().unwrap();assert_ne!(port,0);
@@ -74,20 +76,25 @@ fn copy_existing(file:&str){
  let index:usize=num(&input,"outputIndex").try_into().unwrap();assert!(index<honest.prefix().outputs.len()&&index<2,"fixed two-output fixture");let p=honest.prefix().outputs[index].key.to_bytes();
  let vault=ViewPair::new(CompressedPoint::from(dig(strv(&input,"vaultSpend"))).decompress().unwrap(),Zeroizing::new(Scalar::from(CS::ONE))).unwrap();
  let mut rpc=Rpc{port,genesis:None};let initial_height=rpc.check();let genesis=rpc.block(0).block.hash();rpc.genesis=Some(genesis);rpc.check();
- let row=rpc.tx(honest_id);assert_eq!(unhex(strv(&row,"as_hex")),raw);let honest_height=num(&row,"block_height");let honest_block=rpc.block(honest_height);assert!(honest_block.block.transactions.contains(&honest_id));
+ let (honest_block,honest_height)=if prepared{
+  rpc.absent(honest_id);
+  // This container decodes public candidate output data only. Its synthetic
+  // positions are never reported or accepted as canonical deposit indices.
+  let mut container=rpc.block(initial_height.checked_sub(1).unwrap());container.block.transactions=vec![honest_id];container.transactions=vec![Transaction::<Pruned>::from(honest.clone())];(container,None)
+ }else{let row=rpc.tx(honest_id);assert_eq!(unhex(strv(&row,"as_hex")),raw);let height=num(&row,"block_height");let block=rpc.block(height);assert!(block.block.transactions.contains(&honest_id));(block,Some(height))};
  let admitted=Scanner::new(vault.clone()).scan(honest_block).unwrap().not_additionally_locked().into_iter().filter(|o|o.transaction()==honest_id&&o.index_in_transaction()==index as u64&&o.key().compress().to_bytes()==p).collect::<Vec<_>>();assert_eq!(admitted.len(),1);let amount=admitted[0].commitment().amount;assert!(amount>0);
  let own_secret=Zeroizing::new(Scalar::random(&mut OsRng));let own=wallet(&own_secret);let start=rpc.check();rpc.mine(&own,18);rpc.mine(&own,60);let funded_height=rpc.check();
  let mut scanner=Scanner::new(own.clone());let funds=(start..start+18).flat_map(|h|scanner.scan(rpc.block(h)).unwrap().additional_timelock_satisfied_by(funded_height as usize,0)).collect::<Vec<_>>();assert_eq!(funds.len(),18);
  let indices=funds.iter().take(16).map(WalletOutput::index_on_blockchain).collect::<Vec<_>>();let estimate=rpc.json("get_fee_estimate",json!({"grace_blocks":10}));let fee=FeeRate::new(num(&estimate,"fee"),num(&estimate,"quantization_mask")).unwrap();
  let copy=copy_tx(&rpc,&honest,&own,&own_secret,&funds[0],&indices,&vault,fee,mode,index,amount);assert_ne!(copy.hash(),honest_id);assert_eq!(copy.prefix().outputs[index].key.to_bytes(),p);
- let copy_height=rpc.check();let reply=rpc.submit(&copy);assert_eq!(reply["status"],"OK","{reply}");rpc.mine(&own,1);let copy_block=rpc.block(copy_height);assert!(copy_block.block.transactions.contains(&copy.hash()));let copy_block_hash=copy_block.block.hash();
+ if prepared{rpc.absent(honest_id);}let copy_height=rpc.check();let reply=rpc.submit(&copy);assert_eq!(reply["status"],"OK","{reply}");rpc.mine(&own,1);let copy_block=rpc.block(copy_height);assert!(copy_block.block.transactions.contains(&copy.hash()));let copy_block_hash=copy_block.block.hash();
  let decoded=Scanner::new(vault.clone()).scan(copy_block).unwrap().not_additionally_locked().into_iter().filter(|o|o.transaction()==copy.hash()).collect::<Vec<_>>();assert_eq!(decoded.len(),usize::from(mode=="decodable"));if let Some(o)=decoded.first(){assert_eq!(o.key().compress().to_bytes(),p);assert_eq!(o.commitment().amount,amount);}
  let final_height=rpc.check();let mut occurrences=0usize;for h in 0..final_height{let block=rpc.block(h);occurrences+=block.block.miner_transaction().prefix().outputs.iter().filter(|o|o.key.to_bytes()==p).count();for tx in block.transactions{occurrences+=tx.prefix().outputs.iter().filter(|o|o.key.to_bytes()==p).count();}}
- assert!(occurrences>=2);assert_eq!(rpc.check(),final_height);assert_eq!(unhex(strv(&rpc.tx(honest_id),"as_hex")),raw);
- println!("{}",json!({"operation":"copy-existing-public-deposit","mode":mode,"genesis":hex(&genesis),"initialHeight":initial_height,"honestTx":hex(&honest_id),"honestHeight":honest_height,"honestOutputIndex":index,"honestChainIndex":admitted[0].index_on_blockchain(),"honestDecodedAtomic":amount.to_string(),"copyTx":hex(&copy.hash()),"copyHeight":copy_height,"copyBlockHash":hex(&copy_block_hash),"outputKey":hex(&p),"rawOccurrences":occurrences,"copyDecodedOutputs":decoded.len(),"copyDecodedAtomic":decoded.first().map(|o|o.commitment().amount.to_string()),"copySubmission":reply,"finalHeight":final_height}));
+ assert_eq!(rpc.check(),final_height);if prepared{assert_eq!(occurrences,1);rpc.absent(honest_id);}else{assert!(occurrences>=2);assert_eq!(unhex(strv(&rpc.tx(honest_id),"as_hex")),raw);}
+ println!("{}",json!({"operation":if prepared{"copy-prepared-public-deposit"}else{"copy-existing-public-deposit"},"mode":mode,"genesis":hex(&genesis),"initialHeight":initial_height,"honestTx":hex(&honest_id),"honestHeight":honest_height,"honestOutputIndex":index,"honestChainIndex":if prepared{None}else{Some(admitted[0].index_on_blockchain())},"honestDecodedAtomic":amount.to_string(),"copyTx":hex(&copy.hash()),"copyHeight":copy_height,"copyBlockHash":hex(&copy_block_hash),"outputKey":hex(&p),"rawOccurrences":occurrences,"copyDecodedOutputs":decoded.len(),"copyDecodedAtomic":decoded.first().map(|o|o.commitment().amount.to_string()),"copySubmission":reply,"finalHeight":final_height}));
 }
 fn main(){
- let args=std::env::args().collect::<Vec<_>>();assert_eq!(args.len(),3,"copy-existing <public-input.json> OR <raw|decodable> <honest-first|copy-first>");if args[1]=="copy-existing"{copy_existing(&args[2]);return;}let mode=&args[1];let order=&args[2];assert!(["raw","decodable"].contains(&mode.as_str()));assert!(["honest-first","copy-first"].contains(&order.as_str()));clear();
+ let args=std::env::args().collect::<Vec<_>>();assert_eq!(args.len(),3,"copy-existing|copy-prepared <public-input.json> OR <raw|decodable> <honest-first|copy-first>");if ["copy-existing","copy-prepared"].contains(&args[1].as_str()){copy_existing(&args[2],args[1]=="copy-prepared");return;}let mode=&args[1];let order=&args[2];assert!(["raw","decodable"].contains(&mode.as_str()));assert!(["honest-first","copy-first"].contains(&order.as_str()));clear();
  let mut rpc=Rpc{port:std::env::var("MONERO_LOCAL_RPC_PORT").unwrap().parse().unwrap(),genesis:None};let start=rpc.check();let genesis=rpc.block(0).block.hash();rpc.genesis=Some(genesis);
  let honest_secret=Zeroizing::new(Scalar::random(&mut OsRng));let attacker_secret=Zeroizing::new(Scalar::random(&mut OsRng));let vault_secret=Zeroizing::new(Scalar::random(&mut OsRng));let honest=wallet(&honest_secret);let attacker=wallet(&attacker_secret);let vault=wallet(&vault_secret);
  rpc.mine(&honest,18);rpc.mine(&attacker,18);rpc.mine(&honest,60);let height=rpc.check();
@@ -111,4 +118,14 @@ fn main(){
  let mut spend_indices=h_indices[..15].to_vec();spend_indices.push(honest_output.index_on_blockchain());spend_indices.sort_unstable();
  let spend=construct(&rpc,&vault,&vault_secret,honest_output,&spend_indices,&honest,fee,90_000_000_000);let spend_height=rpc.check();let spend_reply=rpc.submit(&spend);assert_eq!(spend_reply["status"],"OK","{spend_reply}");rpc.mine(&honest,1);assert!(rpc.block(spend_height).block.transactions.contains(&spend.hash()));assert_eq!(rpc.block(0).block.hash(),genesis);
  println!("{}",json!({"mode":mode,"ordering":order,"genesis":hex(&genesis),"honestTx":hex(&honest_tx.hash()),"copyTx":hex(&copy.hash()),"outputKey":hex(&output_key),"honestOutputIndex":target_index,"honestChainIndex":honest_output.index_on_blockchain(),"honestHeight":h_height,"copyHeight":c_height,"rawOccurrences":occurrences,"honestDecodedOutputs":hscan.len(),"copyDecodedOutputs":cscan.len(),"copyDecodedAtomic":cscan.first().map(|o|o.commitment().amount.to_string()),"firstSubmission":first_reply,"secondSubmission":second_reply,"specificallySelectedHonestSpendTx":hex(&spend.hash()),"honestSpendSubmission":spend_reply,"honestSpendCanonicalHeight":spend_height,"finalHeight":rpc.check(),"privateRExported":false}));
+}
+#[cfg(test)]mod tests{
+ use super::*;
+ #[test]fn omitted_empty_transactions_still_requires_exact_missing_id(){
+  let id=[0x11;32];let good=json!({"status":"OK","missed_tx":[hex(&id)]});absent_result(&good,id);
+  let mut empty=good.clone();empty["txs"]=json!([]);absent_result(&empty,id);
+  for(field,value)in [("txs",json!([{"in_pool":true}])),("txs",Value::Null),("missed_tx",json!([])),("missed_tx",json!(["22".repeat(32)])),("status",json!("BUSY"))]{
+   let mut bad=good.clone();bad[field]=value;assert!(std::panic::catch_unwind(||absent_result(&bad,id)).is_err());
+  }
+ }
 }

@@ -2,6 +2,10 @@
   "baseline": "1edc2fb982de4560c5265e04e2ed8b93d00b40df",
   "workspaceDistributionFiles": [
     {
+      "path": "node_modules/sqlite3/build/Release/node_sqlite3.node",
+      "sha256": "f806f89dc41dde00ca7124dc1e649bdc9b08ff2eff5c891b764f3e5aefa9548c"
+    },
+    {
       "path": "node_modules/@rosen-bridge/rosen-extractor/dist/getRosenData/abstract/abstractRosenDataExtractor.d.ts",
       "sha256": "adcd186297c91738a8ed7c20088a8dca74f00876cc879ff28ee78b3a8c4552e6"
     },
@@ -1252,6 +1256,6 @@
       "sha256": "5fc41e84bc3bdc1ae7a4c9c0a1bed7fe7412ff1614ed4503be0c5c11867edf46"
     }
   ],
-  "installationStatus": "Existing prepared npm dependencies and compiled workspace distributions reused; fresh install and rebuild not exercised.",
+  "installationStatus": "Windows x64 preparation reconstructs the published Rosen overlay, locked npm dependencies, explicit patches and ErgoChain build; sqlite3 5.1.7 uses its pinned N-API 6 prebuilt driver. Complete runtime qualification is recorded separately.",
   "scope": "Pinned prepared distributions and selected direct dependency source closure; execution traces retain actual loaded module evidence separately"
 }

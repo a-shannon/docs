@@ -4,6 +4,7 @@ import {resolve,join,dirname,isAbsolute} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {assertExternalWork,freezeInputs} from './launcher-guards.mjs';
+import {captureProofConfiguration,proofArtifactPins} from './proof-pins.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const sha=x=>createHash('sha256').update(x).digest('hex'),ordinal=(a,b)=>a<b?-1:a>b?1:0;
 const args=Object.create(null),allowed=new Set(['config','manifest-sha256','check-only','collect-only','profile']);
@@ -18,7 +19,7 @@ for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','
 const work=resolve(config.runtimeDirectory),rosen=resolve(config.rosenRoot);
 const observerFiles=profile==='watcher-authority'?[[config.observerBinary,config.observerSha256]]:[];
 if(config.collisionExperiment!==undefined){
-  if(profile!=='watcher-authority'||!['raw-before-credit','decodable-before-credit','raw-after-credit','decodable-after-credit'].includes(config.collisionExperiment))throw Error('Collision profile');
+  if(profile!=='watcher-authority'||!['raw-before-credit','decodable-before-credit','raw-after-credit','decodable-after-credit','raw-copy-first','decodable-copy-first'].includes(config.collisionExperiment))throw Error('Collision profile');
   observerFiles.push([config.collisionBinary,config.collisionSha256]);
 }
 for(const [file,pin] of observerFiles)if(typeof file!=='string'||!isAbsolute(file)||!/^[0-9a-f]{64}$/.test(pin)||sha(readFileSync(file))!==pin)throw Error('Observer executable pin');
@@ -27,7 +28,7 @@ if(observerFiles.length)assertExternalWork(work,observerFiles.map(([file])=>file
 if(existsSync(work))throw Error('New external runtime directory required');
 for(const [pathKey,hashKey]of [['nativeBinary','nativeSha256'],['moneroDaemon','moneroDaemonSha256']])if(!/^[0-9a-f]{64}$/.test(config[hashKey])||sha(readFileSync(config[pathKey]))!==config[hashKey])throw Error('Executable pin: '+pathKey);
 if(typeof config.ergoRecipient!=='string'||!config.ergoRecipient||typeof config.wslDistro!=='string'||!config.wslDistro)throw Error('Prepared Ergo recipient and WSL distro required');
-for(const key of ['proofBinary','proofLibrary'])if(typeof config[key]!=='string'||!config[key].startsWith('/')||/[\x00-\x1f]/.test(config[key])||!/^[0-9a-f]{64}$/.test(config[key+'Sha256']))throw Error('Prepared proof path and pin required');
+const capturedProof=captureProofConfiguration(config);
 const list=(dir,prefix='',skip=new Set())=>readdirSync(dir).flatMap(name=>{const relative=prefix?prefix+'/'+name:name;if(skip.has(relative))return [];const absolute=join(dir,name),st=lstatSync(absolute);if(st.isSymbolicLink())throw Error('Source symlink');if(st.isDirectory())return list(absolute,relative,skip);if(!st.isFile())throw Error('Source kind');return [relative];});
 const manifestBytes=readFileSync(join(root,'source-manifest.json'));if(sha(manifestBytes)!==args['manifest-sha256'])throw Error('Manifest pin');
 const manifest=JSON.parse(manifestBytes),names=manifest.files.map(x=>x.path);
@@ -46,10 +47,10 @@ const declaredFiles=[...manifest.files.map(e=>({path:join(root,e.path),sha256:e.
   ...['package.json','package-lock.json'].map(name=>({path:join(rosen,name),sha256:manifest.files.find(e=>e.path===name).sha256})),
   ...dependencies.map(e=>({path:join(rosen,e.path),sha256:e.sha256}))];
 const verifySourceSet=()=>{if(JSON.stringify(list(root).filter(x=>x!=='source-manifest.json').sort(ordinal))!==JSON.stringify(names))throw Error('Exact source set changed');};
-const proofPins=['proofBinary','proofLibrary'].map(key=>({path:config[key],sha256:config[key+'Sha256']}));
+const proofPins=proofArtifactPins(capturedProof);
 const verifyProofPins=()=>{
-  const program='import hashlib,json,pathlib,sys; pins=json.loads(sys.argv[1]); print(json.dumps([hashlib.sha256(pathlib.Path(p["path"]).read_bytes()).hexdigest() for p in pins]))';
-  const actual=JSON.parse(execFileSync('wsl.exe',['-d',config.wslDistro,'--','python3','-c',program,JSON.stringify(proofPins)],{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:4096}));
+  const program='import hashlib,json,pathlib,sys; pins=json.loads(sys.argv[1]); assert all(str(pathlib.Path(p["path"]).resolve(strict=True))==p["path"] and pathlib.Path(p["path"]).is_file() for p in pins); print(json.dumps([hashlib.sha256(pathlib.Path(p["path"]).read_bytes()).hexdigest() for p in pins]))';
+  const actual=JSON.parse(execFileSync('wsl.exe',['-d',config.wslDistro,'--cd','/','--','python3','-c',program,JSON.stringify(proofPins)],{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:16384}));
   if(JSON.stringify(actual)!==JSON.stringify(proofPins.map(p=>p.sha256)))throw Error('Prepared proof pin');
 };
 const frozenOptions={files:declaredFiles,paths:[root,rosen,config.ergoRuntime],gitRoot:rosen,expectedHead:'1edc2fb982de4560c5265e04e2ed8b93d00b40df',validateSets:verifySourceSet,checks:[verifyProofPins]};
@@ -64,7 +65,7 @@ const runtimeConfig=join(work,'configuration.json'),runtimeConfigBytes=JSON.stri
 const skippedLinks=new Set(['node_modules','consumer/node_modules','guard-service/node_modules']);
 const closure=freezeInputs({...frozenOptions,files:[...declaredFiles,...manifest.files.map(e=>({path:join(fixture,e.path),sha256:e.sha256})),{path:join(fixture,'source-manifest.json'),sha256:args['manifest-sha256']},{path:runtimeConfig,sha256:sha(runtimeConfigBytes)}],
   paths:[...frozenOptions.paths,...[...skippedLinks].map(p=>join(fixture,p))],validateSets:()=>{verifySourceSet();if(JSON.stringify(list(fixture,'',skippedLinks).sort(ordinal))!==JSON.stringify([...names,'source-manifest.json'].sort(ordinal)))throw Error('Exact copied source set changed');}});
-const proofConfig=JSON.stringify(Object.fromEntries(['proofBinary','proofBinarySha256','proofLibrary','proofLibrarySha256'].map(k=>[k,config[k]])));
+const proofConfig=JSON.stringify(capturedProof);
 const runId=randomUUID(),cwd=join(fixture,'consumer');
 const env={...process.env,ROUNDTRIP_CONFIG:runtimeConfig,ROUNDTRIP_PROOF_CONFIG:proofConfig,WSLENV:[process.env.WSLENV,'ROUNDTRIP_PROOF_CONFIG'].filter(Boolean).join(':'),PARTICIPANT_SHA256:config.nativeSha256,MONERO_NODE_NATIVE_SHA256:config.nativeSha256,PARTICIPANT_BIN:config.nativeBinary,W1HB_RUN_ID:runId,W1HB_TRACE_DIR:trace,W1HC_SPEC:spec,NODE_OPTIONS:'--experimental-vm-modules --import ./observe.mjs --import tsx --import '+pathToFileURL(join(fixture,'ergo-node/deposit-register.mjs')).href};
 const command=[join(rosen,'node_modules/vitest/vitest.mjs'),args['collect-only']?'list':'run','--config',testConfig,...(args['collect-only']?[]:['--reporter','verbose'])];

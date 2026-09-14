@@ -78,9 +78,10 @@ public deposit facts and funds its own isolated wallet.
 | Raw copy included before the honest deposit | Monero inclusion and spending the selected honest occurrence | Pass |
 | Decodable copy included before the honest deposit | Monero inclusion and spending the selected honest occurrence | Pass |
 
-The copy-first tests are Monero-only. They do not establish the complete bridge
-path when the copy precedes honest inclusion. The complete bridge cases test
-both credit timing boundaries after honest inclusion.
+At this checkpoint, the copy-first tests were Monero-only; the complete bridge
+cases tested both credit timing boundaries after honest inclusion. The later
+[copy-first qualification](copy-first-reproduction.md) exercises both copy types
+through the complete bridge with the copy included before the honest deposit.
 
 Each passing complete run observes two raw occurrences, confirms one authorized
 Ergo credit, redeems that exact box, and spends the authenticated Monero output.

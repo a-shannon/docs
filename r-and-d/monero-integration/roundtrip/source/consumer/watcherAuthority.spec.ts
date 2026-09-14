@@ -19,16 +19,29 @@ let node:LocalMonero|undefined,vault:any,transport:any,credit:any,timing:any;
 afterEach(async()=>{try{await credit?.close();transport?.close();await vault?.close();}finally{await timing?.close();await node?.stop();delete process.env.MONERO_LOCAL_RPC_PORT;}});
 it('settles an actual two-direction watcher roundtrip with four guarded credit assignments and retained recovery',async()=>{
   const experiment=config.collisionExperiment;
-  if(experiment!==undefined&&!['raw-before-credit','decodable-before-credit','raw-after-credit','decodable-after-credit'].includes(experiment))throw Error('Collision experiment profile');
+  if(experiment!==undefined&&!['raw-before-credit','decodable-before-credit','raw-after-credit','decodable-after-credit','raw-copy-first','decodable-copy-first'].includes(experiment))throw Error('Collision experiment profile');
+  const copyFirst=experiment?.endsWith('copy-first');
   let collision;
   const deployment=await setupAuthorityFixture(),directory=mkdtempSync(join(config.runtimeDirectory,'watcher-roundtrip-'));
   node=await LocalMonero.start(config.runtimeDirectory);
   timing=await openRpcTimingProxy({targetPort:node.port,onEvent:(event:any)=>{if(event.method==='generateblocks'||event.errorCategory)console.log(JSON.stringify({stage:'native-rpc',...event}));}});
   process.env.MONERO_LOCAL_RPC_PORT=String(timing.port);
-  vault=await openParticipantVault({binary:config.nativeBinary,sha256:config.nativeSha256,runtime:config.runtimeDirectory,mode:'deposit'});
+  vault=await openParticipantVault({binary:config.nativeBinary,sha256:config.nativeSha256,runtime:config.runtimeDirectory,mode:'deposit',
+    ...(copyFirst?{beforeDepositSubmit:async({vault:preparedVault,deposit}:any)=>{
+      collision=await injectPublicCopy({node,vault:preparedVault,deposit,mode:experiment.split('-')[0],prepared:true});
+    }}:{})});
   if(experiment?.endsWith('before-credit'))collision=await injectPublicCopy({node,vault,deposit:captureParticipantDeposit(vault),mode:experiment.split('-')[0]});
   const source=await buildDepositSource(vault,node,config.runtimeDirectory,config.ergoRecipient,deployment.tokens.Asset,{sourcePolicy:'authenticated-backing-v1'});
   expect(source.observation.historyOccurrences).toBe(collision?2:1);
+  if(copyFirst){
+    expect(collision.rawOccurrences).toBe(1);expect(collision.copyHeight).toBeLessThan(source.deposit.blockHeight);
+    expect(collision.honestTx).toBe(source.deposit.txId);expect(collision.outputKey).toBe(source.deposit.outputKey);
+    const copyRow=await node.transaction(collision.copyTx),honestRow=await node.transaction(source.deposit.txId);
+    expect(copyRow.txs[0].block_height).toBe(collision.copyHeight);expect(honestRow.txs[0].block_height).toBe(source.deposit.blockHeight);
+    expect(copyRow.txs[0].output_indices[source.deposit.outputIndex]).not.toBe(source.deposit.chainIndex);
+    collision={...collision,rawOccurrencesAtCopy:collision.rawOccurrences,rawOccurrences:source.observation.historyOccurrences,
+      honestHeight:source.deposit.blockHeight,honestChainIndex:source.deposit.chainIndex,ordering:'copy-first'};
+  }
   const opts={binary:config.observerBinary,sha256:config.observerSha256,runtimeDirectory:config.runtimeDirectory};
   const readers=[0,1].map(i=>makeIndependentDepositProviders({...opts,source,observerId:'watcher-'+i}));
   transport=await createWatcherTransport({directory:join(directory,'deposit-watchers'),deployment,nodePort:{rpc,confirmed,getStateContext:stateContext},

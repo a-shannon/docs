@@ -6,15 +6,15 @@ This experimental source package joins an actual isolated Monero deposit and nat
 
 The original signing and proof algorithms are retained. A public fixed-view native reader and the watcher/guard composition extend the baseline. `relocation-only-changes.json` records the historical baseline relocation; it does not describe these subsequent changes. `source-manifest.json` binds the current exact file set, sizes, and ordinal aggregate. Its SHA-256 must be obtained independently from the reviewed package.
 
-## Prepared prerequisites
+## Build and prepare
 
-The supported environment is the exercised Windows Node.js/WSL arrangement with already prepared dependencies and separately supplied binaries. A fresh installation, cross-platform build, or independent reproducible binary build has not been established.
+The reference environment is Windows x64 with Node.js 24.13.1, PowerShell 7.4 or later, Rust 1.98.1, Java 17 and WSL Ubuntu 22.04. Follow the [fresh preparation recipe](tools/reproduction-prerequisites.md) to reconstruct the dependencies and binaries from the public source package and initialize new isolated Ergo data and keys. System toolchains must already be installed. Other platforms and byte-identical binaries across different build paths are not qualified.
 
 - Prepared Rosen workspace at Git commit `1edc2fb982de4560c5265e04e2ed8b93d00b40df`, matching package metadata and the distribution pins in `prepared-dependencies.json`. This includes ErgoChain 15.0.0, ergo-node-network 10.0.5 and rosen-extractor 12.1.1. Local deposit sources are included separately: fetching this Git commit does not provide them.
 - Built `monero-participant` from the supplied `native` sources and locked dependencies. The build target is `cargo build --locked --features participant-host --bin monero-participant`; place build output outside this package. Supply and independently verify its executable SHA-256. Source and executable pins are distinct assurances.
 - Monero 0.18.5.1 daemon binary, independently pinned. The harness starts only its isolated local fakechain process and retires that process.
-- An already funded isolated Ergo 6.0.3 devnet on `127.0.0.1:19051`, zero peers, prepared genuine parameterized contracts and fixture token issuance. Supply the external Ergo runtime containing its deployment and local spending capabilities. The package does not create that runtime. Standard mining reward delay and transaction fees remain applicable.
-- A supplied C++ proof helper built against the pinned Monero core wallet library in WSL, with independently checked binary and library SHA-256 values. `proof/tx-proof.cpp` is the exact source; `proof/run.py` validates the supplied helper and library before invocation. Building the helper requires the prepared Monero core build flags and linked libraries; a clean build recipe is not claimed here.
+- A funded isolated Ergo 6.0.3 devnet on `127.0.0.1:19051`, zero peers. `ergo-node/bootstrap-devnet.mjs` creates a new external runtime, initializes its wallet, waits for mature mining rewards, and confirms a plain EIP3 funding output used by the watcher fixture. It verifies the owned Java process and REST listener around every API call. Standard mining reward delay and transaction fees remain applicable. The watcher profile subsequently prepares its parameterized contracts and fixture tokens.
+- A C++ proof helper built against the pinned public Monero core wallet sources in WSL. [The build recipe](proof/README.md) reconstructs the required shared-library closure. `proof/run.py` checks the helper, every declared non-system library and actual dynamic-library resolution before and after proof invocation. Operating-system libraries remain part of the declared Ubuntu environment.
 
 ## Configuration and replay
 
@@ -32,6 +32,7 @@ Create a caller-owned JSON configuration outside the package with these fields:
 | `wslDistro` | Prepared WSL distribution name |
 | `proofBinary`, `proofBinarySha256` | Absolute WSL helper path and independent SHA-256 |
 | `proofLibrary`, `proofLibrarySha256` | Absolute WSL wallet library path and independent SHA-256 |
+| `proofSharedLibraries` | Complete absolute-path/hash list of non-system shared libraries emitted by the proof build |
 
 Run from this source directory, replacing the placeholders:
 
@@ -57,7 +58,8 @@ submission. The legacy inspection profile still rejects duplicate raw keys.
 Version-1 assignment databases are rejected, without implicit migration.
 
 The optional `collisionExperiment` setting accepts `raw-before-credit`,
-`decodable-before-credit`, `raw-after-credit` or `decodable-after-credit`.
+`decodable-before-credit`, `raw-after-credit`, `decodable-after-credit`,
+`raw-copy-first` or `decodable-copy-first`.
 These cases additionally require `collisionBinary` and `collisionSha256`, built
 from the separate `test-fixtures/public-copy` package. Its patched wallet is
 exclusive to the test generator; the participant build retains its original
@@ -65,6 +67,13 @@ dependency. The generator funds its own local wallet and receives only public
 deposit facts. Before-credit source inspection takes a fresh snapshot which
 both original holders and the public readers independently validate. The
 launcher binds the additional executable before and after execution.
+
+For copy-first cases, the original native holder prepares the honest transaction
+without submitting it. The separate copier receives only its public bytes and
+deposit metadata, funds its own wallet and includes the copy. The original holder
+then submits its cached transaction once. The test checks actual block ordering,
+distinct global indices, authenticated backing and spending of the honest
+occurrence through the complete credit/redemption/payout path.
 
 The
 observer uses the fixture's public view scalar and does not establish a general
