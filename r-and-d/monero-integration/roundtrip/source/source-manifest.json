@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 393,
-  "aggregateSha256": "fe77d63f99927a43a63dfc6dc21c771156928ec3ca323c3f13dcb6dc7b789a82",
+  "fileCount": 397,
+  "aggregateSha256": "3aa587f3671b036a700013d6420b4dda404250cc46d2acc3e9c6d60258a94a38",
   "files": [
     {
       "path": "README.md",
-      "bytes": 8413,
-      "sha256": "4312d41a503f0ec72981765df560c883ecfb5a69ae86eea2dcc034299a389a47"
+      "bytes": 10556,
+      "sha256": "c93289e012f4aedc41e4f28ba976591fd1311d6fca49f8b287d5b7c04e8dcbf8"
     },
     {
       "path": "consumer/adapter.ts",
@@ -76,8 +76,8 @@
     },
     {
       "path": "consumer/authorityRoundtrip.ts",
-      "bytes": 6547,
-      "sha256": "7692307f938aab5a60df202bcc5d5be6b4ea754fdeac699df3ae7ebacd8cfe18"
+      "bytes": 7909,
+      "sha256": "989d1cd3fa5145d4821dbc26771a26e9d3a620dbb1683f7090015cb0de3af53e"
     },
     {
       "path": "consumer/authorizedAgreement.spec.ts",
@@ -148,6 +148,26 @@
       "path": "consumer/distributedWithdrawal.spec.ts",
       "bytes": 3979,
       "sha256": "c8629ba7b2fc12413d68e4f75b4823904227651f682355c279b133a5deb1e0ba"
+    },
+    {
+      "path": "consumer/economicReconciliation.mjs",
+      "bytes": 13559,
+      "sha256": "d4842d579c08dcdead5c14a41439990375ec877f200b061fb02cd44150ea7119"
+    },
+    {
+      "path": "consumer/economicReconciliation.test.mjs",
+      "bytes": 20403,
+      "sha256": "3cf0463e6730304a8c6942d40c324dc7f4169d72188cc377907b152e8c05452d"
+    },
+    {
+      "path": "consumer/economicRoundtrip.config.ts",
+      "bytes": 277,
+      "sha256": "e18a815a0914431b073a282ec77f1aad5b5373cdc3a709df99f0a98b6b3f932c"
+    },
+    {
+      "path": "consumer/economicRoundtrip.spec.ts",
+      "bytes": 13925,
+      "sha256": "6d590e010c41c398c9f32c4222cf7aa5335c6739e8fbfcbcb833cf5309784419"
     },
     {
       "path": "consumer/fixturePorts.ts",
@@ -1896,8 +1916,8 @@
     },
     {
       "path": "tools/launch-roundtrip.mjs",
-      "bytes": 11313,
-      "sha256": "6c9e7b363943b2f5c71480c0ec46fa5d1eba4192d2250cbd0001554b4cf5325a"
+      "bytes": 11423,
+      "sha256": "3e88ad096653f3201571901f9527d7fb9a783a6d55b76ac037ba86841614da7a"
     },
     {
       "path": "tools/launcher-guards.mjs",

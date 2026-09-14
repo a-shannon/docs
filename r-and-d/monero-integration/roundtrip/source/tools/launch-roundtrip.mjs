@@ -11,13 +11,14 @@ const args=Object.create(null),allowed=new Set(['config','manifest-sha256','chec
 for(let i=2;i<process.argv.length;i+=2){const key=process.argv[i]?.slice(2),value=process.argv[i+1];if(!process.argv[i]?.startsWith('--')||!allowed.has(key)||!value||Object.hasOwn(args,key))throw Error('Arguments');args[key]=value;}
 if(!args.config||!isAbsolute(args.config)||!/^[0-9a-f]{64}$/.test(args['manifest-sha256']))throw Error('Explicit config and manifest pin required');
 for(const key of ['check-only','collect-only'])if(args[key]&&args[key]!=='true')throw Error('Boolean option');
-const profile=args.profile??'baseline';if(!['baseline','watcher-authority'].includes(profile))throw Error('Unsupported profile');
-const spec=profile==='watcher-authority'?'watcherAuthority.spec.ts':'roundtrip.spec.ts';
-const testConfig=profile==='watcher-authority'?'watcherAuthority.config.ts':'roundtrip.config.ts';
+const profile=args.profile??'baseline';if(!['baseline','watcher-authority','economic-reconciliation'].includes(profile))throw Error('Unsupported profile');
+const profiles={baseline:['roundtrip.spec.ts','roundtrip.config.ts'],'watcher-authority':['watcherAuthority.spec.ts','watcherAuthority.config.ts'],
+  'economic-reconciliation':['economicRoundtrip.spec.ts','economicRoundtrip.config.ts']};
+const [spec,testConfig]=profiles[profile];
 const configBytes=readFileSync(args.config),config=JSON.parse(configBytes);
 for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','ergoRuntime'])if(typeof config[key]!=='string'||!isAbsolute(config[key]))throw Error('Absolute configuration: '+key);
 const work=resolve(config.runtimeDirectory),rosen=resolve(config.rosenRoot);
-const observerFiles=profile==='watcher-authority'?[[config.observerBinary,config.observerSha256]]:[];
+const observerFiles=profile!=='baseline'?[[config.observerBinary,config.observerSha256]]:[];
 if(config.collisionExperiment!==undefined){
   if(profile!=='watcher-authority'||!['raw-before-credit','decodable-before-credit','raw-after-credit','decodable-after-credit','raw-copy-first','decodable-copy-first'].includes(config.collisionExperiment))throw Error('Collision profile');
   observerFiles.push([config.collisionBinary,config.collisionSha256]);

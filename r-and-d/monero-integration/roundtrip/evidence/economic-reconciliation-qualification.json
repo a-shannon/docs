@@ -1,0 +1,1316 @@
+{
+  "schema": "rosen-monero/economic-reconciliation-qualification/v1",
+  "date": "2026-09-14",
+  "baselineCommit": "754d1672aab78104a6f8aa16d954b268b8946e1e",
+  "source": {
+    "manifest": "../source/source-manifest.json",
+    "fileCount": 397,
+    "aggregateSha256": "3aa587f3671b036a700013d6420b4dda404250cc46d2acc3e9c6d60258a94a38",
+    "manifestSha256": "3d2e1696648900065f3dcdc745c00b0966f6a77237545662cb2cd40d7dad5040"
+  },
+  "evidenceStatus": {
+    "implementation": "matrix_covered",
+    "independentReview": "complete",
+    "ci": "not_run",
+    "targetRuntime": "verified",
+    "readiness": "draft_review",
+    "externalAudit": false
+  },
+  "validation": {
+    "pureTestGroups": 13,
+    "guardRemovalMutants": [
+      {
+        "name": "credit-conservation",
+        "exitCode": 1,
+        "failedTests": [
+          "not ok 4 - rejects each decisive credit, withdrawal and final-settlement arithmetic mutation"
+        ]
+      },
+      {
+        "name": "withdrawal-conservation",
+        "exitCode": 1,
+        "failedTests": [
+          "not ok 4 - rejects each decisive credit, withdrawal and final-settlement arithmetic mutation"
+        ]
+      },
+      {
+        "name": "settlement-recipient",
+        "exitCode": 1,
+        "failedTests": [
+          "not ok 4 - rejects each decisive credit, withdrawal and final-settlement arithmetic mutation"
+        ]
+      },
+      {
+        "name": "settlement-miner-fee",
+        "exitCode": 1,
+        "failedTests": [
+          "not ok 4 - rejects each decisive credit, withdrawal and final-settlement arithmetic mutation"
+        ]
+      },
+      {
+        "name": "settlement-change",
+        "exitCode": 1,
+        "failedTests": [
+          "not ok 4 - rejects each decisive credit, withdrawal and final-settlement arithmetic mutation"
+        ]
+      },
+      {
+        "name": "settlement-source-alias",
+        "exitCode": 1,
+        "failedTests": [
+          "not ok 12 - rejects settlement and redemption transaction IDs that alias cross-role creators"
+        ]
+      },
+      {
+        "name": "redemption-credit-alias",
+        "exitCode": 1,
+        "failedTests": [
+          "not ok 12 - rejects settlement and redemption transaction IDs that alias cross-role creators"
+        ]
+      }
+    ],
+    "integration": {
+      "profile": "economic-reconciliation",
+      "testDurationMs": 280202,
+      "runId": "7e01cc81-4e56-49ef-9953-7ad66b876fe0",
+      "exitCode": 0,
+      "declaredInputsUnchanged": true,
+      "publicResultSha256": "bb091d0e61730ab30780fa484dfc06a2cf689150aa146b9aef769fa17b003727",
+      "executionBeforeSha256": "9b1bb29b893fb997d5f8cf42c506dddc019f7a87455d6a74cbd6c2fafee0f5fe",
+      "executionAfterSha256": "f8423d53a6c4206ff8159d9355d0b2eb3f426d5fe0cd57a8543ff3945541d89c",
+      "runtimeObservation": "Author-run isolated chains; hashes identify retained execution receipts, not independent execution attestations"
+    },
+    "checkpointReportsRecomputed": 13
+  },
+  "reusedPreparation": {
+    "record": "copy-first-reproduction-qualification.json",
+    "sourceCommit": "754d1672aab78104a6f8aa16d954b268b8946e1e",
+    "newBuild": false,
+    "nodeSha256": "e3be0545990c90995d7bf3a7af5d64af1f2e0fc1bbd9b79c27f7abc1e9676e50",
+    "nativeSha256": "fd96831b4ed8f3e23b5dd9b801fa67d2b8166f1bab3d25c36cf21d3e6f179bfa",
+    "observerSha256": "fd96831b4ed8f3e23b5dd9b801fa67d2b8166f1bab3d25c36cf21d3e6f179bfa",
+    "moneroDaemonSha256": "e69bf239e0acad637fc1bc257ba68661133fca77727f2ff6f25c8db917cfee42"
+  },
+  "operations": [
+    {
+      "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+      "genesis": "418015bb9ae982a1975da7d79277c2705727a56894ba0fb246adaabb1f4632e3",
+      "vaultSpend": "a596cf4122e45e4c55ac54a4dee2bda98a18b4b5f140f7e511775c1ed22a38ec",
+      "assetId": "079ec6a0c280ef11faf57e2bbc987739f5ebbfd15b5160fdb3a734d4310dfe22",
+      "deposit": {
+        "txId": "a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "outputIndex": 0,
+        "publicKey": "a989bfc0cdcddaf9b4da488f60b1b31d4048a9a9e4048fa9d89f73d378f9fdad",
+        "amountAtomic": "500000240"
+      },
+      "credit": {
+        "txId": "092a91c605e153954ef8a69273d1e97dc54b8b8a6f7b4e2e0f2eede507352f2b",
+        "boxId": "270da7a38966fd4d865a8ed853329172abb5f422973faf21ea4fe41f60655172",
+        "depositId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "recipientAtomic": "500000120",
+        "bridgeFeeAtomic": "100",
+        "networkFeeAtomic": "20",
+        "issuedFeeTokenAtomic": "120"
+      },
+      "redemption": {
+        "txId": "4b01559c9daa8424b803edfdd3730a8058eda0945046660a7f027b17a3a3482f",
+        "creditTxId": "092a91c605e153954ef8a69273d1e97dc54b8b8a6f7b4e2e0f2eede507352f2b",
+        "creditBoxId": "270da7a38966fd4d865a8ed853329172abb5f422973faf21ea4fe41f60655172",
+        "amountAtomic": "500000120",
+        "bridgeFeeAtomic": "100",
+        "networkFeeAtomic": "20"
+      },
+      "withdrawal": {
+        "reservationId": "65f22283a7f01364028c8c53099f484e9750cf85340fd359f363cd5634bf140f",
+        "proposalId": "36340d3c1c8c8fe52e1be76ded237484c0c0649192f085c7de582d197676ec7a",
+        "redemptionTxId": "4b01559c9daa8424b803edfdd3730a8058eda0945046660a7f027b17a3a3482f",
+        "inputs": [
+          {
+            "txId": "ac1bb53227cc2a6953bc42c231a058117af6592e46b628e890610d026ae4bf33",
+            "outputIndex": 0,
+            "publicKey": "172ad34b8040fe8ced794379f31e42b077717ab8a0f5694b52d86562115a22e8",
+            "amountAtomic": "35183130595583"
+          },
+          {
+            "txId": "a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "outputIndex": 0,
+            "publicKey": "a989bfc0cdcddaf9b4da488f60b1b31d4048a9a9e4048fa9d89f73d378f9fdad",
+            "amountAtomic": "500000240"
+          }
+        ],
+        "recipientAtomic": "500000000",
+        "minerFeeAtomic": "2599200000",
+        "changeAtomic": "35180531395823",
+        "changePublicKey": "616098aa8e3f0de2af84ed0c87c05c6a26b0d25ec0fdd8cd0c39c3c5c44a0c81",
+        "settlement": {
+          "txId": "3f80606ae9fb2c924e08fd3988cb53522dcafaeb1445106c713d8247eeed287e",
+          "proposalId": "36340d3c1c8c8fe52e1be76ded237484c0c0649192f085c7de582d197676ec7a",
+          "reservationId": "65f22283a7f01364028c8c53099f484e9750cf85340fd359f363cd5634bf140f",
+          "inputAtomic": "35183630595823",
+          "recipientAtomic": "500000000",
+          "minerFeeAtomic": "2599200000",
+          "changeAtomic": "35180531395823",
+          "changePublicKey": "616098aa8e3f0de2af84ed0c87c05c6a26b0d25ec0fdd8cd0c39c3c5c44a0c81",
+          "rewardState": "pending-reward"
+        }
+      }
+    },
+    {
+      "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+      "genesis": "418015bb9ae982a1975da7d79277c2705727a56894ba0fb246adaabb1f4632e3",
+      "vaultSpend": "2bec5ddd64a0527748bea13f2cc83c25cca1fd6fe73afcc29db61433617a1bbf",
+      "assetId": "079ec6a0c280ef11faf57e2bbc987739f5ebbfd15b5160fdb3a734d4310dfe22",
+      "deposit": {
+        "txId": "9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "outputIndex": 1,
+        "publicKey": "93ade13b8e6390b16f3a4694cd5565489a9addd93a9233b6da9e4bf9c4f881a3",
+        "amountAtomic": "500000240"
+      },
+      "credit": {
+        "txId": "1d9cf7e2708e6b51e7621e998afaa6283609ec4b3444f9bcf131c052082e6d3c",
+        "boxId": "5a7a35e885daeb36665a4ea5a3440ec17cb6648d2759bcb618f6760cefbc081b",
+        "depositId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "recipientAtomic": "500000120",
+        "bridgeFeeAtomic": "100",
+        "networkFeeAtomic": "20",
+        "issuedFeeTokenAtomic": "120"
+      },
+      "redemption": {
+        "txId": "8292ecdefe52aa6f5d3f49a45d1bc7c3b10f39f9aec1c3a55f53ec79800279d6",
+        "creditTxId": "1d9cf7e2708e6b51e7621e998afaa6283609ec4b3444f9bcf131c052082e6d3c",
+        "creditBoxId": "5a7a35e885daeb36665a4ea5a3440ec17cb6648d2759bcb618f6760cefbc081b",
+        "amountAtomic": "500000120",
+        "bridgeFeeAtomic": "100",
+        "networkFeeAtomic": "20"
+      },
+      "withdrawal": {
+        "reservationId": "cf572ed22e6bc5b34899261d6b3d37472fdac0c3471d5b2864e803df37ba080f",
+        "proposalId": "a01eef7c08f653b64de02fcf7256db77124c75655d3cfbac7fa418973b7ef74b",
+        "redemptionTxId": "8292ecdefe52aa6f5d3f49a45d1bc7c3b10f39f9aec1c3a55f53ec79800279d6",
+        "inputs": [
+          {
+            "txId": "07ea6543d43c2be50e7104d6c7735433c0769b3d667b701df9fd53a5b4eb4cbd",
+            "outputIndex": 0,
+            "publicKey": "0865d6efecbce57b2d4a5e26d7635b8ec56c910e223db97e6cc9f16c0dbb2c98",
+            "amountAtomic": "35172596442983"
+          },
+          {
+            "txId": "9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "outputIndex": 1,
+            "publicKey": "93ade13b8e6390b16f3a4694cd5565489a9addd93a9233b6da9e4bf9c4f881a3",
+            "amountAtomic": "500000240"
+          }
+        ],
+        "recipientAtomic": "500000000",
+        "minerFeeAtomic": "2601600000",
+        "changeAtomic": "35169994843223",
+        "changePublicKey": "c5cf4c371a3b438ccc8027b4f3c648e9be2638ac771b76a153823cbbc6fa4e57",
+        "settlement": {
+          "txId": "fbc590e509cf84b761300bb4ff4c7d8000ba22be9c49eb11dcdaaa74443666c0",
+          "proposalId": "a01eef7c08f653b64de02fcf7256db77124c75655d3cfbac7fa418973b7ef74b",
+          "reservationId": "cf572ed22e6bc5b34899261d6b3d37472fdac0c3471d5b2864e803df37ba080f",
+          "inputAtomic": "35173096443223",
+          "recipientAtomic": "500000000",
+          "minerFeeAtomic": "2601600000",
+          "changeAtomic": "35169994843223",
+          "changePublicKey": "c5cf4c371a3b438ccc8027b4f3c648e9be2638ac771b76a153823cbbc6fa4e57",
+          "rewardState": "pending-reward"
+        }
+      }
+    }
+  ],
+  "checkpoints": [
+    {
+      "stage": "deposit-0",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "deposited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000240",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "0",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "0",
+            "chargedNetworkFeeAtomic": "0",
+            "feeCoverageVarianceAtomic": "0",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "0"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "500000240",
+          "outstandingUserAtomic": "500000240",
+          "pendingPayoutAtomic": "0",
+          "issuedDepositFeeTokenAtomic": "0",
+          "retainedReturnFeeAtomic": "0",
+          "selectedReserveAtomic": "0",
+          "accountedBackingAtomic": "500000240",
+          "paidRecipientAtomic": "0",
+          "paidMinerFeeAtomic": "0",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "0",
+          "chargedNetworkFeeAtomic": "0",
+          "feeCoverageVarianceAtomic": "0",
+          "selectedResidualAtomic": "0",
+          "feeBackingRequirementAtomic": "0",
+          "operationCount": 1,
+          "settledCount": 0
+        }
+      }
+    },
+    {
+      "stage": "credit-0",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "credited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000120",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "100",
+            "chargedNetworkFeeAtomic": "20",
+            "feeCoverageVarianceAtomic": "20",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "120"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "500000240",
+          "outstandingUserAtomic": "500000120",
+          "pendingPayoutAtomic": "0",
+          "issuedDepositFeeTokenAtomic": "120",
+          "retainedReturnFeeAtomic": "0",
+          "selectedReserveAtomic": "0",
+          "accountedBackingAtomic": "500000240",
+          "paidRecipientAtomic": "0",
+          "paidMinerFeeAtomic": "0",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "100",
+          "chargedNetworkFeeAtomic": "20",
+          "feeCoverageVarianceAtomic": "20",
+          "selectedResidualAtomic": "0",
+          "feeBackingRequirementAtomic": "120",
+          "operationCount": 1,
+          "settledCount": 0
+        }
+      }
+    },
+    {
+      "stage": "redemption-0",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "redeemed",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "500000000",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "40",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "240"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "500000240",
+          "outstandingUserAtomic": "0",
+          "pendingPayoutAtomic": "500000000",
+          "issuedDepositFeeTokenAtomic": "120",
+          "retainedReturnFeeAtomic": "120",
+          "selectedReserveAtomic": "0",
+          "accountedBackingAtomic": "500000240",
+          "paidRecipientAtomic": "0",
+          "paidMinerFeeAtomic": "0",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "200",
+          "chargedNetworkFeeAtomic": "40",
+          "feeCoverageVarianceAtomic": "40",
+          "selectedResidualAtomic": "0",
+          "feeBackingRequirementAtomic": "240",
+          "operationCount": 1,
+          "settledCount": 0
+        }
+      }
+    },
+    {
+      "stage": "deposit-1",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "redeemed",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "500000000",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "40",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "deposited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000240",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "0",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "0",
+            "chargedNetworkFeeAtomic": "0",
+            "feeCoverageVarianceAtomic": "0",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "0"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "500000240",
+          "pendingPayoutAtomic": "500000000",
+          "issuedDepositFeeTokenAtomic": "120",
+          "retainedReturnFeeAtomic": "120",
+          "selectedReserveAtomic": "0",
+          "accountedBackingAtomic": "1000000480",
+          "paidRecipientAtomic": "0",
+          "paidMinerFeeAtomic": "0",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "200",
+          "chargedNetworkFeeAtomic": "40",
+          "feeCoverageVarianceAtomic": "40",
+          "selectedResidualAtomic": "0",
+          "feeBackingRequirementAtomic": "240",
+          "operationCount": 2,
+          "settledCount": 0
+        }
+      }
+    },
+    {
+      "stage": "credit-1",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "redeemed",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "500000000",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "40",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "credited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000120",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "100",
+            "chargedNetworkFeeAtomic": "20",
+            "feeCoverageVarianceAtomic": "20",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "120"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "500000120",
+          "pendingPayoutAtomic": "500000000",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "120",
+          "selectedReserveAtomic": "0",
+          "accountedBackingAtomic": "1000000480",
+          "paidRecipientAtomic": "0",
+          "paidMinerFeeAtomic": "0",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "300",
+          "chargedNetworkFeeAtomic": "60",
+          "feeCoverageVarianceAtomic": "60",
+          "selectedResidualAtomic": "0",
+          "feeBackingRequirementAtomic": "360",
+          "operationCount": 2,
+          "settledCount": 0
+        }
+      }
+    },
+    {
+      "stage": "two-open-obligations",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "redeemed",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "500000000",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "40",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "credited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000120",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "100",
+            "chargedNetworkFeeAtomic": "20",
+            "feeCoverageVarianceAtomic": "20",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "120"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "500000120",
+          "pendingPayoutAtomic": "500000000",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "120",
+          "selectedReserveAtomic": "0",
+          "accountedBackingAtomic": "1000000480",
+          "paidRecipientAtomic": "0",
+          "paidMinerFeeAtomic": "0",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "300",
+          "chargedNetworkFeeAtomic": "60",
+          "feeCoverageVarianceAtomic": "60",
+          "selectedResidualAtomic": "0",
+          "feeBackingRequirementAtomic": "360",
+          "operationCount": 2,
+          "settledCount": 0
+        }
+      }
+    },
+    {
+      "stage": "reserved-0",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "reserved",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "500000000",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35183130595583",
+            "accountedBackingAtomic": "35183630595823",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "2599200000",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "40",
+            "selectedResidualAtomic": "35183130595583",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "credited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000120",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "100",
+            "chargedNetworkFeeAtomic": "20",
+            "feeCoverageVarianceAtomic": "20",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "120"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "500000120",
+          "pendingPayoutAtomic": "500000000",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "120",
+          "selectedReserveAtomic": "35183130595583",
+          "accountedBackingAtomic": "35184130596063",
+          "paidRecipientAtomic": "0",
+          "paidMinerFeeAtomic": "0",
+          "pendingMinerFeeAtomic": "2599200000",
+          "chargedBridgeFeeAtomic": "300",
+          "chargedNetworkFeeAtomic": "60",
+          "feeCoverageVarianceAtomic": "60",
+          "selectedResidualAtomic": "35183130595583",
+          "feeBackingRequirementAtomic": "360",
+          "operationCount": 2,
+          "settledCount": 0
+        }
+      }
+    },
+    {
+      "stage": "settled-0",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35183130595583",
+            "accountedBackingAtomic": "35180531395823",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2599200000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2599199960",
+            "selectedResidualAtomic": "35180531395583",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "credited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000120",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "100",
+            "chargedNetworkFeeAtomic": "20",
+            "feeCoverageVarianceAtomic": "20",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "120"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "500000120",
+          "pendingPayoutAtomic": "0",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "120",
+          "selectedReserveAtomic": "35183130595583",
+          "accountedBackingAtomic": "35181031396063",
+          "paidRecipientAtomic": "500000000",
+          "paidMinerFeeAtomic": "2599200000",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "300",
+          "chargedNetworkFeeAtomic": "60",
+          "feeCoverageVarianceAtomic": "-2599199940",
+          "selectedResidualAtomic": "35180531395583",
+          "feeBackingRequirementAtomic": "360",
+          "operationCount": 2,
+          "settledCount": 1
+        }
+      }
+    },
+    {
+      "stage": "first-settled-second-credited",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35183130595583",
+            "accountedBackingAtomic": "35180531395823",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2599200000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2599199960",
+            "selectedResidualAtomic": "35180531395583",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "credited",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "500000120",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "0",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "100",
+            "chargedNetworkFeeAtomic": "20",
+            "feeCoverageVarianceAtomic": "20",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "120"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "500000120",
+          "pendingPayoutAtomic": "0",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "120",
+          "selectedReserveAtomic": "35183130595583",
+          "accountedBackingAtomic": "35181031396063",
+          "paidRecipientAtomic": "500000000",
+          "paidMinerFeeAtomic": "2599200000",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "300",
+          "chargedNetworkFeeAtomic": "60",
+          "feeCoverageVarianceAtomic": "-2599199940",
+          "selectedResidualAtomic": "35180531395583",
+          "feeBackingRequirementAtomic": "360",
+          "operationCount": 2,
+          "settledCount": 1
+        }
+      }
+    },
+    {
+      "stage": "redemption-1",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35183130595583",
+            "accountedBackingAtomic": "35180531395823",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2599200000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2599199960",
+            "selectedResidualAtomic": "35180531395583",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "redeemed",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "500000000",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "0",
+            "accountedBackingAtomic": "500000240",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "40",
+            "selectedResidualAtomic": "0",
+            "feeBackingRequirementAtomic": "240"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "0",
+          "pendingPayoutAtomic": "500000000",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "240",
+          "selectedReserveAtomic": "35183130595583",
+          "accountedBackingAtomic": "35181031396063",
+          "paidRecipientAtomic": "500000000",
+          "paidMinerFeeAtomic": "2599200000",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "400",
+          "chargedNetworkFeeAtomic": "80",
+          "feeCoverageVarianceAtomic": "-2599199920",
+          "selectedResidualAtomic": "35180531395583",
+          "feeBackingRequirementAtomic": "480",
+          "operationCount": 2,
+          "settledCount": 1
+        }
+      }
+    },
+    {
+      "stage": "reserved-1",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35183130595583",
+            "accountedBackingAtomic": "35180531395823",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2599200000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2599199960",
+            "selectedResidualAtomic": "35180531395583",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "reserved",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "500000000",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35172596442983",
+            "accountedBackingAtomic": "35173096443223",
+            "paidRecipientAtomic": "0",
+            "paidMinerFeeAtomic": "0",
+            "pendingMinerFeeAtomic": "2601600000",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "40",
+            "selectedResidualAtomic": "35172596442983",
+            "feeBackingRequirementAtomic": "240"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "0",
+          "pendingPayoutAtomic": "500000000",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "240",
+          "selectedReserveAtomic": "70355727038566",
+          "accountedBackingAtomic": "70353627839046",
+          "paidRecipientAtomic": "500000000",
+          "paidMinerFeeAtomic": "2599200000",
+          "pendingMinerFeeAtomic": "2601600000",
+          "chargedBridgeFeeAtomic": "400",
+          "chargedNetworkFeeAtomic": "80",
+          "feeCoverageVarianceAtomic": "-2599199920",
+          "selectedResidualAtomic": "70353127838566",
+          "feeBackingRequirementAtomic": "480",
+          "operationCount": 2,
+          "settledCount": 1
+        }
+      }
+    },
+    {
+      "stage": "settled-1",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35183130595583",
+            "accountedBackingAtomic": "35180531395823",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2599200000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2599199960",
+            "selectedResidualAtomic": "35180531395583",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35172596442983",
+            "accountedBackingAtomic": "35169994843223",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2601600000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2601599960",
+            "selectedResidualAtomic": "35169994842983",
+            "feeBackingRequirementAtomic": "240"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "0",
+          "pendingPayoutAtomic": "0",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "240",
+          "selectedReserveAtomic": "70355727038566",
+          "accountedBackingAtomic": "70350526239046",
+          "paidRecipientAtomic": "1000000000",
+          "paidMinerFeeAtomic": "5200800000",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "400",
+          "chargedNetworkFeeAtomic": "80",
+          "feeCoverageVarianceAtomic": "-5200799920",
+          "selectedResidualAtomic": "70350526238566",
+          "feeBackingRequirementAtomic": "480",
+          "operationCount": 2,
+          "settledCount": 2
+        }
+      }
+    },
+    {
+      "stage": "both-settled",
+      "report": {
+        "scope": "selected-input-reconciliation-v1",
+        "operations": [
+          {
+            "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35183130595583",
+            "accountedBackingAtomic": "35180531395823",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2599200000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2599199960",
+            "selectedResidualAtomic": "35180531395583",
+            "feeBackingRequirementAtomic": "240"
+          },
+          {
+            "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+            "state": "settled",
+            "depositAtomic": "500000240",
+            "outstandingUserAtomic": "0",
+            "pendingPayoutAtomic": "0",
+            "issuedDepositFeeTokenAtomic": "120",
+            "retainedReturnFeeAtomic": "120",
+            "selectedReserveAtomic": "35172596442983",
+            "accountedBackingAtomic": "35169994843223",
+            "paidRecipientAtomic": "500000000",
+            "paidMinerFeeAtomic": "2601600000",
+            "pendingMinerFeeAtomic": "0",
+            "chargedBridgeFeeAtomic": "200",
+            "chargedNetworkFeeAtomic": "40",
+            "feeCoverageVarianceAtomic": "-2601599960",
+            "selectedResidualAtomic": "35169994842983",
+            "feeBackingRequirementAtomic": "240"
+          }
+        ],
+        "totals": {
+          "depositAtomic": "1000000480",
+          "outstandingUserAtomic": "0",
+          "pendingPayoutAtomic": "0",
+          "issuedDepositFeeTokenAtomic": "240",
+          "retainedReturnFeeAtomic": "240",
+          "selectedReserveAtomic": "70355727038566",
+          "accountedBackingAtomic": "70350526239046",
+          "paidRecipientAtomic": "1000000000",
+          "paidMinerFeeAtomic": "5200800000",
+          "pendingMinerFeeAtomic": "0",
+          "chargedBridgeFeeAtomic": "400",
+          "chargedNetworkFeeAtomic": "80",
+          "feeCoverageVarianceAtomic": "-5200799920",
+          "selectedResidualAtomic": "70350526238566",
+          "feeBackingRequirementAtomic": "480",
+          "operationCount": 2,
+          "settledCount": 2
+        }
+      }
+    }
+  ],
+  "report": {
+    "scope": "selected-input-reconciliation-v1",
+    "operations": [
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "state": "settled",
+        "depositAtomic": "500000240",
+        "outstandingUserAtomic": "0",
+        "pendingPayoutAtomic": "0",
+        "issuedDepositFeeTokenAtomic": "120",
+        "retainedReturnFeeAtomic": "120",
+        "selectedReserveAtomic": "35183130595583",
+        "accountedBackingAtomic": "35180531395823",
+        "paidRecipientAtomic": "500000000",
+        "paidMinerFeeAtomic": "2599200000",
+        "pendingMinerFeeAtomic": "0",
+        "chargedBridgeFeeAtomic": "200",
+        "chargedNetworkFeeAtomic": "40",
+        "feeCoverageVarianceAtomic": "-2599199960",
+        "selectedResidualAtomic": "35180531395583",
+        "feeBackingRequirementAtomic": "240"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "state": "settled",
+        "depositAtomic": "500000240",
+        "outstandingUserAtomic": "0",
+        "pendingPayoutAtomic": "0",
+        "issuedDepositFeeTokenAtomic": "120",
+        "retainedReturnFeeAtomic": "120",
+        "selectedReserveAtomic": "35172596442983",
+        "accountedBackingAtomic": "35169994843223",
+        "paidRecipientAtomic": "500000000",
+        "paidMinerFeeAtomic": "2601600000",
+        "pendingMinerFeeAtomic": "0",
+        "chargedBridgeFeeAtomic": "200",
+        "chargedNetworkFeeAtomic": "40",
+        "feeCoverageVarianceAtomic": "-2601599960",
+        "selectedResidualAtomic": "35169994842983",
+        "feeBackingRequirementAtomic": "240"
+      }
+    ],
+    "totals": {
+      "depositAtomic": "1000000480",
+      "outstandingUserAtomic": "0",
+      "pendingPayoutAtomic": "0",
+      "issuedDepositFeeTokenAtomic": "240",
+      "retainedReturnFeeAtomic": "240",
+      "selectedReserveAtomic": "70355727038566",
+      "accountedBackingAtomic": "70350526239046",
+      "paidRecipientAtomic": "1000000000",
+      "paidMinerFeeAtomic": "5200800000",
+      "pendingMinerFeeAtomic": "0",
+      "chargedBridgeFeeAtomic": "400",
+      "chargedNetworkFeeAtomic": "80",
+      "feeCoverageVarianceAtomic": "-5200799920",
+      "selectedResidualAtomic": "70350526238566",
+      "feeBackingRequirementAtomic": "480",
+      "operationCount": 2,
+      "settledCount": 2
+    }
+  },
+  "chainCosts": {
+    "ergoTransactionFees": [
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "6b0beab69ba97fd276d677de83b6079c52f3ff73b3ee573cae6cbce6ba4c657b",
+        "feeBoxId": "9eb37b67f9884157a9c7f2e79a0559ec6b830806232550bfae6739f2deee205c",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "bc3cb3240974e08bdca7ed37c3c239d041b5df5b4936d588f735620f3b2f5af2",
+        "feeBoxId": "41f451851b9b11071945572a0eda21a04ed3899713db85fa97bc5e0fe82cdab2",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "cb43990f609f803d75b6ce1789961dc90a47cf3dfce708b696380fbef97b6667",
+        "feeBoxId": "0f9123b42c2c725469f8fcb40e67071953e3753f3ac1d39b348b60b8baa520e8",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "092a91c605e153954ef8a69273d1e97dc54b8b8a6f7b4e2e0f2eede507352f2b",
+        "feeBoxId": "eca6a8312e0c8ec6456afd30133b9f394476493f50ff83e0b8599bd8f63ae9a1",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "4b01559c9daa8424b803edfdd3730a8058eda0945046660a7f027b17a3a3482f",
+        "feeBoxId": "2d8191878eb439a5bebee1a644235bb99d01829344e027e2bd681967aca20950",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "fd475ef8a71cbf549b30e7f8234171056dd3ceab6627d3696f7504998a430325",
+        "feeBoxId": "06e37dde69b2a40ab918a579f0bba293b65d2fd80542c56daba57ba903b27d77",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "d2a61511552c1cc93cbf50b0af6870bc6a66d80320bda0dcb781594441c89f00",
+        "feeBoxId": "e0e16d29f6bd18cf4bda39bb9c8f10212d389d2cfd00c38107ecd853d8dc2ae9",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+        "txId": "ba7b5a52d0c0ade73cf11faf6de494bf3e689d0954fc6f6e0baad78737214ddc",
+        "feeBoxId": "e0cdd144ee189c651e5fb71ebb5e67dbcbd7ccc3bfc6c5fad62aca5bf2aca14d",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "fe35a9519a60c4d16afff1dde548c60e18ff135775d125bb925a9945e94806e9",
+        "feeBoxId": "f7a3821812fb278c6491dbbbbafbc136aa6b995df6607a7528f179a892a3a4df",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "c7fdf1325a856a59c5dc20c6a70a3c81ab6a66e00b7b9e362cdd8401bdb35a96",
+        "feeBoxId": "d65a0d089adb0d4755b41f58de386715914a2fa2c1129a1efd12b80707d0ea07",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "2d34b315ec5291dcda0650f033f4f53f1e117d7a63459882328b00c108304df9",
+        "feeBoxId": "672224a1bfe51cd2f5f0771bc960e2e90748e8a2bf8791255af050cace270f74",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "1d9cf7e2708e6b51e7621e998afaa6283609ec4b3444f9bcf131c052082e6d3c",
+        "feeBoxId": "5d27db563caaaf19820f52aad83b4fc259e29c7fcca4d789bad7faed13b564b4",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "8292ecdefe52aa6f5d3f49a45d1bc7c3b10f39f9aec1c3a55f53ec79800279d6",
+        "feeBoxId": "6f9ae511b261e453fbb075f1b2f06caf6d64f243e326e433a51a091b299f0099",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "fb548674b5cbb65b000eb0969bb597377498e945b76011aaf109d9758b739086",
+        "feeBoxId": "f6ad49108ce2ac41eddf10253e239e8b7c33109f5c1bdab53e0868dfa532cebb",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "6d16389636389785ac2e291102c1d19f641ab6e161b8510e3dffd6a6247a5d44",
+        "feeBoxId": "f3e9e1b0a8229f7799d54c96324ec059194a8310781d4da7a6cca76d6281857e",
+        "feeNanoErg": "1100000"
+      },
+      {
+        "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+        "txId": "9865eae5c2e4540008fff385fc24f1c52b6697f2460d80a6d9a6782885fe0448",
+        "feeBoxId": "75dce0ca3531288ad7705c5f5586948d8a0ba0a2dd29575f79bdc7f7dd19224d",
+        "feeNanoErg": "1100000"
+      }
+    ],
+    "ergoMinerFeeNanoErg": "17600000",
+    "donorMoneroMinerFeeAtomic": "3618000000",
+    "withdrawalMoneroMinerFeeAtomic": "5200800000",
+    "scope": "deposit-and-return-operations-excluding-fixture-setup-and-mining"
+  },
+  "observations": [
+    {
+      "operationId": "monero:deposit:mainnet:a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c",
+      "deposit": {
+        "amountAtomic": "500000240",
+        "blockHash": "7ad1289c51a3ccd5292bb35ad2a045bf1e1a87ef3b8da7c2ab68cd03ab74cdc8",
+        "blockHeight": 97,
+        "chainIndex": 97,
+        "feeAtomic": "1808400000",
+        "outputIndex": 0,
+        "outputKey": "a989bfc0cdcddaf9b4da488f60b1b31d4048a9a9e4048fa9d89f73d378f9fdad",
+        "txBytes": "02000102001000010101010101010101010101010101fe00852dcfe9ff020dfab1373a2e1ba14e08afb143a1d87c44faeb370f097f77020003a989bfc0cdcddaf9b4da488f60b1b31d4048a9a9e4048fa9d89f73d378f9fdade5000345a991302d97be30e418c7797413b59c97fcb5210828e696bfa482886c0f44cdff2c017ead747a7bf983287963df7710f7d56d17bc6a028b7fb1c3e76bce320508120302090118d72fa0663c887a0680fda7de062b4e3fc53f22e78cb987e036991bd82a71820cbb5facde24a8a2cb472bba2fad45cbb67b6a292b726fab32ed0bee0bcca1e6ad714c6772e4277e983dba4db0b03100795b51088ba2bddf4d5c637a264501f9564234c64e575ba70478f0d5760f45d41a3121a295fcf80d8a19802eb0fe0be6c5d2c016ab721941dc7664ec5be6bb081c9440072c368c48369ed09c2333ee10ea242909530a1a0a421ba095b1c20e8dea4e26b9915ff7b5b202e3a09a5eed0ca3c4dadb34d22b7dc744cea746a64fb383919ac782f4db487ab64bcd700b0c6364653cecea44009babf3183ee3d66d7fab3f4b58401be761d892fd39ae4f035f110309193e2715798f11169a6e1024bdfd26656275e9c8641b337986ced30407926d9c209627562230a6c26c0de2aef27f850649d0b3c8fc5854ca5bd28ac458256ad19b54593ae260ef79bcc2d752a26c684dbb6512508523a2f4081a6b2479c93746ad1fa635e8c9e90944be201d2e5ced12974299b285324caa33446a49b2ef3a3abe7499b99598f94a2978a67b48e72619f835352246b07a337edfc62e55bfdfe54eff3b55e677a1563f43a5a278a0329f88f6da7eee1accc31c8abac6ad64b0335951f213db19a7cc3aed2da543b9b7649ee7f1d5e2f75579eeb61739f57a5c74dcc8553e9af438e840994b5958f44b2a427b0c678b833a126187f2b71107ebf588e6f197970f543d152b3b9d2cd12c5a0535479dd1fd3a9efa10fa0034f7dd28fd4eca6161bea7c8201c5ddd55269246c8ef2d91b8017ef964ea18de32ac1574995b27b23101b0334ad3bf89698eebb0c50415d143bdf655d5121ff036763d4a431f516bcc152c3095533959f63c4e4ae169d71de8ecbe303c2cc4566966df5c92781fa9e7ff7fc04373a820bc1ecaa84682a5a656255e4784ffdeab1f6297864cfea5fa3cc2ae5279dd8e6a6b1c14a0ba4bf2047ae85a6320ef5447e04151b566cee0ff951e9ca82c22ebfb03881b2a5dbe8b2b4ba0a527d27b1b248005334daf8b702041c87abb31ba80a1cd6e232ac497ec354f46ceac8b9328596b0c3f85ca4a6e057d3876f1b2e2c4017f247315b6a9403fd5795945e5da5086e4097ca50c5928979b3e7198fe57dd9c76831178150c0bdb7a7637baf0ee015f0c078a1e98653e514a581c98b337ced3509d42b7ab14a0ffd0623890c0a22ec3a506296ab3cb4ab9f06ab4dbbee02c738fb0bed776de6818240648c85956f8dccf025e596ff01a4524112eedce001ff0a1e2fcbbcd1e0f8da7b07d51f39f25eee709952f51f872cb47c4377c4d54d4d41fcc2a9929cda02f7808ed7c0521c7fc8607aad951087435a958345ef7c3bd4b7fed1432e90b9e8807bd02f4b8c5c7d41508c6a466cba06da86b6782810dd901a465ee04520a072ba5b6607bdcec9b121a0ddd88e9687627e0a86576ec67f73271ab13bbe3fa736941fb22be6427371bd80b2977e0f0ae2d78b358b5676f074a6b75f1ad2e8f5c26f05a4616d47927afa204d2b22bbb3dea6af500cfcb08e00f95c0f4413b0d436e415b5a203ebcad866109f28f20bc30d078b5aaea9a5af7ec6686ea750b4273b8b31974043ba5781b0404d7213a278e21d7a9ca1ae8d2f27caccb4a59d0f0e911d6ecc65701430a0a64005fc2d42a16d4555e6183802b24073a67c6fc3ee7e2d7b200816860f5dfa9a50be6ad2fabfc4c0602470bb3a74ee2be97fe0ae7b0e38565b83ab6fe4c7506d70597623207108786d745e66b074dfe002c218f10e338a32224cefdaac342048300357eca299ba39921ef760b96bc1f49726a850ef5ac776b352c15ecd809095239f948a754a03a8b355ae4adcf4e1608f448baed5443c1021d41e145b3f39d9003",
+        "txId": "a0d9e3e679e4c81b1576d21aabcbe3cdcda942f5a0fc615c525381723de2677c"
+      },
+      "depositIntentHash": "b5263f2053e28b33cd6ca04b691a04e8a51094382c3854fcbc96c213fb406944",
+      "credit": {
+        "txId": "092a91c605e153954ef8a69273d1e97dc54b8b8a6f7b4e2e0f2eede507352f2b",
+        "status": "confirmed",
+        "replayTxId": "092a91c605e153954ef8a69273d1e97dc54b8b8a6f7b4e2e0f2eede507352f2b",
+        "replayCounts": {
+          "messagesSubmitted": 0,
+          "messagesDelivered": 0,
+          "completedGuards": 0,
+          "guardCommitments": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "guardPartialSigns": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "issuedDepositFeeBoxId": "2a2b056427acff65b4a2872021fa872be61d1dd78326762cd7fee39d685b8ca5"
+      },
+      "depositWatcherTransactionId": "cb43990f609f803d75b6ce1789961dc90a47cf3dfce708b696380fbef97b6667",
+      "returnWatcherTransactionId": "ba7b5a52d0c0ade73cf11faf6de494bf3e689d0954fc6f6e0baad78737214ddc",
+      "withdrawal": {
+        "finalTxId": "3f80606ae9fb2c924e08fd3988cb53522dcafaeb1445106c713d8247eeed287e",
+        "byteDigest": "d674b02070ace25ea6803cb3be7d63a87dfb6635c805dd9ea32d889d307806cf",
+        "blockHash": "18714a1e43f19c0eb01ee4e0c56854d30bc45894c9ec94104c0d8f83a15533fd",
+        "blockHeight": 315,
+        "controls": {
+          "separateHolderCount": 4,
+          "nativeThreshold": 2,
+          "selected": [
+            1,
+            2
+          ],
+          "shares": 2,
+          "lostSubmissionReplyRecovered": true,
+          "originalProposalPreserved": true,
+          "sourceOutputSpent": true,
+          "settlement": "settled",
+          "signCalls": 1,
+          "recoveries": 5,
+          "submissions": 1,
+          "scans": 2
+        }
+      }
+    },
+    {
+      "operationId": "monero:deposit:mainnet:9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43",
+      "deposit": {
+        "amountAtomic": "500000240",
+        "blockHash": "64a633ba5b397c24898bcc9fe047486383ed6ba7551343bf76ef8ddcf1870ef6",
+        "blockHeight": 254,
+        "chainIndex": 257,
+        "feeAtomic": "1809600000",
+        "outputIndex": 1,
+        "outputKey": "93ade13b8e6390b16f3a4694cd5565489a9addd93a9233b6da9e4bf9c4f881a3",
+        "txBytes": "0200010200109f01010101010101010101010101010101121e3a8a2e0c4d7ba3c22b061028e200fa3602a4dcdc4f016a7c8280d0b21129020003860c6aac0790e80b93b60b7cf34ed8c2afe3fc1bd25a2f7e0992b88281b08abef6000393ade13b8e6390b16f3a4694cd5565489a9addd93a9233b6da9e4bf9c4f881a39c2c01d37821fe82da9f8b58c125fc8057c3a96ac58c0d146aa41b8b4c868694233254020901de349c390835ca6006809cf1de06d492785f27b09ca2a0381b6995b5282da318837f555ed1fbc8f31f04e52e8d0c9ec69628a183a4fb92559f88cd17acd65e65cd4f127846950a5bfc7a5de0bb8f7431743e765e57aef954a288f57d80e0015e0a9c50216496c9117a7dc4164973f7f20f93d1d30a0845940061e6845df2bb17ad3f58011c8f38c349215e278764357eab0019fd6e124c6e414347b2f9378582282ffab55834b764305a47214fdbc571bd0adf8c196b8df56fea2cbe4f6c756aaa3b5a247acf9824a660992393e86612abaa8a39dc2b51cc07168440f5c3006241edd0561a431406d137c4df10ca936769daa1557f9f0892b50f9b22951e063b666d3435d3c2ebe5045a5db2d562abad022651ac7ca600baf89b8726b22400077a9d46264b56aee8694c12cb252f256b6684001db0678155911884300d05725f10e6344a8314f69a34f8f3f456fa1f534657a57d3316c0c75e8b50b258ff5af70ea58edb7890512238f864ee3776f9ed7adaeae3c7bdd70ed23c0aa68e27287058aab89666ac940f4b85e9e5838b2c3585aaab333482f838fb8dba0bbdf58fd9200b03a68997adf7de8e86187acffb8b73ae7d02a46a50ade544948d4b3c371699ed99753b9d9c75f74c9a563ad3d825a6e7b8d55ce2008655d224a6dcc448427cc502505adcc090d050806e972006d85b529fdc3bfb1e2da7a968dc6c7a2ba307c10c5e5024ca276ec8d0d8c4802c381b88f264ea4f54de808edd65867dc73994f0df87e0599f11dd3cdf824b5f9994035aa512954014ba16af16bc907c8d4eba3f7478a80c8316a3b9fc900d9e0e026c3f3ad4509ba3f965447bb539775043a9df8d26d3a6c959cad685ffd8118495237912241ac2a49c3b10e79a77d81236449b77b62094132831f6585126f086988ca3c34c080ec15b7e9a2bc8ecd58250955c85416859d2be1858de03b215747f73a289b10aeb10ccbbbd69f798150060b49092dd427aeb0724ea86b4cee486b484c5e4ba334d5444528c2605bc5def9ad6611752a564ec6c448c554dbe33dbf9ac9bdd36b1ccd25670d007a7285a42a10bba5e42868ece86a9c0c8cd38d8ded97e5b725d7dfb300e6b55d22c2ca71a170e6e94e3697628c9654ec267d3a2c64f9fd5bc30cbda6697962037b843bcfc7c0695a9f938274522e997f2a02366585552f982969c1802d4949f6ef1622b96000f81d81a28c9662201b01e55214f2a0a4e4bbf41b6082ba715e60991ab358c4d0ccb419349d0f114804a048f74e979364355cbcb62c66ce6f96b5b518e83617904c7414c2e5be076ca7d3cb39019e716091140206b7909c0d4f34a5f029cc782072e9e9b29189842a7d7889b65ec1ae4d41b2c264dc77b0a56b415ca4cdc9dea0b72e1389169be7837e603e2adddc193d42be36ae127bf48a5f173a11b87a2af0f2b6b3606c5dad4b1cea22c9c3a7ae06f269fe8cee6406021a55b27e72581fb054178446a760067988069a9c988c9210e547681724126abeb476b50ca42804a076b2ce4ac85065c9d8e12f7d56ba28744f6ebca25746e861661d8571c306f6e0df54ae1266a65069a3255b247c2a59352c112824f222ee808be847d5bc35f5a0801c5a8f504ca840a7b691a8922acace794d8c3dbc54a333157e2b18a30c9100b2f1281772054b3d034bbfd2d73d9ff8eedf5864b14d338b256f6cec5ee85de08d8dc0fa68bb58d3b8cf328ca8345f9d54bcd86c7c17fcc09cc2e4ec1eefc690d6fa78654fc8fc96654839e94504c4c40e4820b8eac4227dbca5826add2906e0eca754865073c4cc2c7d785007cf6893b87aed66e8363c889280eed341ec4ee08d2b37fc3fdb9155fbb53d0421132417c0f3ff59c57a240d827afbd22e143b26d",
+        "txId": "9d7f1038b513cc17ce444bf13c5664efd050494496f2d022413b5b797ab05a43"
+      },
+      "depositIntentHash": "73fd221430bc606da60bdd97823ee19bfca6483fec224ec169ffd88a4ae15bca",
+      "credit": {
+        "txId": "1d9cf7e2708e6b51e7621e998afaa6283609ec4b3444f9bcf131c052082e6d3c",
+        "status": "confirmed",
+        "replayTxId": "1d9cf7e2708e6b51e7621e998afaa6283609ec4b3444f9bcf131c052082e6d3c",
+        "replayCounts": {
+          "messagesSubmitted": 0,
+          "messagesDelivered": 0,
+          "completedGuards": 0,
+          "guardCommitments": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "guardPartialSigns": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "issuedDepositFeeBoxId": "313dea2e4c456245664ce0f022a340f7bcdce0672f1e9ddd0f2efd9c7c33c50c"
+      },
+      "depositWatcherTransactionId": "2d34b315ec5291dcda0650f033f4f53f1e117d7a63459882328b00c108304df9",
+      "returnWatcherTransactionId": "9865eae5c2e4540008fff385fc24f1c52b6697f2460d80a6d9a6782885fe0448",
+      "withdrawal": {
+        "finalTxId": "fbc590e509cf84b761300bb4ff4c7d8000ba22be9c49eb11dcdaaa74443666c0",
+        "byteDigest": "00bafe877510afa9140f072dc4d9175bf61f395415713f4fd11308f878afc47c",
+        "blockHash": "30a32636f636e2a86c7931d0a162ab0424257c7d060bba76cc293d4a289d4d41",
+        "blockHeight": 317,
+        "controls": {
+          "separateHolderCount": 4,
+          "nativeThreshold": 2,
+          "selected": [
+            1,
+            2
+          ],
+          "shares": 2,
+          "lostSubmissionReplyRecovered": true,
+          "originalProposalPreserved": true,
+          "sourceOutputSpent": true,
+          "settlement": "settled",
+          "signCalls": 1,
+          "recoveries": 5,
+          "submissions": 1,
+          "scans": 2
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Two separate one-shot vaults sharing the same isolated Monero/Ergo fixtures and bridged asset",
+    "Pure arithmetic requires caller-authenticated facts; packaged observations are recorded evidence, not chain authentication",
+    "Selected-input residual under twelve-decimal one-to-one backing, excluding unselected outputs and other possible claims",
+    "Deposit fee tokens already issued; return fee entitlement remains pending-reward without completed reward distribution",
+    "Ergo operation fees and donor Monero fees separate; fixture setup and mining costs excluded",
+    "Fixture fee parameters do not cover observed withdrawal miner costs; test reserves subsidize the difference",
+    "Four credit guards share one JavaScript host; native holders use separate processes",
+    "No pooled-vault solvency, sustainable fee policy, production deployment or independent operator reproduction claim"
+  ]
+}

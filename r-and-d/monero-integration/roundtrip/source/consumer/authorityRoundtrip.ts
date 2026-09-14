@@ -15,9 +15,11 @@ import TransactionProcessor from '../guard-service/src/transaction/transactionPr
 import EventSerializer from '../guard-service/src/event/eventSerializer';
 import {setFixtureChain} from './resolver';
 import {verifyReturnAuthority} from '../ergo-node/return-authority.mjs';
+import {decodeNativeSelection} from '../guard-service/src/withdrawal/moneroWithdrawalSelection';
 
 /** Same reviewed withdrawal owner/lifecycle; its input is the actual two-watcher return. */
-export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment,backingClaim}:any){
+export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment,backingClaim,onAccounting}:any){
+  assert(onAccounting===undefined || typeof onAccounting==='function');
   const verifySource=()=>verifyReturnAuthority({returnReceipt,redemption,deployment,terms:returnTerms});
   const trusted=await verifySource(),returnTx=trusted.transaction,returnBox=trusted.trigger,event=trusted.event;
   assert.equal(event.WIDsCount,2);
@@ -36,6 +38,13 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
     const beforeConstruction=await verifySource();assert.deepEqual(beforeConstruction.event,event);assert.equal(beforeConstruction.trigger.boxId,returnBox.boxId);
     const owner=await launchDistributedNative(vault,request,{database,clock:()=>1000n,leaseDuration:1000000n,authority,backingClaim},timestamp);
     assert(owner.disposition.inputReferences.includes(source.deposit.outputKey));assert.equal(owner.disposition.recipientAtomic,'500000000');assert(await verify(owner.transaction));
+    const selection=decodeNativeSelection(owner.anchor.reservation.selectionBytes);
+    const accounting={reservationId:owner.reservationId,proposalId:owner.transaction.txId,redemptionTxId:redemption.txId,
+      inputs:selection.inputs.map(input=>({txId:input.txid,outputIndex:Number(input.outputIndex),publicKey:input.publicKey,amountAtomic:input.amount})),
+      recipientAtomic:owner.disposition.recipientAtomic,minerFeeAtomic:owner.anchor.reservation.receipt!.necessaryFeeAtomic,
+      changeAtomic:owner.disposition.changeAtomic,changePublicKey:owner.disposition.changeIdentity,settlement:null as any};
+    // Observation only: the callback receives no owner, approval or signing capability.
+    if(onAccounting)await onAccounting(structuredClone(accounting));
     const agreement=new FixtureAgreement();await agreement.prepare();const signatures=await votes(owner.transaction,timestamp);
     const current=await verifySource();assert.deepEqual(current.event,event);assert.equal(current.trigger.boxId,returnBox.boxId);
     await agreement.approve(owner.transaction,[...signatures.slice(0,3),''],timestamp);
@@ -59,7 +68,12 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
     await TransactionProcessor.processTransactions();assert.equal(payment.counts().signCalls,1);assert.equal(payment.counts().submissions,1);
     assert.deepEqual((await node.call('/is_key_image_spent',{key_images:[source.observation.keyImage]})).spent_status,[1]);
     const scan=payment.observations().at(-1);assert.equal(scan.recipientAtomic,'500000000');
+    accounting.settlement={txId:final.finalTxId,proposalId:owner.transaction.txId,reservationId:owner.reservationId,
+      inputAtomic:scan.inputAtomic,recipientAtomic:scan.recipientAtomic,minerFeeAtomic:scan.feeAtomic,
+      changeAtomic:scan.changeAtomic,changePublicKey:scan.changeOutputKey,rewardState:storedEvent.status};
+    if(onAccounting)await onAccounting(structuredClone(accounting));
     return {sourceEventId:request.eventId,proposalId:owner.transaction.txId,finalTxId:final.finalTxId,byteDigest:final.byteDigest,...scan,
+      accounting,
       controls:{separateHolderCount:4,nativeThreshold:2,selected:[1,2],shares:owner.counts().shares,lostSubmissionReplyRecovered:true,
         originalProposalPreserved:true,sourceOutputSpent:true,settlement:'settled',...payment.counts()}};
   }finally{lifecycleState.database=undefined;await closeAgreementDatabase();}

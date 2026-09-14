@@ -2,7 +2,11 @@
 
 A. Shannon · 14 September 2026
 
-**Latest increment: complete copy-first bridge tests and fresh public preparation.**
+**Latest increment: two-operation economic reconciliation.** Read the
+[economic report](economic-reconciliation.md) for cumulative obligations,
+confirmed payments, selected reserve consumption and separately measured fees.
+
+**Complete copy-first bridge tests and fresh public preparation:**
 Read the [copy-first and reproduction report](copy-first-reproduction.md) for the
 new ordering tests and the public preparation recipe.
 
@@ -30,4 +34,4 @@ The experiment addresses a more demanding question than whether a multisignature
 
 Read the [technical report](technical-report.md) for the execution path, security boundaries, evidence and remaining work. The [source package](source/README.md) documents its prepared prerequisites and replay command. The [earlier preliminary study](../preliminary-study/README.md) remains the design and migration background.
 
-The scope is a local integration prototype. The original baseline uses local operator triggers; the successor runs the pinned watcher jobs with bounded node/database ports. Four credit guards are separate instances in one JavaScript host; the four Monero holders and native source readers use separate processes. Assets are fixture tokens. A successful run does not establish full watcher-daemon integration, independently operated custody, permissionless deposit submission, full economic reconciliation or FCMP++/Carrot migration.
+The scope is a local integration prototype. The original baseline uses local operator triggers; the successor runs the pinned watcher jobs with bounded node/database ports. Four credit guards are separate instances in one JavaScript host; the four Monero holders and native source readers use separate processes. Assets are fixture tokens. A successful run does not establish full watcher-daemon integration, independently operated custody, permissionless deposit submission, pooled-vault solvency, sustainable fee pricing or FCMP++/Carrot migration.

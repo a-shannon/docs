@@ -86,4 +86,41 @@ requirements.
 
 Use the same command with `--check-only true` for read-only pin validation. `--collect-only true` creates an external execution mirror and collects the roundtrip test without running it. These checks do not establish the complete roundtrip result.
 
+## Multiple-operation accounting
+
+The `economic-reconciliation` profile runs two separately backed, one-shot vault
+operations on the same isolated chains. It credits and redeems the first deposit,
+credits the second, then pays the first while the second credit remains unspent.
+It finally redeems and pays the second. Redeeming the first credit recycles the
+existing fixture tokens; the profile does not increase their issuance.
+
+```text
+node tools/launch-roundtrip.mjs --config <absolute-config-file> --manifest-sha256 <reviewed-manifest-sha256> --profile economic-reconciliation
+node --test consumer/economicReconciliation.test.mjs
+```
+
+Use the watcher configuration, including the independent observer executable,
+without a `collisionExperiment`. The external runtime retains the public
+operations, intermediate accounting checkpoints, final report and transaction
+evidence in `public-result.json`.
+
+The pure `reconcileEconomicOperations` consumer checks exact identities and
+integer conservation across deposit, credit, redemption, reservation and
+settlement facts. Its caller must establish those facts; arithmetic alone does
+not authenticate a chain observation. The integration profile obtains them from
+the existing source, credit, return and native payment verifiers.
+
+The report separates user credits, pending Monero payouts, deposit-fee tokens
+already issued on Ergo, retained return fees, selected test reserve inputs,
+confirmed Monero miner fees and change. A return event remains `pending-reward`;
+its retained fees are not a completed reward distribution. The residual covers
+only selected inputs under the fixture's 12-decimal, one-to-one backing model.
+Unselected mining outputs and other possible vault claims are outside that sum.
+Ergo operation fees are reported separately in nanoERG, and the sender's Monero
+deposit fees separately from vault-funded withdrawal fees. Fixture deployment
+and mining costs are excluded. Fee-coverage variance is not profitability.
+
+This profile does not add reusable pooled vaults, fee-token redemption, return
+reward distribution, global reserve accounting or production solvency checks.
+
 The package includes reusable consumer, deposit policy, funding selection and native tests. Some historical fixture tests exercise earlier native host modes; they require the corresponding prepared binary, and are not the supported roundtrip launch command. Runtime custody, node data, keys, donor proof material and compiled dependencies are not source-package inputs.
