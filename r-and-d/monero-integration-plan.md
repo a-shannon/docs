@@ -11,7 +11,7 @@ adapter and operational qualification.
 
 The review has two entry points: this RCS requirements and component map, and
 [CLSAG signing and transaction construction](monero-signing.md). The complete
-[implementation, tests and reproduction instructions](https://github.com/a-shannon/docs/tree/ce0dde0528ff829a44ab8f2abeac2d05f2cc33fa/r-and-d/monero-integration/roundtrip)
+[implementation, tests and reproduction instructions](https://github.com/a-shannon/docs/tree/6e60829bc6be552b89ba9861bbfd0ea294122b9d/r-and-d/monero-integration/roundtrip)
 remain available in the experimental branch. Its generated execution evidence
 and standalone harness are separate from the proposed documentation change.
 
@@ -98,7 +98,7 @@ parallel framework inside the production Rosen repositories.
 
 The withdrawal path uses Rust `monero-wallet`, `monero-clsag` and
 `modular-frost`. It does not use the official wallet-RPC multisig workflow. A
-small Core `wallet2` helper in the deposit experiment verifies `OutProofV2`;
+small Core `wallet2` helper in the deposit experiment creates and verifies `OutProofV2`;
 replacing that proof implementation is a separate compatibility question.
 
 The [mechanism review](monero-signing.md) describes the exact imported machines,

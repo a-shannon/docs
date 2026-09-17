@@ -13,11 +13,17 @@ The implementation uses published Rust crates without modifying their source:
 | `monero-wallet` | `0.2.0` with `multisig` | Monero addresses, scanning, fee rates, `SignableTransaction`, unsigned transaction generation, transaction serialization, and the multisignature transaction state machine. |
 | `monero-clsag` | `0.1.0` with `multisig` | CLSAG types and the signing/verification implementation used by the wallet state machine. The final Monero witnesses are CLSAGs. |
 | `modular-frost` | `0.11.1`, Ed25519 | Threshold key, participant, preprocessing, signing-machine, share-decoding, and completion abstractions consumed by `monero-wallet`/`monero-clsag`. This does not make the final witness a standalone FROST signature. |
+| `dkg` | `0.6.1` | Threshold parameter and key types used by the local ceremony. |
+| `dkg-pedpop` | `0.6.0` | Imported `KeyGenMachine`, `SecretShareMachine` and `KeyMachine` used for the ceremony's key generation. The local actor supplies phase, envelope and roster checks around these machines. |
 
 The direct pins are in [`native/Cargo.toml`](https://github.com/a-shannon/docs/blob/60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7/r-and-d/monero-integration/roundtrip/source/native/Cargo.toml);
 [`native/Cargo.lock`](https://github.com/a-shannon/docs/blob/60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7/r-and-d/monero-integration/roundtrip/source/native/Cargo.lock)
 records the crates.io checksums and that `monero-wallet 0.2.0` depends on both
 `monero-clsag 0.1.0` and `modular-frost 0.11.1`.
+
+The ceremony imports and invokes those DKG machines in
+[`native/src/participant.rs`](https://github.com/a-shannon/docs/blob/60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7/r-and-d/monero-integration/roundtrip/source/native/src/participant.rs#L5-L10)
+and its [coefficient-generation transition](https://github.com/a-shannon/docs/blob/60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7/r-and-d/monero-integration/roundtrip/source/native/src/participant.rs#L119-L123).
 
 The repository's own code supplies the integration boundary around those crates:
 
