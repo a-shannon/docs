@@ -131,3 +131,8 @@ The experiment uses isolated fakechain/devnet nodes and fixture assets. Native
 source and executable inputs are unchanged from the preceding qualified build.
 There is no new native build, CI result, independent-operator reproduction or
 production deployment claim in this increment.
+
+A [subsequent deeper audit and four offline scanner regressions](../scanner-regression/README.md)
+examine repeated primary transaction public keys and distinct equal-value
+outputs. They use the unchanged published bridge source above and add
+scanner-unit evidence, not a consensus-valid historical vulnerability replay.

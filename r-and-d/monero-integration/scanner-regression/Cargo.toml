@@ -1,0 +1,10 @@
+[package]
+name = "offline-scanner-admission-review"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+monero-wallet = "=0.2.0"
+curve25519-dalek = "=4.1.3"
+zeroize = "=1.9.0"
+hex = "=0.4.3"
