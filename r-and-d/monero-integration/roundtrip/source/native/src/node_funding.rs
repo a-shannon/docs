@@ -194,7 +194,8 @@ fn deposit_mine(rpc:&Rpc,expected_genesis:[u8;32],address:String,count:u64)->Hos
     if genesis(rpc)?!=expected_genesis{return Err(())}Ok(())
 }
 #[cfg(feature="participant-host")]
-pub(in crate::common_owner) fn participant_prepare_deposit(group:[u8;32],directory:&Path)->HostResult<PreparedDeposit>{
+pub(in crate::common_owner) fn participant_prepare_deposit(group:[u8;32],directory:&Path,deposit_data:Option<Vec<u8>>)->HostResult<PreparedDeposit>{
+    if deposit_data.as_ref().is_some_and(|data|data.is_empty()||data.len()>254){return Err(())}
     let rpc=Rpc::connect()?;let original_genesis=genesis(&rpc)?;let donor_start=rpc.check()?;
     if !directory.is_absolute(){return Err(())}std::fs::create_dir_all(directory).map_err(|_|())?;
     if std::fs::read_dir(directory).map_err(|_|())?.next().is_some(){return Err(())}
@@ -215,7 +216,7 @@ pub(in crate::common_owner) fn participant_prepare_deposit(group:[u8;32],directo
     let outgoing=Zeroizing::new(fresh());
     let tx_secret=monero_wallet::send::TransactionKeys::new(&outgoing,vec![(donor_ring.key(),donor_ring.commitment().commit())]).next().ok_or(())?;
     let native=SignableTransaction::new(RctType::ClsagBulletproofPlus,outgoing,vec![donor_ring],
-        vec![(vault.legacy_address(Network::Testnet),500_000_240)],Change::new(donor.clone(),None),vec![],fee).map_err(|_|())?;
+        vec![(vault.legacy_address(Network::Testnet),500_000_240)],Change::new(donor.clone(),None),deposit_data.into_iter().collect(),fee).map_err(|_|())?;
     // Explicit fixture donor scalar1 only. The threshold spend scalar is never
     // reconstructed or accepted by this funding path.
     let tx=native.sign(&mut OsRng,&Zeroizing::new(Scalar::from(curve25519_dalek::scalar::Scalar::ONE))).map_err(|_|())?;

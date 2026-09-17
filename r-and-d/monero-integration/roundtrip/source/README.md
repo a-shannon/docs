@@ -146,3 +146,44 @@ This profile does not add reusable pooled vaults, fee-token redemption, return
 reward distribution, global reserve accounting or production solvency checks.
 
 The package includes reusable consumer, deposit policy, funding selection and native tests. Some historical fixture tests exercise earlier native host modes; they require the corresponding prepared binary, and are not the supported roundtrip launch command. Runtime custody, node data, keys, donor proof material and compiled dependencies are not source-package inputs.
+## Deposit delivery experiment
+
+The `deposit-delivery` launcher profile embeds a compact `RMD1` memo in an
+ordinary Rust-wallet deposit transaction, discovers it from local chain blocks,
+and retrieves the final intent/payment proof from a configured file directory.
+It exercises two reader instances, the actual Rosen commitment/trigger path,
+fresh guard verification and retained output-credit uniqueness. The readers use
+one isolated Monero daemon; this does not qualify independent production nodes.
+
+Use the same prepared configuration and reviewed source-manifest digest as the
+other profiles, with a participant/observer binary built from this source:
+
+```powershell
+node tools/launch-roundtrip.mjs --config $Configuration --manifest-sha256 $ReviewedManifestSha256 --profile deposit-delivery
+```
+
+The experiment writes `<txid>.proof` in its own configured directory. Its exact
+UTF-8 representation is a two-element JSON array containing the canonical full
+intent encoded as lowercase hex and its `OutProofV2` string. Readers impose byte
+limits and canonical encoding, match the intent to the on-transaction memo,
+then independently verify proof, inclusion and output evidence. File presence
+does not authorize credit. Missing, changed or invalid evidence prevents an
+event or guard commitment; operators may retry when the correct proof becomes
+available. No sender-supplied URL is fetched. The fixture tests fresh-process
+file reload and reopening persisted guard credit state.
+
+`RMD1` is an experimental single-output XMR-to-Ergo-testnet format, not an
+assigned Rosen standard. It includes genesis, vault spend key and epoch, source
+and destination network tags, destination asset/address, amount, both fees and
+expiry. All integers are unsigned 64-bit big-endian values. The recipient is
+length-prefixed ASCII, at most 110 bytes; the entire memo is at most 253 bytes,
+within one wallet data field's 254-byte limit. The final txid and output identity
+are added to the subsequently generated intent and payment proof, avoiding a
+self-referential transaction hash. Memo contents are public, including recipient
+and amount. A normal wallet-RPC transfer is not a supported depositor connector.
+
+The guard requires memo verification and the delivery loader together; legacy
+experiments use neither. The existing `fromAddress` output descriptor remains
+opaque and cannot be used as a Monero refund address. Production proof retention,
+redundant delivery, scanner checkpoint/reorg policy, depositor-wallet support and
+maintainer agreement on this auxiliary proof channel remain separate work.

@@ -13,7 +13,7 @@ use rand_core::OsRng;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
-    io::{BufRead, Write},
+    io::{BufRead, Read, Write},
 };
 
 enum Phase {
@@ -25,6 +25,60 @@ enum Phase {
     Ready,
     Retired,
 }
+
+fn deposit_funding_data(value: &Value) -> Result<Option<Vec<u8>>> {
+    if !matches!(wire::string(value, "type")?, "fund-deposit" | "prepare-deposit") {
+        return Err(());
+    }
+    if value.get("depositData").is_none() {
+        wire::fields(value, &["type", "runtimeDirectory"])?;
+        return Ok(None);
+    }
+    wire::fields(value, &["type", "runtimeDirectory", "depositData"])?;
+    let data = wire::string(value, "depositData")?;
+    if data.is_empty() || data.len() > 508 { return Err(()); }
+    Ok(Some(wire::unhex(data)?))
+}
+
+fn extract_deposit_data(frame: &[u8]) -> Result<Value> {
+    use monero_wallet::{extra::{ExtraField, MAX_EXTRA_SIZE_BY_RELAY_RULE}, transaction::Transaction};
+    let value = wire::parse(frame)?;
+    wire::fields(&value, &["txId", "txBytes"])?;
+    let expected: [u8; 32] = wire::unhex(wire::string(&value, "txId")?)?
+        .try_into().map_err(|_| ())?;
+    let bytes = wire::unhex(wire::string(&value, "txBytes")?)?;
+    let mut reader = bytes.as_slice();
+    let tx: Transaction = Transaction::read(&mut reader).map_err(|_| ())?;
+    if !reader.is_empty() || tx.serialize() != bytes || tx.hash() != expected { return Err(()); }
+    let extra = tx.prefix().extra.as_slice();
+    if extra.len() > MAX_EXTRA_SIZE_BY_RELAY_RULE { return Err(()); }
+    let mut reader = extra;
+    let mut data = Vec::new();
+    while !reader.is_empty() {
+        let before = reader;
+        let field = ExtraField::read(&mut reader).map_err(|_| ())?;
+        let consumed = before.len().checked_sub(reader.len()).ok_or(())?;
+        // Do not inherit Extra::read's partial parse or lossy field decoding.
+        if consumed == 0 || field.serialize() != before[..consumed] { return Err(()); }
+        if let ExtraField::Nonce(nonce) = field {
+            if nonce.first() == Some(&127) {
+                if nonce.len() < 2 { return Err(()); }
+                data.push(wire::hex(&nonce[1..]));
+            }
+        }
+    }
+    Ok(json!({"txId":wire::hex(&expected),"data":data}))
+}
+
+/// Bounded public transaction decoding only; no node, custody, or signing calls.
+pub fn deposit_data(mut input: impl std::io::Read, mut output: impl Write) -> Result<()> {
+    let mut frame = Vec::new();
+    input.by_ref().take((wire::MAX_FRAME + 1) as u64).read_to_end(&mut frame).map_err(|_| ())?;
+    let result = extract_deposit_data(&frame)?;
+    output.write_all(&wire::bytes(&result)).and_then(|_| output.write_all(b"\n"))
+        .and_then(|_| output.flush()).map_err(|_| ())
+}
+
 struct Actor {
     id: u16,
     identity: SigningKey,
@@ -177,11 +231,12 @@ impl Actor {
             return Ok(vec![out]);
         }
         if matches!(self.phase, Phase::Ready) && matches!(kind, "fund" | "fund-deposit" | "prepare-deposit") {
-            if kind == "fund" {
-                wire::fields(v, &["type"])?
+            let deposit_data = if kind == "fund" {
+                wire::fields(v, &["type"])?;
+                None
             } else {
-                wire::fields(v, &["type", "runtimeDirectory"])?
-            }
+                deposit_funding_data(v)?
+            };
             if self.id != 1 || self.funded {
                 return Err(());
             }
@@ -191,6 +246,7 @@ impl Actor {
                 let (pending, frame) = crate::common_owner::participant_signing::prepare_deposit(
                     group,
                     std::path::Path::new(wire::string(v, "runtimeDirectory")?),
+                    deposit_data,
                 )?;
                 self.deposit = Some(pending);
                 return Ok(vec![frame]);
@@ -201,6 +257,7 @@ impl Actor {
                 crate::common_owner::participant_signing::fund_deposit(
                     group,
                     std::path::Path::new(wire::string(v, "runtimeDirectory")?),
+                    deposit_data,
                 )?
             }]);
         }
@@ -412,6 +469,68 @@ pub fn run(id: u16, mut input: impl BufRead, mut output: impl Write) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn deposit_data_frame(extra: Vec<u8>) -> Vec<u8> {
+        use monero_wallet::transaction::{Input, Timelock, Transaction, TransactionPrefix};
+        let tx: Transaction = Transaction::V2 {
+            prefix: TransactionPrefix { additional_timelock: Timelock::None,
+                inputs: vec![Input::Gen(1)], outputs: vec![], extra },
+            proofs: None,
+        };
+        let mut frame = wire::bytes(&json!({"txId":wire::hex(&tx.hash()),"txBytes":wire::hex(&tx.serialize())}));
+        frame.push(b'\n');
+        frame
+    }
+    #[test]
+    fn deposit_data_funding_optional_closed_and_bounded() {
+        for kind in ["fund-deposit", "prepare-deposit"] {
+            let legacy = json!({"type":kind,"runtimeDirectory":"fixture"});
+            assert_eq!(deposit_funding_data(&legacy).unwrap(), None);
+            for size in [1, 254] {
+                let mut value = legacy.clone();value["depositData"] = json!("ab".repeat(size));
+                assert_eq!(deposit_funding_data(&value).unwrap(), Some(vec![0xab; size]));
+            }
+            for bad in [json!(""),json!("0"),json!("AB"),json!("zz"),json!("00".repeat(255)),json!(null),json!(2)] {
+                let mut value = legacy.clone();value["depositData"] = bad;
+                assert!(deposit_funding_data(&value).is_err());
+            }
+            let mut unknown = legacy.clone();unknown["other"] = json!("00");
+            assert!(deposit_funding_data(&unknown).is_err());
+        }
+        assert!(deposit_funding_data(&json!({"type":"fund","runtimeDirectory":"fixture","depositData":"00"})).is_err());
+    }
+    #[test]
+    fn deposit_data_exact_transaction_and_extra() {
+        use monero_wallet::extra::ExtraField;
+        let mut nonce = vec![127];nonce.extend(vec![0xab;254]);
+        let good = deposit_data_frame(ExtraField::Nonce(nonce).serialize());
+        assert_eq!(extract_deposit_data(&good).unwrap()["data"], json!(["ab".repeat(254)]));
+        assert_eq!(extract_deposit_data(&deposit_data_frame(vec![])).unwrap()["data"], json!([]));
+        for bad in [vec![255],vec![2,2,127],vec![2,1,127],vec![2,0x82,0,127,1],vec![0;1061]] {
+            assert!(extract_deposit_data(&deposit_data_frame(bad)).is_err());
+        }
+        let mut trailing = ExtraField::Nonce(vec![127,1]).serialize();trailing.push(255);
+        assert!(extract_deposit_data(&deposit_data_frame(trailing)).is_err());
+        let value = wire::parse(&good).unwrap();
+        for change in 0..5 {
+            let mut bad = value.clone();
+            match change {
+                0 => bad["txId"] = json!("11".repeat(32)),
+                1 => bad["txBytes"] = json!(format!("{}00",value["txBytes"].as_str().unwrap())),
+                2 => bad["txBytes"] = json!(value["txBytes"].as_str().unwrap().to_uppercase()),
+                3 => bad["extra"] = json!(0),
+                _ => bad["txBytes"] = json!(""),
+            }
+            let mut frame = wire::bytes(&bad);frame.push(b'\n');
+            assert!(extract_deposit_data(&frame).is_err());
+        }
+        let mut output = Vec::new();
+        deposit_data(good.as_slice(), &mut output).unwrap();
+        assert_eq!(wire::parse(&output).unwrap(), extract_deposit_data(&good).unwrap());
+        assert!(deposit_data(vec![b'x';wire::MAX_FRAME+1].as_slice(), Vec::new()).is_err());
+        let mut output = Vec::new();
+        assert!(deposit_data(deposit_data_frame(vec![255]).as_slice(), &mut output).is_err());
+        assert!(output.is_empty());
+    }
     fn initialized() -> (Vec<Actor>, Vec<Value>) {
         let mut actors = (1..=4).map(|i| Actor::new(i).unwrap()).collect::<Vec<_>>();
         let roster = actors

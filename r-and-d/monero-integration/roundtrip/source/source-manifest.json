@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 398,
-  "aggregateSha256": "e563554df703006f2eb78246d47725c6f460ccc6301290fa230ce0f5846a52b6",
+  "fileCount": 402,
+  "aggregateSha256": "0c0adbb91f24722373ec69c6fc29166d5e204a57e7c5f8986d5098b0f44d260c",
   "files": [
     {
       "path": "README.md",
-      "bytes": 11905,
-      "sha256": "146b7577198a81b140df62918c6119763695ebcafe3ff34f2c45df9293b049bd"
+      "bytes": 14499,
+      "sha256": "f1674e647a2a3349ac0a478c1af1c07e725335659d9be9c8bab87f61aa5bfdeb"
     },
     {
       "path": "consumer/adapter.ts",
@@ -135,9 +135,29 @@
       "sha256": "1f472daf1df384f5647701d21ba4f2d87cbf1d512a0597ae375776348c885120"
     },
     {
+      "path": "consumer/depositDelivery.config.ts",
+      "bytes": 240,
+      "sha256": "fd1fa84439242ce6eb36cf8593db90b33f8fb5837eb22a3a260567fd295f3131"
+    },
+    {
+      "path": "consumer/depositDelivery.mjs",
+      "bytes": 8661,
+      "sha256": "c44d95239fdb97776150d794355c075dfc4189e0c9de4af51121547726d50caa"
+    },
+    {
+      "path": "consumer/depositDelivery.spec.ts",
+      "bytes": 9380,
+      "sha256": "ba0fbabf662f0e916e1f92e62824f0f5165f7c1fc10f549d3564c1f863711651"
+    },
+    {
+      "path": "consumer/depositDelivery.test.mjs",
+      "bytes": 6008,
+      "sha256": "9a81ff71d2406f76fe493e5ffecdf9edb6eb6f4c99e7009f4b21dbe406eda230"
+    },
+    {
       "path": "consumer/depositSource.ts",
-      "bytes": 9679,
-      "sha256": "208bc3e440fd326b56073a148f13d8b4a48e7fa33e28508865584794811589fa"
+      "bytes": 10083,
+      "sha256": "6fbd502818038001d852162fa29b98ea63fabe23285d7122323a0b4cc04a323e"
     },
     {
       "path": "consumer/distributedIssuer.ts",
@@ -191,8 +211,8 @@
     },
     {
       "path": "consumer/independentDepositSource.mjs",
-      "bytes": 11080,
-      "sha256": "01c9c90515aeff33ed2c7bf281147f65af7a585c9b0097b095217762cb5288ac"
+      "bytes": 11665,
+      "sha256": "3898b4b0d962c9dbf9299713b830575021a8df50d27daa0d131fe2e2ceb16583"
     },
     {
       "path": "consumer/independentDepositSource.test.mjs",
@@ -311,8 +331,8 @@
     },
     {
       "path": "consumer/participantSigning.mjs",
-      "bytes": 13425,
-      "sha256": "8778098d518d95b7775c82dc6544554f6db8b5c37ea8c30113991a4d7b7614f3"
+      "bytes": 13873,
+      "sha256": "0c61b50d41815ffece6889b49fa15f1cd9d1e13d69ef39667b0c95d90f0d6b50"
     },
     {
       "path": "consumer/participantSigningFaults.spec.ts",
@@ -481,8 +501,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 13908,
-      "sha256": "9243c848b561f2e7a50708d3cc088789775b1209134accec0f9a6692ab1b2a2b"
+      "bytes": 14139,
+      "sha256": "7ce01566262f838c8e0a9ecd3d14a8c3777b45d0aac1f09ec2d72f762f45bb0c"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -1546,8 +1566,8 @@
     },
     {
       "path": "native/src/bin/monero_participant.rs",
-      "bytes": 1884,
-      "sha256": "0121cfe44ce4425162a5ece743f480e977ece99813995a9b1e90cd4b7abbedc4"
+      "bytes": 2221,
+      "sha256": "3251962395ff729311387ed052c24a345f7dec7208f878face02bd663f3dc094"
     },
     {
       "path": "native/src/bin/synthetic_candidate_host.rs",
@@ -1601,13 +1621,13 @@
     },
     {
       "path": "native/src/node_funding.rs",
-      "bytes": 44017,
-      "sha256": "9f0c293f875e6a02a71fb1f661d587eab83ca7aa534b4d92578395d73633a8ac"
+      "bytes": 44170,
+      "sha256": "b01a8e938d8e8eb906ad8818cdf7ef0f13ce9cad08693efcdcb226bddd84f35d"
     },
     {
       "path": "native/src/participant.rs",
-      "bytes": 22607,
-      "sha256": "87f047477c95adc10dd5ef808e8319d188df6804c722d3f15cf1d8a8e960bc3c"
+      "bytes": 28687,
+      "sha256": "05708430a919e3968c8b3be424e4fee807bd575731e1ff9bc0b4dce6a4e7c025"
     },
     {
       "path": "native/src/participant_envelope.rs",
@@ -1616,8 +1636,8 @@
     },
     {
       "path": "native/src/participant_signing.rs",
-      "bytes": 27633,
-      "sha256": "72f636aff9cdc7be20e730db7e91f86a04563af2b83250289507a42a01ff054a"
+      "bytes": 27723,
+      "sha256": "7921ab7dc71066dc5849bdafdae6ee7b7d5d1eb43f41ce2049390dfb11d8b91b"
     },
     {
       "path": "native/src/participant_source.rs",
@@ -1921,8 +1941,8 @@
     },
     {
       "path": "tools/launch-roundtrip.mjs",
-      "bytes": 11423,
-      "sha256": "3e88ad096653f3201571901f9527d7fb9a783a6d55b76ac037ba86841614da7a"
+      "bytes": 11520,
+      "sha256": "c0b4ec24de217eb7f6c0a817adcf58abee46996647ef364186d67bbd95d4530f"
     },
     {
       "path": "tools/launcher-guards.mjs",

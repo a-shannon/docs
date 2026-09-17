@@ -5,6 +5,7 @@ import {isAbsolute} from 'node:path';
 import {spawn} from 'node:child_process';
 import {canonical} from './participantHarness.mjs';
 import {captureAuthenticatedDepositSource} from './authenticatedDepositSource.mjs';
+import {decodeDepositMemo,extractDepositMemo,verifyMemoIntent} from './depositDelivery.mjs';
 
 const MAX_FRAME=65536;
 const fields=(value,expected)=>{assert(value!==null&&typeof value==='object'&&!Array.isArray(value),'Observer object');assert.deepEqual(Object.keys(value).sort(),[...expected].sort(),'Observer closed schema');};
@@ -59,7 +60,14 @@ export function makeIndependentDepositProviders({source,publicScan=source.public
     proof:{identity:source.providers.proof.identity,async verify(request){authenticated();counts.proofCalls++;return source.providers.proof.verify(request);}},
     addresses:{identity:source.providers.addresses.identity,async verify(request){counts.addressCalls++;return source.providers.addresses.verify(request);}},
     receipt:{identity:{kind:'independent',id:'fresh-local-fixed-view-'+observerId,sourcePin:source.providers.receipt.identity.sourcePin},async reconstruct(intent,_evidence,snapshot){
-      authenticated();counts.receiptCalls++;await source.current();const result=await independentlyVerifyDeposit({binary,sha256,publicScan:scan,runtimeDirectory,observerId});await source.current();authenticated();
+      authenticated();counts.receiptCalls++;await source.current();
+      if(source.context.configuration.depositData!==undefined){
+        const memo=await extractDepositMemo({binary,sha256,txId:scan.source.deposit.txId,txBytes:scan.source.deposit.txBytes});
+        assert(memo,'Missing transaction deposit memo');
+        assert.deepEqual(memo,decodeDepositMemo(Buffer.from(source.context.configuration.depositData,'hex')),'Reader memo agreement');
+        verifyMemoIntent(memo,intent,{genesis:scan.genesis,vaultSpend:scan.groupPublicKey});
+      }
+      const result=await independentlyVerifyDeposit({binary,sha256,publicScan:scan,runtimeDirectory,observerId});await source.current();authenticated();
       const deposit=scan.source.deposit;assert.equal(intent.txid,deposit.txId);assert.equal(intent.vault_address,result.vaultAddress);assert.equal(result.vaultAddress,source.context.configuration.vaultAddress);assert.equal(snapshot.id,source.context.snapshot.id);assert.equal(snapshot.network,'mainnet');assert.equal(snapshot.txid,deposit.txId);assert.equal(snapshot.blockHash,deposit.blockHash);assert.equal(snapshot.blockHeight,BigInt(deposit.blockHeight));assert.equal(snapshot.chainHeight,BigInt(scan.snapshot.height));
       receipts.push(result);return {status:'verified',value:{network:'mainnet',txid:deposit.txId,vaultAddress:result.vaultAddress,blockHash:deposit.blockHash,blockHeight:BigInt(deposit.blockHeight),snapshotId:snapshot.id,inPool:false,outputs:result.outputs.map(output=>({index:BigInt(output.outputIndex),publicKey:output.publicKey,amount:BigInt(output.amountAtomic),owned:output.owned,maturity:output.maturity,spent:'unspent',keyOccurrences:BigInt(output.historyOccurrences)}))}};
     }}

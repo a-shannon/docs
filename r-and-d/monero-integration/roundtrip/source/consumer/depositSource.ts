@@ -4,7 +4,8 @@ import {join,resolve} from 'node:path';
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
-import {encodeIntent} from '../packages/monero-deposit/lib/intentCodec';
+import {encodeIntent,decodeIntent} from '../packages/monero-deposit/lib/intentCodec';
+import {decodeDepositMemo,verifyMemoIntent} from './depositDelivery.mjs';
 import {verifyDeposit} from '../packages/monero-deposit/lib/depositPolicy';
 import {NATIVE_SOURCE_PIN,type VerificationProviders} from '../packages/monero-deposit/lib/evidence';
 import {inspectParticipantDeposit} from './participantSigning.mjs';
@@ -38,7 +39,8 @@ export async function nativeProof(mode:'produce'|'verify',request:any,runtime:st
 }
 
 /** Fresh local-chain composition: fixed snapshot, native ownership and actual OutProofV2. */
-export async function buildDepositSource(vault:any,node:LocalMonero,runtime:string,recipient:string,asset:string,{sourcePolicy}: {sourcePolicy?:'authenticated-backing-v1'}={}){
+export async function buildDepositSource(vault:any,node:LocalMonero,runtime:string,recipient:string,asset:string,{sourcePolicy,depositData}: {sourcePolicy?:'authenticated-backing-v1',depositData?:string}={}){
+  const memo=depositData===undefined?undefined:decodeDepositMemo(Buffer.from(depositData,'hex'));
   let inspectionSnapshot;
   if(sourcePolicy){
     const info=await node.isolated(),genesis=await node.rpc('get_block_header_by_height',{height:0}),tip=await node.rpc('get_block_header_by_height',{height:info.height-1});
@@ -52,11 +54,12 @@ export async function buildDepositSource(vault:any,node:LocalMonero,runtime:stri
     txid:d.txId,blockHash:d.blockHash,blockHeight:BigInt(d.blockHeight),chainHeight:BigInt(o.snapshot.height),minConfirmations:2n};
   const context:DepositContext={id:'local-roundtrip-'+vault.genesis,revision:1n,configurationRevision:sourcePolicy?'local-protocol16-backed-v1':'local-protocol16-v1',
     configuration:{version:2,domain:'rosen-monero-deposit',sourceNetwork:'mainnet',vaultEpoch:'1',vaultAddress:vault.vaultAddress,
-      destinationNetwork:'ergo-testnet',destinationAsset:asset,nativeSourcePin:NATIVE_SOURCE_PIN,...(sourcePolicy?{outputHistoryPolicy:sourcePolicy}:{})},
+      destinationNetwork:'ergo-testnet',destinationAsset:asset,nativeSourcePin:NATIVE_SOURCE_PIN,...(sourcePolicy?{outputHistoryPolicy:sourcePolicy}:{}),...(depositData===undefined?{}:{depositData})},
     feePolicy:{bridgeFee:'100',networkFee:'20',sourceDecimals:12,destinationDecimals:12,remainder:'reject'},snapshot};
   const intentBytes=encodeIntent({version:2,domain:context.configuration.domain,source_network:'mainnet',vault_epoch:'1',vault_address:vault.vaultAddress,
     destination_network:'ergo-testnet',destination_asset:asset,bridge_fee:'100',network_fee:'20',txid:d.txId,to_address:recipient,
-    amount:d.amountAtomic,expiry_height:snapshot.chainHeight+100n,outputs:[{output_index:BigInt(d.outputIndex),output_public_key:d.outputKey,amount:d.amountAtomic}]});
+    amount:d.amountAtomic,expiry_height:memo?BigInt(memo.expiryHeight):snapshot.chainHeight+100n,outputs:[{output_index:BigInt(d.outputIndex),output_public_key:d.outputKey,amount:d.amountAtomic}]});
+  if(memo)verifyMemoIntent(memo,decodeIntent(intentBytes),{genesis:vault.genesis,vaultSpend:vault.groupKey});
   const proofRequest={txHex:d.txBytes,txId:d.txId,vaultAddress:vault.vaultAddress,messageHex:Buffer.from(intentBytes).toString('hex'),proof:''};
   const generated=await nativeProof('produce',proofRequest,runtime,inspected.donorProofKeyPath);
   if(!generated.good||generated.received!==d.amountAtomic)throw Error('Generated deposit proof');

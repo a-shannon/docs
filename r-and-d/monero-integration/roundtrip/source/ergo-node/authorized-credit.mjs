@@ -16,6 +16,7 @@ import {canonicalAssignment,committeeConfigDigest} from '../guard-service/src/db
 import {makeIndependentDepositProviders,independentlyDecideDeposit} from '../consumer/independentDepositSource.mjs';
 import {captureAuthenticatedDepositSource,moneroCreditOrigin} from '../consumer/authenticatedDepositSource.mjs';
 import {issueBackingClaim} from '../consumer/backingClaim.mjs';
+import {verifyDeliveryMode} from '../consumer/depositDelivery.mjs';
 
 const require=createRequire(path.join(config.rosenRoot,'package.json'));
 const load=relative=>import(pathToFileURL(path.join(config.rosenRoot,relative)).href);
@@ -43,7 +44,8 @@ export function creditOrder(candidate,deployment,wids){
 const orderKey=order=>text(order.map(row=>({...row,address:tree(row.address)})));
 
 /** Local raw-source -> actual trigger/order/reduction verifier for each guard. */
-export async function openAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment}){
+export async function openAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment,loadRequest}){
+  verifyDeliveryMode(source.context?.configuration?.depositData,loadRequest);
   const authenticatedSource=captureAuthenticatedDepositSource(source);
   assert(path.isAbsolute(directory));fs.mkdirSync(directory,{recursive:true});
   const request=structuredClone(rawRequest),receipt=structuredClone(watcherReceipt);
@@ -71,7 +73,8 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
   async function verifyForGuard(index,snapshot){
     assert(live,'Closed source authority');
     authenticatedSource.current();
-    const candidate=await independentlyDecideDeposit({source,rawRequest:request,providers:readers[index].providers});
+    const supplied=loadRequest===undefined?request:await loadRequest();
+    const candidate=await independentlyDecideDeposit({source,rawRequest:supplied,providers:readers[index].providers});
     if(candidate.status!=='accepted')throw Error('Guard source '+candidate.status+':'+candidate.reason);
     const expected=creditObservation(candidate,source);assert.equal(candidate.destinationAsset,d.tokens.Asset);
     assert.deepEqual(expected,receipt.observation,'Guard source event agreement');

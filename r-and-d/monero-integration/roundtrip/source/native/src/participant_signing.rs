@@ -152,8 +152,8 @@ pub(crate) fn fund(group: [u8; 32]) -> R<Value> {
     host::node::participant_fund(group)
 }
 pub(crate) struct PendingDeposit(host::node::PreparedDeposit);
-pub(crate) fn prepare_deposit(group: [u8; 32], directory: &Path) -> R<(PendingDeposit, Value)> {
-    let pending = host::node::participant_prepare_deposit(group, directory)?;
+pub(crate) fn prepare_deposit(group: [u8; 32], directory: &Path, deposit_data: Option<Vec<u8>>) -> R<(PendingDeposit, Value)> {
+    let pending = host::node::participant_prepare_deposit(group, directory, deposit_data)?;
     let frame = pending.public_frame();
     Ok((PendingDeposit(pending), frame))
 }
@@ -170,8 +170,8 @@ impl PendingDeposit {
         host::node::participant_submit_deposit(self.0)
     }
 }
-pub(crate) fn fund_deposit(group: [u8; 32], directory: &Path) -> R<Value> {
-    let (pending, frame) = prepare_deposit(group, directory)?;
+pub(crate) fn fund_deposit(group: [u8; 32], directory: &Path, deposit_data: Option<Vec<u8>>) -> R<Value> {
+    let (pending, frame) = prepare_deposit(group, directory, deposit_data)?;
     pending.submit(&json!({"type":"submit-deposit","txId":frame["deposit"]["txId"]}))
 }
 pub(crate) fn recover(directory: &Path, expected: [u8; 32]) -> R<Value> {

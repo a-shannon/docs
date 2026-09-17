@@ -20,15 +20,18 @@ function checkFinal(frame){
 }
 
 /** Opens actual actors and funds their public vault on the already-owned daemon. */
-export async function openParticipantVault({binary,sha256,runtime,mode='coinbase',beforeDepositSubmit}){
+export async function openParticipantVault({binary,sha256,runtime,mode='coinbase',beforeDepositSubmit,depositData}){
   if(!['coinbase','deposit'].includes(mode))throw Error('Participant funding mode');
   if(beforeDepositSubmit!==undefined&&(mode!=='deposit'||typeof beforeDepositSubmit!=='function'))throw Error('Participant deposit preparation mode');
+  if(depositData!==undefined&&(mode!=='deposit'||typeof depositData!=='function'||beforeDepositSubmit!==undefined))throw Error('Participant deposit data mode');
   const ceremony=await runCeremony({binary,sha256,keepAlive:true});
   try{
     const depositDirectory=mode==='deposit'?mkdtempSync(join(runtime,'donor-')):undefined;
     let funded;
     if(beforeDepositSubmit!==undefined){funded=await fundPreparedDeposit(ceremony.actors[0],depositDirectory,ceremony.ready[0].groupKey,beforeDepositSubmit);}
-    else{await ceremony.actors[0].send(mode==='deposit'?{type:'fund-deposit',runtimeDirectory:depositDirectory}:{type:'fund'});
+    else{const data=depositData===undefined?undefined:await depositData(ceremony.ready[0].groupKey);
+      if(data!==undefined&&(typeof data!=='string'||!/^(?:[0-9a-f]{2}){1,254}$/.test(data)))throw Error('Participant deposit data');
+      await ceremony.actors[0].send(mode==='deposit'?{type:'fund-deposit',runtimeDirectory:depositDirectory,...(data===undefined?{}:{depositData:data})}:{type:'fund'});
       funded=await ceremony.actors[0].next(mode==='deposit'?180000:60000,'funding');}
     if(funded.type!=='funded'||funded.id!==1||!/^[0-9a-f]{64}$/.test(funded.genesis)||funded.source?.kind!==mode)throw Error('Participant funding response');
     const handle=Object.freeze({groupKey:ceremony.ready[0].groupKey,rosterDigest:ceremony.summary.rosterDigest,

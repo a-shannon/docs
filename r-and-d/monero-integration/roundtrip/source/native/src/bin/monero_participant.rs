@@ -1,4 +1,11 @@
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("deposit-data") {
+        if std::env::args().count() != 2 || pedpop_wallet_type_join::participant::deposit_data(
+            std::io::stdin().lock(), std::io::stdout().lock()).is_err() {
+            eprintln!("participant-error"); std::process::exit(1);
+        }
+        return;
+    }
     if std::env::args().nth(1).as_deref() == Some("scan-source") {
         if std::env::args().count() != 2 || pedpop_wallet_type_join::observe_public_source(
             std::io::stdin().lock(), std::io::stdout().lock()).is_err() {

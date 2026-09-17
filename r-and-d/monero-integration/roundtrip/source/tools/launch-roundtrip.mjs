@@ -11,9 +11,10 @@ const args=Object.create(null),allowed=new Set(['config','manifest-sha256','chec
 for(let i=2;i<process.argv.length;i+=2){const key=process.argv[i]?.slice(2),value=process.argv[i+1];if(!process.argv[i]?.startsWith('--')||!allowed.has(key)||!value||Object.hasOwn(args,key))throw Error('Arguments');args[key]=value;}
 if(!args.config||!isAbsolute(args.config)||!/^[0-9a-f]{64}$/.test(args['manifest-sha256']))throw Error('Explicit config and manifest pin required');
 for(const key of ['check-only','collect-only'])if(args[key]&&args[key]!=='true')throw Error('Boolean option');
-const profile=args.profile??'baseline';if(!['baseline','watcher-authority','economic-reconciliation'].includes(profile))throw Error('Unsupported profile');
+const profile=args.profile??'baseline';if(!['baseline','watcher-authority','economic-reconciliation','deposit-delivery'].includes(profile))throw Error('Unsupported profile');
 const profiles={baseline:['roundtrip.spec.ts','roundtrip.config.ts'],'watcher-authority':['watcherAuthority.spec.ts','watcherAuthority.config.ts'],
-  'economic-reconciliation':['economicRoundtrip.spec.ts','economicRoundtrip.config.ts']};
+  'economic-reconciliation':['economicRoundtrip.spec.ts','economicRoundtrip.config.ts'],
+  'deposit-delivery':['depositDelivery.spec.ts','depositDelivery.config.ts']};
 const [spec,testConfig]=profiles[profile];
 const configBytes=readFileSync(args.config),config=JSON.parse(configBytes);
 for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','ergoRuntime'])if(typeof config[key]!=='string'||!isAbsolute(config[key]))throw Error('Absolute configuration: '+key);
