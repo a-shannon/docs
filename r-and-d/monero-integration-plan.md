@@ -11,7 +11,7 @@ adapter and operational qualification.
 
 The review has two entry points: this RCS requirements and component map, and
 [CLSAG signing and transaction construction](monero-signing.md). The complete
-[implementation, tests and reproduction instructions](https://github.com/a-shannon/docs/tree/10b743b4f93e5e78573d50861ed8b90219124b09/r-and-d/monero-integration/roundtrip)
+[implementation, tests and reproduction instructions](https://github.com/a-shannon/docs/tree/4a11e2818031552bd38a1dcb997e9a15ae56648d/r-and-d/monero-integration/roundtrip)
 remain available in the experimental branch. Its generated execution evidence
 and standalone harness are separate from the proposed documentation change.
 
@@ -23,7 +23,7 @@ It identifies both implemented experimental behavior and integration gaps.
 | Requirement | Monero approach and present limit |
 | --- | --- |
 | Multi-signer transactions | `monero-wallet 0.2.0` with `multisig` uses the imported CLSAG threshold machinery. The experiment has four holder processes and selects two signers. Ceremony, operator independence, rotation and production transport remain to be qualified. |
-| Data on the lock transaction | The experiment uses a canonical deposit intent and an `OutProofV2` proof of payment carrying that intent as its message. These are supplied separately from the Monero transaction. This does **not yet satisfy RCS's on-transaction data requirement**; the discovery, delivery and availability contract must be agreed before a production scanner can admit deposits. |
+| Data on the lock transaction | The `deposit-delivery` experiment places destination, amount, fees and source/vault context in a compact memo on the Monero transaction. The final output-bound intent and `OutProofV2` follow separately. This addresses the metadata requirement in the local profile; production acceptance, retention and availability of the auxiliary proof channel remain open. |
 | Sufficient endpoints | Deposits and payouts are checked against an isolated Monero daemon. Independent production node providers, disagreement handling and availability have not been qualified. |
 | Token support | Native XMR only. There is no Monero token-issuance adapter or proposal to issue other Rosen assets on Monero. |
 | Wallet/dApp connector | A depositor must create the exact intent and supply the matching payment proof. The experiment provides that path through its harness; a supported user-wallet connector and delivery interface remain open. |
@@ -71,6 +71,26 @@ the experiment. Production adoption must preserve the field through the chosen
 extractors, API and displays; generic address-based refunds are unsupported for
 this descriptor.
 
+### Proposed metadata and proof delivery
+
+The [delivery contract and validation report](https://github.com/a-shannon/docs/blob/4a11e2818031552bd38a1dcb997e9a15ae56648d/r-and-d/monero-integration/roundtrip/deposit-delivery.md)
+provide the runnable proposal and its remaining integration decisions.
+
+The `deposit-delivery` profile uses a single bounded Rust-wallet data field.
+Its pre-transaction memo contains the destination and fee data required by RCS,
+plus amount, expiry and source/vault context. The final txid and output identity
+enter the later intent and payment proof; embedding the final intent in its own
+transaction would make the hash self-referential. Every overlapping memo/intent
+field must match. Memo contents, including destination and amount, are public.
+
+Readers discover the memo from chain transaction bytes and retrieve the proof by
+txid. The experiment uses a configured file directory, canonical bounded bytes
+and fresh guard retrieval. Missing or invalid delivery cannot authorize credit.
+The transport is untrusted; native proof, output, image-association and source
+checks remain necessary. Production retention, redundant retrieval, retries and
+wallet support remain to be defined. The experimental format and network tags
+are not assigned Rosen standards.
+
 Copied output keys are not resolved by globally blacklisting every repeated
 key: that could let an unrelated copied output disable an authenticated deposit.
 The selected backing policy verifies the intended receipt and tracks one
@@ -116,11 +136,13 @@ not a claim about production storage failure or network fork selection.
 
 ## Scope for the next implementation contribution
 
-The first decision is the RCS-compatible delivery contract for the intent and
-proof, together with acceptance of the output origin descriptor through existing
-event consumers. That determines the smallest scanner-to-guard adapter change.
-Then qualify it with independent node readers and the supported depositor wallet,
-keeping the signer mechanism independently reviewable.
+The next decision is acceptance of on-transaction lock metadata with an auxiliary
+payment-proof channel, together with preservation of the output origin descriptor
+through existing event consumers. The local delivery experiment provides a
+concrete candidate; it does not define production availability. Then implement
+the smallest production scanner/extractor join and qualify independent node
+readers and a supported depositor wallet, keeping the signer independently
+reviewable.
 
 The present experiment fixes one qualifying output per deposit transaction,
 local fakechain/devnet nodes, fixture assets, a local ceremony, a selected signer
