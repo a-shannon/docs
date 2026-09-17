@@ -55,7 +55,7 @@ it('reconciles two independently backed operations through overlapping liabiliti
     const readers=[0,1].map(i=>makeIndependentDepositProviders({source,binary:config.observerBinary,sha256:config.observerSha256,
       runtimeDirectory:config.runtimeDirectory,observerId:'economic-'+index+'-watcher-'+i}));
     transport=await createWatcherTransport({directory:join(ownDirectory,'deposit-watchers'),deployment,nodePort:{rpc,confirmed,getStateContext:stateContext},
-      dependencyRoot:config.rosenRoot,observe:async(i:number,rawRequest:any)=>creditObservation(await independentlyDecideDeposit({source,rawRequest,providers:readers[i].providers}))});
+      dependencyRoot:config.rosenRoot,observe:async(i:number,rawRequest:any)=>creditObservation(await independentlyDecideDeposit({source,rawRequest,providers:readers[i].providers}),source)});
     const deposited=await transport.publish(source.request);expect(deposited.commitments).toHaveLength(2);
     transport.close();transport=undefined;
     const open=()=>openAuthorizedCredit({directory:join(ownDirectory,'credit'),source,rawRequest:source.request,watcherReceipt:deposited,deployment});

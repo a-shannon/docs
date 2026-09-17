@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {registerAuthenticatedDepositSource as register,captureAuthenticatedDepositSource as capture} from './authenticatedDepositSource.mjs';
+import * as authenticatedSource from './authenticatedDepositSource.mjs';
 
 const h=n=>n.toString(16).padStart(2,'0').repeat(32);
 const canonical=value=>JSON.stringify(value,(_,item)=>item&&Object.getPrototypeOf(item)===Object.prototype?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
@@ -65,4 +66,81 @@ test('bigint/string and byte/array substitutions cannot preserve source meaning'
 test('selected backing policy retains duplicate observations without inferring a second claim',()=>{
   const {source,authority}=fixture();source.publicScan.sourcePolicy='authenticated-backing-v1';source.observation.sourcePolicy='authenticated-backing-v1';source.observation.historyOccurrences=2;
   register(source,authority);assert.equal(capture(source).backing.publicKey,h(5));assert.equal(capture(source).backing.amountAtomic,'1000');
+});
+
+function rewriteIntent(source, edit) {
+  const intent=JSON.parse(Buffer.from(source.request.intentBytes).toString('utf8'));
+  edit(intent);
+  const bytes=Uint8Array.from(Buffer.from(canonical(intent)));
+  source.request.intentBytes=bytes;
+  source.decision.intentBytesHex=Buffer.from(bytes).toString('hex');
+  source.decision.intentHash=createHash('sha256').update(bytes).digest('hex');
+  source.proofRequest.messageHex=source.decision.intentBytesHex;
+}
+
+test('origin agrees across fresh verifier identities and independently registered equal sources',()=>{
+  const first=fixture(),second=fixture();
+  register(first.source,first.authority);register(second.source,second.authority);
+  const candidate=structuredClone(first.source.decision);
+  candidate.verifierReferences=['independent:fresh-reader@'+'ab'.repeat(20)];
+  const origin=authenticatedSource.moneroCreditOrigin(first.source,candidate);
+  assert.match(origin,/^rosen-monero-output:v1:[0-9a-f]{64}$/);
+  assert.equal(origin,authenticatedSource.moneroCreditOrigin(second.source,second.source.decision));
+  assert.throws(()=>authenticatedSource.moneroCreditOrigin({...first.source},candidate),/source:unregistered/);
+  first.source.request.intentBytes[0]^=1;
+  assert.throws(()=>authenticatedSource.moneroCreditOrigin(first.source,candidate),/source:changed/);
+});
+
+test('each recomputed decision field remains bound despite fresh verifier references',()=>{
+  const {source,authority}=fixture();register(source,authority);
+  for(const field of Object.keys(source.decision).filter(name=>name!=='verifierReferences')){
+    const candidate=structuredClone(source.decision);
+    const value=candidate[field];
+    candidate[field]=typeof value==='bigint'?value+1n:typeof value==='string'?value+'x':[];
+    assert.throws(()=>authenticatedSource.moneroCreditOrigin(source,candidate),/source:agreement:candidate/,field);
+  }
+  for(const candidate of [{...source.decision,unexpected:'value'},Object.fromEntries(Object.entries(source.decision).filter(([name])=>name!=='intentHash'))]){
+    assert.throws(()=>authenticatedSource.moneroCreditOrigin(source,candidate),/source:agreement:candidate/);
+  }
+});
+
+test('origin distinguishes selected output, associated image, full intent and destination',()=>{
+  const base=fixture();register(base.source,base.authority);
+  const original=authenticatedSource.moneroCreditOrigin(base.source,base.source.decision);
+  // These are coherent structural sources, not alternative native deposits or proofs.
+  const variants={
+    outputIndex(s){
+      s.deposit.outputIndex=s.observation.outputIndex=s.publicScan.source.deposit.outputIndex=1;
+      s.publicScan.source.outputIds[0].index=1;
+      s.decision.outputs[0].outputIndex=1n;s.decision.outputs[0].locator=s.decision.depositId+':1';
+      rewriteIntent(s,intent=>{intent.outputs[0].output_index='1';});
+    },
+    outputKey(s){
+      s.deposit.outputKey=s.observation.outputKey=s.publicScan.source.deposit.outputKey=h(21);
+      s.decision.outputs[0].publicKey=h(21);s.decision.outputs[0].economicId='monero:output-key:mainnet:'+h(21);
+      rewriteIntent(s,intent=>{intent.outputs[0].output_public_key=h(21);});
+    },
+    globalIndex(s){
+      s.deposit.chainIndex=s.observation.chainIndex=s.publicScan.source.deposit.chainIndex=43;
+      s.publicScan.source.outputIds[0].chainIndex=43;
+    },
+    keyImage(s){s.observation.keyImage=s.publicScan.keyImage=h(21);},
+    expiry(s){s.decision.expiresAtHeight=201n;rewriteIntent(s,intent=>{intent.expiry_height='201';});},
+    recipient(s){s.decision.recipient='another-recipient';rewriteIntent(s,intent=>{intent.to_address='another-recipient';});},
+  };
+  for(const [name,mutate] of Object.entries(variants)){
+    const {source,authority}=fixture();mutate(source);register(source,authority);
+    assert.notEqual(authenticatedSource.moneroCreditOrigin(source,source.decision),original,name);
+  }
+});
+
+test('origin excludes local snapshot handles while retaining the same immutable backing',()=>{
+  const first=fixture(),second=fixture(),s=second.source;
+  s.context.snapshot.chainHeight=s.decision.checkedAtHeight=101n;
+  s.publicScan.snapshot.height=s.observation.snapshot.height=101;
+  s.publicScan.snapshot.hash=s.observation.snapshot.hash=h(22);
+  s.context.snapshot.id=s.decision.snapshotId=createHash('sha256').update(s.publicScan.genesis+h(22)).digest('hex');
+  register(first.source,first.authority);register(s,second.authority);
+  assert.notEqual(first.source.decision.snapshotId,s.decision.snapshotId);
+  assert.equal(authenticatedSource.moneroCreditOrigin(first.source,first.source.decision),authenticatedSource.moneroCreditOrigin(s,s.decision));
 });

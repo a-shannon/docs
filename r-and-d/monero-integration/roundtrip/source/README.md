@@ -86,6 +86,28 @@ requirements.
 
 Use the same command with `--check-only true` for read-only pin validation. `--collect-only true` creates an external execution mirror and collects the roundtrip test without running it. These checks do not establish the complete roundtrip result.
 
+## Output agreement
+
+Monero deposit observations use `rosen-monero-output:v1:<sha256>` in the existing
+`fromAddress` field. This is an origin descriptor, not a sender or refund address.
+The digest commits the authenticated single-output backing: chain genesis,
+vault, transaction and output indices, output key, associated key image, amount,
+full intent hash and credited destination. Independent watchers and guards
+recompute it after their source checks. The existing Rosen commitment, trigger
+and guard comparison bind this field without changing the generic event layout.
+The raw transaction ID and one qualifying output per transaction remain unchanged.
+
+The source policy already determines a unique output in this profile. The
+descriptor makes the complete backing and intent explicit in agreement; it is
+not a replacement for proof verification, native key-image association,
+confirmation/currentness checks or permanent output-key/image reservations.
+Local reader names and snapshot handles do not change the shared descriptor.
+All participants must use the same profile; old vault-address observations are
+rejected before credit signing. This is not a production migration mechanism.
+
+The [output-agreement results](../output-agreement.md) distinguish focused
+structural tests, real Rosen commitment checks and complete local-chain runs.
+
 ## Multiple-operation accounting
 
 The `economic-reconciliation` profile runs two separately backed, one-shot vault

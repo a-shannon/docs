@@ -122,3 +122,34 @@ export function captureAuthenticatedDepositSource(source){
   };
   current();return Object.freeze({backing:expected.backing,current});
 }
+
+/**
+ * Commit the exact single-output backing and full deposit intent into Rosen's
+ * existing origin field. This is a descriptor, not a sendable Monero address.
+ * Callers must freshly verify the proof, source and unspent state first; this
+ * function binds those results without granting chain-verification authority.
+ */
+export function moneroCreditOrigin(source, candidate) {
+  const {backing}=captureAuthenticatedDepositSource(source);
+  const semanticDecision=value=>{
+    requireValue(value && Object.getPrototypeOf(value)===Object.prototype,'agreement:candidate');
+    // Reader names legitimately differ. Every other field, including the exact
+    // output list, intent, source policy and checked snapshot, must agree with
+    // this source's verified decision. Reject extra or missing semantic fields.
+    return Object.fromEntries(dataEntries(value).filter(([name])=>name!=='verifierReferences'));
+  };
+  requireValue(
+    canonicalData(semanticDecision(candidate))===canonicalData(semanticDecision(source.decision)),
+    'agreement:candidate',
+  );
+  // The shared preimage excludes local reader identities and snapshot handles.
+  // Immutable backing includes genesis, vault, txid, both output indices, key,
+  // associated image, amount, intent hash and the credited destination/amount.
+  const preimage=canonicalData({
+    domain:'rosen-monero-credit-origin',
+    version:1,
+    sourceNetwork:candidate.sourceNetwork,
+    backing,
+  });
+  return 'rosen-monero-output:v1:'+hash(preimage);
+}

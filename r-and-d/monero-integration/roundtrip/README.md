@@ -1,8 +1,12 @@
 # Monero → Ergo → Monero: local integration experiment
 
-A. Shannon · 14 September 2026
+A. Shannon · 17 September 2026
 
-**Latest increment: two-operation economic reconciliation.** Read the
+**Latest increment: explicit output and intent agreement.** Read the
+[output agreement report](output-agreement.md) for the watcher/guard binding,
+isolated negative tests and exact replay results.
+
+**Two-operation economic reconciliation.** Read the
 [economic report](economic-reconciliation.md) for cumulative obligations,
 confirmed payments, selected reserve consumption and separately measured fees.
 

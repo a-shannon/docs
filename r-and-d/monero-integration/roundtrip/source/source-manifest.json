@@ -2,12 +2,12 @@
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
   "fileCount": 397,
-  "aggregateSha256": "3aa587f3671b036a700013d6420b4dda404250cc46d2acc3e9c6d60258a94a38",
+  "aggregateSha256": "35c1e0da40e42bbcda93fb1347e962c01048d2e2c95547e87582837bec1eaed7",
   "files": [
     {
       "path": "README.md",
-      "bytes": 10556,
-      "sha256": "c93289e012f4aedc41e4f28ba976591fd1311d6fca49f8b287d5b7c04e8dcbf8"
+      "bytes": 11905,
+      "sha256": "146b7577198a81b140df62918c6119763695ebcafe3ff34f2c45df9293b049bd"
     },
     {
       "path": "consumer/adapter.ts",
@@ -66,13 +66,13 @@
     },
     {
       "path": "consumer/authenticatedDepositSource.mjs",
-      "bytes": 13236,
-      "sha256": "9e33cce76c3da20ffa3e6a9202a3dcb8a808d65dc2b089b3132339972eb8359d"
+      "bytes": 14744,
+      "sha256": "27d2dd315372cc2c94fe384344b6f0e645fba368357c58a4cbcc3be05601546e"
     },
     {
       "path": "consumer/authenticatedDepositSource.test.mjs",
-      "bytes": 9334,
-      "sha256": "3b70bab07822bb4d07d7624773ae2fa5b5651cf1d3b0268c463451aaca9959e3"
+      "bytes": 14057,
+      "sha256": "733fa04a8def2864b557afeeb6036ab5dd3821ba1ff56875f7d31b88e99a97e5"
     },
     {
       "path": "consumer/authorityRoundtrip.ts",
@@ -166,8 +166,8 @@
     },
     {
       "path": "consumer/economicRoundtrip.spec.ts",
-      "bytes": 13925,
-      "sha256": "6d590e010c41c398c9f32c4222cf7aa5335c6739e8fbfcbcb833cf5309784419"
+      "bytes": 13932,
+      "sha256": "b3a679a6d726d1aad1d065cef665b550d38478d29df8926f40070268f9959ffe"
     },
     {
       "path": "consumer/fixturePorts.ts",
@@ -441,8 +441,8 @@
     },
     {
       "path": "consumer/watcherAuthority.spec.ts",
-      "bytes": 9237,
-      "sha256": "9705db47145fe6d9e0d0e1418ef1eae626a30633c7f681348eeaa0d9416416c2"
+      "bytes": 10158,
+      "sha256": "fe295f08fd18b85378340413b3809d03d6cf13f6b7c18931f405939cc407c52e"
     },
     {
       "path": "consumer/watcherSource.config.ts",
@@ -451,8 +451,8 @@
     },
     {
       "path": "consumer/watcherSource.spec.ts",
-      "bytes": 6015,
-      "sha256": "40d64537e56b121887ae805e371649973f45b54daae2bb5525d72e149fd4281d"
+      "bytes": 5412,
+      "sha256": "bf7cab5e2a4716a8ee060ba8f19c6acb6f264313ffb53bc0322ad20e945af178"
     },
     {
       "path": "consumer/withdrawalJournal.spec.ts",
@@ -481,8 +481,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 14028,
-      "sha256": "f7d651ea2e58e09769df99892919f3172708d817624252e028eab21f778fd93e"
+      "bytes": 14196,
+      "sha256": "a5b978dc125cbcfb4b88098368ac194e471689392b60ef438b0cc4a4540a152d"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -616,8 +616,8 @@
     },
     {
       "path": "ergo-node/watcher-runtime.test.mjs",
-      "bytes": 5314,
-      "sha256": "6fda54e00cfba8a7ade316b5e38827b7a8f66aa85e7cbfac54ff5901a2f768f0"
+      "bytes": 9108,
+      "sha256": "a0c294c256dadae9e2a6ade5a69bf69025ad40e585eb5a8c55f3ef2755a6cdc6"
     },
     {
       "path": "ergo-node/watcher-setup.mjs",

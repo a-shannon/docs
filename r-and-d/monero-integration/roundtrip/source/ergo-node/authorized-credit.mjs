@@ -13,7 +13,7 @@ import {verifyCreditOutputs} from './credit-output-policy.mjs';
 import {retainCreditRecord,recoverCredit} from './credit-recovery.mjs';
 import {canonicalAssignment,committeeConfigDigest} from '../guard-service/src/db/moneroCreditAssignment.mjs';
 import {makeIndependentDepositProviders,independentlyDecideDeposit} from '../consumer/independentDepositSource.mjs';
-import {captureAuthenticatedDepositSource} from '../consumer/authenticatedDepositSource.mjs';
+import {captureAuthenticatedDepositSource,moneroCreditOrigin} from '../consumer/authenticatedDepositSource.mjs';
 import {issueBackingClaim} from '../consumer/backingClaim.mjs';
 
 const require=createRequire(path.join(config.rosenRoot,'package.json'));
@@ -24,10 +24,11 @@ const text=value=>JSON.stringify(value,(_,item)=>typeof item==='bigint'?item.toS
 const nativeBox=value=>wasm.ErgoBox.sigma_parse_bytes(Buffer.from(value,'hex'));
 const boxes=values=>{const result=wasm.ErgoBoxes.empty();values.forEach(v=>result.add(v));return result;};
 
-export function creditObservation(candidate){
+/** The origin descriptor binds output backing through the unchanged Rosen event. */
+export function creditObservation(candidate,source){
   assert.equal(candidate.status,'accepted');assert.equal(candidate.evidenceMode,'independent');assert.equal(candidate.destinationNetwork,'ergo-testnet');
   assert.equal(candidate.retainedAtomicRemainder,0n);assert.equal(candidate.destinationAmount,candidate.netAmount);
-  return {sourceTxId:candidate.txid,fromChain:'monero',toChain:'ergo',fromAddress:candidate.vaultAddress,toAddress:candidate.recipient,
+  return {sourceTxId:candidate.txid,fromChain:'monero',toChain:'ergo',fromAddress:moneroCreditOrigin(source,candidate),toAddress:candidate.recipient,
     amount:String(candidate.amount),bridgeFee:String(candidate.bridgeFee),networkFee:String(candidate.networkFee),sourceChainTokenId:'XMR',
     targetChainTokenId:candidate.destinationAsset,sourceBlockId:candidate.blockHash,height:Number(candidate.blockHeight),
     requestId:Buffer.from(require('blakejs').blake2b(Buffer.from(candidate.txid),undefined,32)).toString('hex')};
@@ -71,7 +72,8 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
     authenticatedSource.current();
     const candidate=await independentlyDecideDeposit({source,rawRequest:request,providers:readers[index].providers});
     if(candidate.status!=='accepted')throw Error('Guard source '+candidate.status+':'+candidate.reason);
-    const expected=creditObservation(candidate);assert.equal(candidate.destinationAsset,d.tokens.Asset);assert.deepEqual(expected,receipt.observation);
+    const expected=creditObservation(candidate,source);assert.equal(candidate.destinationAsset,d.tokens.Asset);
+    assert.deepEqual(expected,receipt.observation,'Guard source event agreement');
     const tx=wasm.ReducedTransaction.sigma_parse_bytes(Buffer.from(snapshot.reducedHex,'hex')),inputs=snapshot.inputHex.map(nativeBox),data=snapshot.dataHex.map(nativeBox);
     assert.equal(snapshot.requiredSign,3);assert.equal(data.length,1);assert.equal(data[0].box_id().to_str(),d.guard.boxId);
     for(const box of [...inputs,...data])assert.equal(hex(box),hex(wasm.ErgoBox.from_json(text(await rpc('/utxo/byId/'+box.box_id().to_str())))),'Input no longer canonical/unspent');

@@ -45,9 +45,21 @@ it('settles an actual two-direction watcher roundtrip with four guarded credit a
   const opts={binary:config.observerBinary,sha256:config.observerSha256,runtimeDirectory:config.runtimeDirectory};
   const readers=[0,1].map(i=>makeIndependentDepositProviders({...opts,source,observerId:'watcher-'+i}));
   transport=await createWatcherTransport({directory:join(directory,'deposit-watchers'),deployment,nodePort:{rpc,confirmed,getStateContext:stateContext},
-    observe:async(index:number,rawRequest:any)=>creditObservation(await independentlyDecideDeposit({source,rawRequest,providers:readers[index].providers})),dependencyRoot:config.rosenRoot});
+    observe:async(index:number,rawRequest:any)=>creditObservation(await independentlyDecideDeposit({source,rawRequest,providers:readers[index].providers}),source),dependencyRoot:config.rosenRoot});
   const deposited=await transport.publish(source.request);expect(deposited.commitments.length).toBe(2);
   transport.close();transport=undefined;
+  const sourceAgreementNegatives=[];
+  for(const [label,origin] of [['legacy-vault-address',source.decision.vaultAddress],['changed-output-origin','rosen-monero-output:v1:'+'00'.repeat(32)]]){
+    const alteredReceipt={...deposited,observation:{...deposited.observation,fromAddress:origin}};
+    const refusing=await openAuthorizedCredit({directory:join(directory,'credit-refusal-'+label),source,rawRequest:source.request,watcherReceipt:alteredReceipt,deployment});
+    try{
+      // Real proof and native source checks precede this exact event comparison.
+      // No signing snapshot is consumed if the output/intent origin disagrees.
+      await expect(refusing.verifyForGuard(0,{})).rejects.toThrow('Guard source event agreement');
+      expect(refusing.counts.guardCommitments).toEqual([0,0,0,0]);
+      sourceAgreementNegatives.push(label);
+    }finally{await refusing.close();}
+  }
   const open=()=>openAuthorizedCredit({directory:join(directory,'credit'),source,rawRequest:source.request,watcherReceipt:deposited,deployment});
   credit=await open();const authorized=await credit.run();expect(authorized.status).toBe('confirmed');
   expect(authorized.counts.completedGuards).toBe(4);expect(authorized.counts.guardPartialSigns.reduce((a:number,b:number)=>a+b,0)).toBe(3);
@@ -86,7 +98,7 @@ it('settles an actual two-direction watcher roundtrip with four guarded credit a
   const rollback={beforeHeight:before.height,afterHeight:after.height,removedDepositBlock:source.deposit.blockHash,
     creditStatus:quarantined.status,retainedOutputClaims:quarantined.checkpoints.map((c:any)=>c.outputs),newCreditCommitments:credit.counts.guardCommitments};
   writeFileSync(join(directory,'public-result.json'),JSON.stringify({scope:'local-actual-watcher-roundtrip-fixed-four-guard-credit',experiment:experiment??'ordinary',collision,deposit:source.deposit,
-    depositIntentHash:source.decision.intentHash,depositWatchers:deposited,authorizedCredit:authorized,creditReplay:{txId:replay.txId,counts:credit.counts},
+    depositIntentHash:source.decision.intentHash,depositWatchers:deposited,sourceAgreementNegatives,authorizedCredit:authorized,creditReplay:{txId:replay.txId,counts:credit.counts},
     redemption,returnWatchers:returned,returnReads,withdrawal,rollback},null,2),{flag:'wx'});
   console.log(JSON.stringify({stage:'actual-watcher-roundtrip-settled',directory,deposit:source.deposit.txId,credit:authorized.txId,withdrawal:withdrawal.finalTxId}));
 });

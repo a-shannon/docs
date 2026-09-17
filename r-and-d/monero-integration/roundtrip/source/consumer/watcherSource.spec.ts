@@ -1,7 +1,6 @@
 import {config} from '../tools/config.mjs';
 import {mkdtempSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {createRequire} from 'node:module';
 import {LocalMonero} from './localMonero';
 import {openParticipantVault} from './participantSigning.mjs';
 import {buildDepositSource} from './depositSource';
@@ -9,11 +8,9 @@ import {makeIndependentDepositProviders,independentlyDecideDeposit,independently
 import {setupAuthorityFixture,stateContext} from '../ergo-node/authority-fixture.mjs';
 import {createWatcherTransport} from '../ergo-node/watcher-runtime.mjs';
 import {rpc,confirmed} from '../ergo-node/rosen-node.mjs';
-import {openAuthorizedCredit} from '../ergo-node/authorized-credit.mjs';
+import {openAuthorizedCredit,creditObservation} from '../ergo-node/authorized-credit.mjs';
 import {openRpcTimingProxy} from './rpcTiming.mjs';
 
-const require=createRequire(import.meta.url),{blake2b}=require('blakejs');
-const requestId=(txid:string)=>Buffer.from(blake2b(Buffer.from(txid),undefined,32)).toString('hex');
 let node:LocalMonero|undefined,vault:any,transport:any,credit:any,timing:any;
 afterEach(async()=>{try{await credit?.close();transport?.close();await vault?.close();}finally{await timing?.close();await node?.stop();delete process.env.MONERO_LOCAL_RPC_PORT;}});
 it('independently scans a real deposit and consumes two actual watcher commitments into a confirmed trigger',async()=>{
@@ -29,9 +26,7 @@ it('independently scans a real deposit and consumes two actual watcher commitmen
   const observe=async(i:number,rawRequest:any)=>{
     const candidate=await independentlyDecideDeposit({source,rawRequest,providers:observers[i].providers});
     if(candidate.status!=='accepted')throw Error('Independent watcher source '+candidate.status+':'+candidate.reason);
-    return {sourceTxId:candidate.txid,fromChain:'monero',toChain:'ergo',fromAddress:candidate.vaultAddress,toAddress:candidate.recipient,
-      amount:candidate.amount.toString(),bridgeFee:candidate.bridgeFee.toString(),networkFee:candidate.networkFee.toString(),sourceChainTokenId:'XMR',
-      targetChainTokenId:candidate.destinationAsset,sourceBlockId:candidate.blockHash,height:Number(candidate.blockHeight),requestId:requestId(candidate.txid)};
+    return creditObservation(candidate,source);
   };
   console.log('Funded actual Monero deposit; independent watcher scans starting');
   transport=await createWatcherTransport({directory,deployment,nodePort:{rpc,confirmed,getStateContext:stateContext},observe,dependencyRoot:config.rosenRoot});
