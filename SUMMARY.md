@@ -27,12 +27,5 @@
 ## 🛠️ r\&d
 
 * [Bringing Monero](r-and-d/bringing-monero.md)
-* [Monero Integration: Architecture and Implementation Plan](r-and-d/monero-integration-plan.md)
-  * [Technical Basis and Evidence](r-and-d/monero-integration/technical-basis.md)
-  * [Preliminary Feasibility Findings](r-and-d/monero-integration/preliminary-study/README.md)
-    * [Architecture, Findings and Remaining Work](r-and-d/monero-integration/preliminary-study/technical-report.md)
-    * [Evidence Ledger](r-and-d/monero-integration/preliminary-study/evidence-ledger.md)
-  * [Linked Local Monero–Ergo Roundtrip](r-and-d/monero-integration/roundtrip/README.md)
-    * [Implementation and Results](r-and-d/monero-integration/roundtrip/technical-report.md)
-    * [Validation Map](r-and-d/monero-integration/roundtrip/validation.md)
-    * [Source and Replay](r-and-d/monero-integration/roundtrip/source/README.md)
+* [Monero Integration](r-and-d/monero-integration-plan.md)
+  * [CLSAG Signing and Transaction Construction](r-and-d/monero-signing.md)

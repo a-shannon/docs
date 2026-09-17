@@ -1,1 +1,0 @@
-{"extends":"./tsconfig.integration.json","include":["integration.ts","integration.spec.ts","gate-fixture.config.ts","gate-fixture.spec.ts","lifecycle-fixture.config.ts","lifecycle-fixture.spec.ts","transport-fixture.config.ts","transport-fixture.spec.ts"]}
