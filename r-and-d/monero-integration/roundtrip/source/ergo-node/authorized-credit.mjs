@@ -10,6 +10,7 @@ import {stateContext} from './authority-fixture.mjs';
 import {createCreditCommittee} from './credit-committee.mjs';
 import {snapshotCreditSigning} from '../guard-service/src/deposit/moneroCreditSigner.mjs';
 import {verifyCreditOutputs} from './credit-output-policy.mjs';
+import {verifyCreditEvent} from './credit-event-policy.mjs';
 import {retainCreditRecord,recoverCredit} from './credit-recovery.mjs';
 import {canonicalAssignment,committeeConfigDigest} from '../guard-service/src/db/moneroCreditAssignment.mjs';
 import {makeIndependentDepositProviders,independentlyDecideDeposit} from '../consumer/independentDepositSource.mjs';
@@ -84,9 +85,7 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
     const triggers=inputs.filter(b=>b.ergo_tree().to_base16_bytes()===d.contracts.EventTrigger.tree);assert.equal(triggers.length,1);
     const trigger=JSON.parse(triggers[0].to_json());assert.equal(trigger.boxId,receipt.trigger.boxId);
     assert.equal(hex(triggers[0]),hex(wasm.ErgoBox.from_json(text(receipt.trigger))));
-    const event=extractor.extractBoxData(trigger);assert(event);
-    for(const key of ['sourceTxId','fromChain','toChain','fromAddress','toAddress','amount','bridgeFee','networkFee','sourceChainTokenId','targetChainTokenId','sourceBlockId'])assert.equal(event[key],expected[key],'Trigger '+key);
-    assert.equal(event.sourceChainHeight,expected.height);assert.equal(event.eventId,expected.requestId);assert.equal(event.WIDsCount,2);
+    const event=extractor.extractBoxData(trigger);verifyCreditEvent(event,expected);
     const wids=receipt.commitments.map(c=>c.WID);assert.deepEqual(wids,d.watchers.map(w=>w.WID));
     assert.equal(Buffer.from(triggers[0].register_value(4).to_byte_array()).toString('hex'),Buffer.from(require('blakejs').blake2b(Buffer.concat(wids.map(w=>Buffer.from(w,'hex'))),undefined,32)).toString('hex'));
     assert.deepEqual(trigger.assets,[{tokenId:d.tokens.RWT,amount:20}]);

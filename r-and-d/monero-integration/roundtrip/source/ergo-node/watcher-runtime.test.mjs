@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {canonicalObservation,openWatcherStore,loadWatcherRuntime} from './watcher-runtime.mjs';
+import {verifyCreditEvent} from './credit-event-policy.mjs';
 const observation={sourceTxId:'11'.repeat(32),fromChain:'monero',toChain:'ergo',fromAddress:'source',toAddress:'target',amount:'100',bridgeFee:'2',networkFee:'3',sourceChainTokenId:'XMR',targetChainTokenId:'22'.repeat(32),sourceBlockId:'33'.repeat(32),height:3,requestId:'44'.repeat(32)};
 test('canonical observation keeps the complete commitment preimage and rejects missing fields',()=>{assert.deepEqual(canonicalObservation({...observation,irrelevant:true}),observation);for(const field of Object.keys(observation)){const candidate={...observation};delete candidate[field];assert.throws(()=>canonicalObservation(candidate));}});
 test('independent durable watcher stores reject request and observation conflicts',()=>{const directory=fs.mkdtempSync(path.join(os.tmpdir(),'watcher-store-'));const filename=path.join(directory,'one.sqlite');let store=openWatcherStore(filename);assert.deepEqual(store.observe({proof:'first'},observation),observation);store.close();store=openWatcherStore(filename);assert.deepEqual(store.observe({proof:'first'},observation),observation);assert.throws(()=>store.observe({proof:'different'},observation),/Conflicting watcher request/);assert.throws(()=>store.observe({proof:'first'},{...observation,amount:'101'}),/Conflicting watcher observation/);const independent=openWatcherStore(path.join(directory,'two.sqlite'));assert.deepEqual(independent.observe({proof:'different'},observation),observation);store.close();independent.close();fs.rmSync(directory,{recursive:true});});
@@ -37,7 +38,7 @@ test('actual pinned trigger extractor and guard comparison reject only a changed
   let EventTriggerExtractor;
   try{({default:EventTriggerExtractor}=await import(pathToFileURL(path.join(dependencyRoot,'node_modules/@rosen-bridge/watcher-data-extractor/dist/extractor/eventTriggerExtractor.js'))));}finally{hooks.deregister();}
   const expected={...observation,fromAddress:'rosen-monero-output:v1:'+'12'.repeat(32)},changedOrigin='rosen-monero-output:v1:'+'13'.repeat(32),boxes=new runtime.Boxes({});
-  const toBox=value=>wasm.ErgoBox.from_box_candidate(boxes.createTriggerEvent(1000000n,3,[WID],value,10n),wasm.TxId.from_str('ab'.repeat(32)),0);
+  const toBox=value=>wasm.ErgoBox.from_box_candidate(boxes.createTriggerEvent(1000000n,3,[WID,'67'.repeat(32)],value,10n),wasm.TxId.from_str('ab'.repeat(32)),0);
   const original=toBox(expected),mutated=toBox({...expected,fromAddress:changedOrigin});
   const r5=box=>box.register_value(5).to_coll_coll_byte().map(value=>Buffer.from(value).toString('hex')),originalR5=r5(original),mutatedR5=r5(mutated);
   assert.notEqual(mutatedR5[3],originalR5[3]);
@@ -46,5 +47,13 @@ test('actual pinned trigger extractor and guard comparison reject only a changed
   const decode=box=>extractor.extractBoxData(JSON.parse(box.to_json())),decoded=decode(original),mutatedDecoded=decode(mutated);
   assert(decoded);assert(mutatedDecoded);assert.equal(decoded.fromAddress,expected.fromAddress);assert.equal(mutatedDecoded.fromAddress,changedOrigin);
   for(const field of ['sourceTxId','fromChain','toChain','toAddress','amount','bridgeFee','networkFee','sourceChainTokenId','targetChainTokenId','sourceBlockId','sourceChainHeight','eventId','WIDsCount','WIDsHash'])assert.deepEqual(mutatedDecoded[field],decoded[field],'Unexpected decoded change in '+field);
-  assert.throws(()=>assert.equal(mutatedDecoded.fromAddress,expected.fromAddress,'Trigger fromAddress'),/Trigger fromAddress/);
+  const expectedEvent={...expected,requestId:Buffer.from(require('blakejs').blake2b(Buffer.from(expected.sourceTxId),undefined,32)).toString('hex')};
+  verifyCreditEvent(decoded,expectedEvent);
+  assert.throws(()=>verifyCreditEvent(mutatedDecoded,expectedEvent),/Trigger fromAddress/);
+  // Exercise the shared guard predicate, not a test-local copy of its checks.
+  for(const field of ['sourceTxId','fromChain','toChain','fromAddress','toAddress','amount','bridgeFee','networkFee','sourceChainTokenId','targetChainTokenId','sourceBlockId','sourceChainHeight','eventId','WIDsCount']){
+    const value=decoded[field],changed={...decoded,[field]:typeof value==='number'?value+1:value+'x'};
+    assert.throws(()=>verifyCreditEvent(changed,expectedEvent),new RegExp('Trigger '+field),field);
+  }
+  assert.throws(()=>verifyCreditEvent(undefined,expectedEvent),/Trigger event/);
 });

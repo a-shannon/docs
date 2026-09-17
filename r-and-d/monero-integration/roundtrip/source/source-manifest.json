@@ -1,8 +1,8 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 397,
-  "aggregateSha256": "35c1e0da40e42bbcda93fb1347e962c01048d2e2c95547e87582837bec1eaed7",
+  "fileCount": 398,
+  "aggregateSha256": "e563554df703006f2eb78246d47725c6f460ccc6301290fa230ce0f5846a52b6",
   "files": [
     {
       "path": "README.md",
@@ -481,8 +481,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 14196,
-      "sha256": "a5b978dc125cbcfb4b88098368ac194e471689392b60ef438b0cc4a4540a152d"
+      "bytes": 13908,
+      "sha256": "9243c848b561f2e7a50708d3cc088789775b1209134accec0f9a6692ab1b2a2b"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -533,6 +533,11 @@
       "path": "ergo-node/credit-committee.test.mjs",
       "bytes": 4627,
       "sha256": "881970ea4007a72cef97d6f46800515b02daec156de2e7051555568bc692db4c"
+    },
+    {
+      "path": "ergo-node/credit-event-policy.mjs",
+      "bytes": 664,
+      "sha256": "c365d3cc7abaf4d6264b31e0ce832eb07195171f8ed15ad5fa0e7bcd404af150"
     },
     {
       "path": "ergo-node/credit-output-policy.mjs",
@@ -616,8 +621,8 @@
     },
     {
       "path": "ergo-node/watcher-runtime.test.mjs",
-      "bytes": 9108,
-      "sha256": "a0c294c256dadae9e2a6ade5a69bf69025ad40e585eb5a8c55f3ef2755a6cdc6"
+      "bytes": 9930,
+      "sha256": "7d6eda904fbcc9116de7d95890e8ca57e436c7098672fa56c9bf525294a3a8bb"
     },
     {
       "path": "ergo-node/watcher-setup.mjs",
