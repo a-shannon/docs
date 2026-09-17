@@ -11,7 +11,7 @@ adapter and operational qualification.
 
 The review has two entry points: this RCS requirements and component map, and
 [CLSAG signing and transaction construction](monero-signing.md). The complete
-[implementation, tests and reproduction instructions](https://github.com/a-shannon/docs/tree/6e60829bc6be552b89ba9861bbfd0ea294122b9d/r-and-d/monero-integration/roundtrip)
+[implementation, tests and reproduction instructions](https://github.com/a-shannon/docs/tree/10b743b4f93e5e78573d50861ed8b90219124b09/r-and-d/monero-integration/roundtrip)
 remain available in the experimental branch. Its generated execution evidence
 and standalone harness are separate from the proposed documentation change.
 
