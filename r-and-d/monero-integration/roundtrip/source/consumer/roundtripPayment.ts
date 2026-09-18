@@ -9,10 +9,12 @@ import type {LocalMonero} from './localMonero';
 import type {DataSource} from '@rosen-bridge/extended-typeorm';
 
 const digest=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
-async function nativeObserve(binary:string,sha256:string,directory:string,expectationDigest:string):Promise<any>{
+export async function nativeObserve(binary:string,sha256:string,directory:string,expectationDigest:string,port?:string):Promise<any>{
   if(digest(readFileSync(binary))!==sha256||!/^[0-9a-f]{64}$/.test(expectationDigest))throw Error('Observation executable anchor');
   return new Promise((resolve,reject)=>{
-    const child=spawn(binary,['observe',directory,expectationDigest],{windowsHide:true,shell:false,stdio:['ignore','pipe','pipe']});
+    if(port!==undefined&&!/^[1-9][0-9]{0,4}$/.test(port))throw Error('Observation endpoint');
+    const child=spawn(binary,['observe',directory,expectationDigest],{windowsHide:true,shell:false,stdio:['ignore','pipe','pipe'],
+      ...(port===undefined?{}:{env:{...process.env,MONERO_LOCAL_RPC_PORT:port}})});
     let output=Buffer.alloc(0),failed=false;const timer=setTimeout(()=>{failed=true;child.kill();},30000);
     child.once('error',()=>{failed=true;});child.stderr.resume();
     child.stdout.on('data',chunk=>{output=Buffer.concat([output,chunk]);if(output.length>4096){failed=true;child.kill();}});

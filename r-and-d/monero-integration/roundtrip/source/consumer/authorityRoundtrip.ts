@@ -16,11 +16,14 @@ import EventSerializer from '../guard-service/src/event/eventSerializer';
 import {setFixtureChain} from './resolver';
 import {verifyReturnAuthority} from '../ergo-node/return-authority.mjs';
 import {decodeNativeSelection} from '../guard-service/src/withdrawal/moneroWithdrawalSelection';
+import {captureWithdrawalFeeAuthority,effectiveWithdrawalFees} from '../ergo-node/v2-withdrawal-authority.mjs';
+import {completeRewardLifecycle,confirmedRewardChain} from './rewardLifecycle';
 
 /** Same reviewed withdrawal owner/lifecycle; its input is the actual two-watcher return. */
-export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment,backingClaim,onAccounting,onReserved,afterSubmission}:any){
+export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment,backingClaim,feeAuthority,onAccounting,onReserved,afterSubmission,completeReward}:any){
   assert(onAccounting===undefined || typeof onAccounting==='function');
   assert(onReserved===undefined || typeof onReserved==='function');assert(afterSubmission===undefined || typeof afterSubmission==='function');
+  assert(config.v2Return!==true||typeof completeReward==='function','V2 return requires confirmed reward completion');
   const verifySource=()=>verifyReturnAuthority({returnReceipt,redemption,deployment,terms:returnTerms});
   const trusted=await verifySource(),returnTx=trusted.transaction,returnBox=trusted.trigger,event=trusted.event;
   assert.equal(event.WIDsCount,2);
@@ -28,7 +31,12 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
   const projectedEvent=EventSerializer.fromEntity({...event,height:returnTx.inclusionHeight});
   assert.equal(EventSerializer.getId(projectedEvent),event.eventId);
   const data=terms();data.source={event:projectedEvent,triggerTransactionId:returnTx.id,triggerBoxId:returnBox.boxId,wids:returnReceipt.commitments.map((row:any)=>row.WID)};
-  data.profile.configurationId='local-authority-roundtrip-v1';
+  const capturedFee=config.v2Return===true?await captureWithdrawalFeeAuthority(deployment,event):undefined;
+  if(capturedFee){assert.deepEqual(capturedFee,feeAuthority,'Return fee policy changed');
+    data.profile.configurationId='minimum-fee:'+capturedFee.digest;
+    data.profile.fees=Object.fromEntries(Object.entries(capturedFee.feeConfig).map(([key,value])=>[key,BigInt(value as string)])) as typeof data.profile.fees;
+  }else data.profile.configurationId='local-authority-roundtrip-v1';
+  const charges=effectiveWithdrawalFees(event,Object.fromEntries(Object.entries(data.profile.fees).map(([key,value])=>[key,String(value)])));
   data.profile.tokens[0].ergo.tokenId=deployment.tokens.Asset;data.profile.tokens[0].ergo.name='Local rsXMR';data.profile.maxMinerFeeAtomic='1000000000000';
   await configureFixtureTokens(data.profile.tokens);const chain=await MoneroChain.create(data.profile.tokens);setFixtureChain(chain);
   ChainHandler.initializeScoped(new Map([['monero',chain]]),undefined!);
@@ -39,7 +47,7 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
     const beforeConstruction=await verifySource();assert.deepEqual(beforeConstruction.event,event);assert.equal(beforeConstruction.trigger.boxId,returnBox.boxId);
     const owner=await launchDistributedNative(vault,request,{database,clock:()=>1000n,leaseDuration:1000000n,authority,backingClaim},timestamp);
     if(onReserved)await onReserved(structuredClone(owner.anchor),owner.counts());
-    assert(owner.disposition.inputReferences.includes(source.deposit.outputKey));assert.equal(owner.disposition.recipientAtomic,'500000000');assert(await verify(owner.transaction));
+    assert(owner.disposition.inputReferences.includes(source.deposit.outputKey));assert.equal(owner.disposition.recipientAtomic,charges.netAtomic);assert(await verify(owner.transaction));
     const selection=decodeNativeSelection(owner.anchor.reservation.selectionBytes);
     const accounting={reservationId:owner.reservationId,proposalId:owner.transaction.txId,redemptionTxId:redemption.txId,
       inputs:selection.inputs.map(input=>({txId:input.txid,outputIndex:Number(input.outputIndex),publicKey:input.publicKey,amountAtomic:input.amount})),
@@ -70,13 +78,30 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
     assert.deepEqual(await state.database!.dataSource.query('SELECT state FROM monero_payment_input'),[{state:'spent'},{state:'spent'}]);
     await TransactionProcessor.processTransactions();assert.equal(payment.counts().signCalls,1);assert.equal(payment.counts().submissions,1);
     assert.deepEqual((await node.call('/is_key_image_spent',{key_images:[source.observation.keyImage]})).spent_status,[1]);
-    const scan=payment.observations().at(-1);assert.equal(scan.recipientAtomic,'500000000');
+    const scan=payment.observations().at(-1);assert.equal(scan.recipientAtomic,charges.netAtomic);
     accounting.settlement={txId:final.finalTxId,proposalId:owner.transaction.txId,reservationId:owner.reservationId,
       inputAtomic:scan.inputAtomic,recipientAtomic:scan.recipientAtomic,minerFeeAtomic:scan.feeAtomic,
       changeAtomic:scan.changeAtomic,changePublicKey:scan.changeOutputKey,rewardState:storedEvent.status};
     if(onAccounting)await onAccounting(structuredClone(accounting));
+    let rewardSummary;
+    if(completeReward){
+      const reward=await completeReward({anchor:structuredClone(owner.anchor),paymentTxId:final.finalTxId});
+      const rewardChain=confirmedRewardChain(reward.chain);
+      ChainHandler.initializeScoped(new Map([['monero',chain],['ergo',rewardChain]]),restarted);
+      const lifecycle=await completeRewardLifecycle({database:state.database!,transaction:reward.transaction,chain:rewardChain,receipt:reward.receipt});
+      assert.deepEqual(await completeRewardLifecycle({database:state.database!,transaction:reward.transaction,chain:rewardChain,receipt:reward.receipt}),lifecycle);
+      const distributed=reward.receipt.outputs.filter((box:any)=>box.ergoTree!==deployment.contracts.Lock.tree)
+        .flatMap((box:any)=>box.assets).filter((asset:any)=>asset.tokenId===deployment.tokens.Asset)
+        .reduce((sum:bigint,asset:any)=>sum+BigInt(asset.amount),0n);
+      assert.equal(distributed,BigInt(charges.bridgeFee)+BigInt(charges.networkFee));
+      accounting.settlement.rewardState=lifecycle.eventStatus;
+      accounting.settlement.reward={txId:reward.receipt.id,paymentTxId:final.finalTxId,redemptionTxId:redemption.txId,
+        assetId:deployment.tokens.Asset,distributedFeeTokenAtomic:String(distributed)};
+      if(onAccounting)await onAccounting(structuredClone(accounting));
+      rewardSummary={...accounting.settlement.reward,...lifecycle,policyDigest:reward.policyDigest,snapshotDigest:reward.snapshot.digest,controls:reward.controls};
+    }
     return {sourceEventId:request.eventId,proposalId:owner.transaction.txId,finalTxId:final.finalTxId,byteDigest:final.byteDigest,...scan,
-      accounting,
+      accounting,feeAuthority:capturedFee,charges,...(rewardSummary?{reward:rewardSummary}:{}),
       controls:{separateHolderCount:4,nativeThreshold:2,selected:[1,2],shares:owner.counts().shares,lostSubmissionReplyRecovered:true,
         originalProposalPreserved:true,sourceOutputSpent:true,settlement:'settled',...payment.counts()}};
   }finally{lifecycleState.database=undefined;await closeAgreementDatabase();}

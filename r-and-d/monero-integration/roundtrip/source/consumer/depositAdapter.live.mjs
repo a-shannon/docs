@@ -231,8 +231,10 @@ test('actual source reaches watcher commitments and four fresh guards on the iso
     if(config.processSimulation===true){
       const {runProcessScenario}=await import('./processAdapterScenario.mjs');
       const processResult=await runProcessScenario({directory,deployment,candidate,sourceFaults,
-        sourceDescriptor:{endpoints,genesis,nativeOptions,configuration,deliveryDirectory:inbox,certificateDirectory:inbox},
-        proofFile,certificateFile,...(config.v2Return===true?{returnRuntime:{node:primary,vault,source:inspected}}:{})});
+        sourceDescriptor:{endpoints,genesis,nativeOptions,configuration,deliveryDirectory:inbox,certificateDirectory:inbox,
+          feeAuthority:{nodeUrl:'http://127.0.0.1:19051',minFeeNFT:deployment.minimumFee.nft,ergoTokenId:deployment.tokens.Asset,
+            expectedErgoTree:deployment.minimumFee.ergoTree,minConfirmations:deployment.minimumFee.minConfirmations}},
+        proofFile,certificateFile,...(config.v2Return===true?{returnRuntime:{node:primary,vault,source:inspected,syncSource:()=>replicate(primary,replica)}}:{})});
       writeFileSync(join(directory,'process-result.json'),JSON.stringify(processResult,null,2),{flag:'wx'});
       console.log(JSON.stringify(processResult));return;
     }

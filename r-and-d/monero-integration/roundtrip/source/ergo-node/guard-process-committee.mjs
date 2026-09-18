@@ -68,7 +68,7 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
     assert.equal(new Set(actors.map(a=>a.pid)).size,4);}
   catch(error){await Promise.allSettled(actors.filter(Boolean).map(a=>a.close()));throw error;}
   const handle={
-    async sign(snapshot,{indices=[0,1,2,3],pausePartials=false,delayMs=0,duplicate=false,drop=[],completionTimeoutMs=60000}={}){
+    async sign(snapshot,{indices=[0,1,2,3],pausePartials=false,delayMs=0,duplicate=false,drop=[],completionTimeoutMs=60000,reward}={}){
       assert(!closed&&!run&&!auditing,'Committee unavailable');assert(Array.isArray(indices)&&indices.length>=3&&indices.length<=4&&new Set(indices).size===indices.length);
       assert(indices.every(i=>Number.isInteger(i)&&i>=0&&i<4&&!actors[i].closed));
       assert(Number.isSafeInteger(delayMs)&&delayMs>=0&&delayMs<=1000);assert.equal(typeof duplicate,'boolean');
@@ -78,7 +78,7 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
       run={session,snapshot:structuredClone(snapshot),indices:[...indices],queued:new Set(),started:false,failed:false,reject,
         delayMs,duplicate,drop:new Set(drop),completionTimeoutMs,timer:undefined};
       try{
-        const jobs=indices.map(i=>actors[i].request('sign',{session,snapshot:run.snapshot,indices:run.indices,pausePartials},{timeoutMs}));
+        const jobs=indices.map(i=>actors[i].request('sign',{session,snapshot:run.snapshot,indices:run.indices,pausePartials,...(reward===undefined?{}:{reward:structuredClone(reward)})},{timeoutMs}));
         const results=await Promise.race([Promise.all(jobs),failed]);
         assert.equal(new Set(results.map(r=>r.signedHex)).size,1,'Signed bytes disagree');assert(results.every(r=>r.txId===snapshot.txId));
         counts.completedGuards=results.length;
@@ -91,6 +91,14 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
     async stats(indices=[0,1,2,3]){return Promise.all(indices.map(i=>actors[i].request('stats',null,{timeoutMs})));},
     async observeAssignment(request){return Promise.all(actors.map(a=>a.request('observe',request,{timeoutMs})));},
     async assertAssigned(request){return Promise.all(actors.map(a=>a.request('assertAssigned',request,{timeoutMs})));},
+    rewardState(request,anchor){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+      try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('rewardState',{request,anchor},{timeoutMs})));
+        const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
+        current();return matching(rows.map(row=>row.value));}finally{auditing=false;}});},
+    verifyReward(snapshot,reward){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+      try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('verifyReward',{snapshot,reward},{timeoutMs})));
+        const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
+        current();return matching(rows.map(row=>row.value));}finally{auditing=false;}});},
     async verifyFresh(snapshot){return Promise.all(actors.map(a=>a.request('verify',snapshot,{timeoutMs})));},
     async auditBacking(snapshot,assignment){assert(!closed&&!run&&!auditing,'Committee unavailable');auditing=true;
       try{const results=await Promise.allSettled(actors.map(a=>a.request('audit',{snapshot,assignment},{timeoutMs})));

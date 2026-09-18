@@ -88,13 +88,14 @@ separately covers two watchers, four guards, source faults and persistent credit
 ## Remaining decisions
 
 Historical pre-fix/post-fix wallet replay and production endpoint/custody
-qualification remain unperformed here. Final independent review of the Ergo
-multisig hook is still pending; its [review packet](multisig-review.md) identifies
-the exact candidate and replayable tests.
+qualification remain unperformed here. The independent local review of the Ergo
+multisig hook is complete; its [review packet](multisig-review.md) identifies
+the exact candidate, corrected overlap case and replayable tests.
 
 The [complete local V2 return](adapter-qualification.md#complete-local-v2-roundtrip)
 now exercises exact V2 backing, a persistent single-withdrawal reservation,
-fresh source checks by all four guards, and the recoverable native Monero payout.
+fresh source checks by all four guards, the recoverable native Monero payout
+and confirmed Ergo reward distribution.
 This closes the local deposit-to-return composition; it does not expand the
 historical vulnerability coverage claimed above. Production contracts, service
 deployment and testnet rollout remain integration work for Rosen.

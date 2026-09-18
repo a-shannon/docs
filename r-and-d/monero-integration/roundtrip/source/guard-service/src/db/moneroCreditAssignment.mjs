@@ -122,6 +122,17 @@ function settlementBytes(value){
   shape(value,names,'settlement');for(const name of names)hex(value[name],32,'settlement:'+name);
   const bytes=canonicalAssignment(value);return {bytes,digest:hash(bytes)};
 }
+function rewardBytes(original,settlement,value){
+  shape(value,['binding','domain','creditAssignmentDigest','settlement','paymentTxId','paymentByteDigest','rewardTransactionId','rewardPolicyDigest'],'reward');
+  shape(value.binding,['creditTransactionDigest'],'reward:binding');
+  hex(value.binding.creditTransactionDigest,32,'reward:credit-transaction-digest');
+  if(value.domain!=='rosen-monero-reward-assignment-v1')throw Error('reward:domain');
+  for(const name of ['creditAssignmentDigest','paymentTxId','paymentByteDigest','rewardTransactionId','rewardPolicyDigest'])hex(value[name],32,'reward:'+name);
+  if(value.creditAssignmentDigest!==hash(canonicalAssignment(original)))throw Error('reward:credit-assignment');
+  const retained=settlementBytes(value.settlement);
+  if(retained.bytes!==settlement.bytes || retained.digest!==settlement.digest)throw Error('reward:settlement');
+  const bytes=canonicalAssignment(value);return {bytes,digest:hash(bytes)};
+}
 
 /** Guard-owned durable anti-equivocation state. Caller owns source/payment verification.
  * No release, epoch migration, standalone signing authority, or rollback detection. */
@@ -151,8 +162,9 @@ export class MoneroCreditAssignment {
           CREATE TABLE claims(obligationId TEXT PRIMARY KEY,requestDigest TEXT NOT NULL,request TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('assigned','invalidated')),reason TEXT NOT NULL,settlementDigest TEXT);
           CREATE TABLE outputs(economicId TEXT PRIMARY KEY,obligationId TEXT NOT NULL REFERENCES claims(obligationId));
           CREATE TABLE nullifiers(nullifierId TEXT PRIMARY KEY,obligationId TEXT NOT NULL UNIQUE REFERENCES claims(obligationId));
-          CREATE TABLE settlements(obligationId TEXT PRIMARY KEY REFERENCES claims(obligationId),settlementDigest TEXT NOT NULL,settlement TEXT NOT NULL);`);
-        db.prepare('INSERT INTO metadata VALUES(1,2,?,0)').run(bytes);
+          CREATE TABLE settlements(obligationId TEXT PRIMARY KEY REFERENCES claims(obligationId),settlementDigest TEXT NOT NULL,settlement TEXT NOT NULL,rewardDigest TEXT);
+          CREATE TABLE rewards(obligationId TEXT PRIMARY KEY REFERENCES settlements(obligationId),rewardDigest TEXT NOT NULL UNIQUE,reward TEXT NOT NULL);`);
+        db.prepare('INSERT INTO metadata VALUES(1,3,?,0)').run(bytes);
       });
       this.#readTransaction(() => this.#verify());
     } catch (error) { db.close(); this.#closed=true; throw error; }
@@ -165,7 +177,9 @@ export class MoneroCreditAssignment {
   #verify() {
     this.#live();
     const m=this.#db.prepare('SELECT * FROM metadata').all();
-    if (m.length!==1 || m[0].singleton!==1 || m[0].version!==2 || m[0].config!==this.#configBytes ||
+    if(m.length!==1 || m[0].singleton!==1)throw Error('custody:config-drift');
+    if(m[0].version!==3)throw Error('custody:version-unsupported');
+    if (m[0].config!==this.#configBytes ||
         !Number.isSafeInteger(m[0].revision) || m[0].revision<0) throw Error('custody:config-drift');
     if (this.#db.prepare('PRAGMA quick_check').get().quick_check!=='ok' ||
         this.#db.prepare('PRAGMA foreign_key_check').all().length) throw Error('custody:integrity');
@@ -173,9 +187,10 @@ export class MoneroCreditAssignment {
     const outputs=this.#db.prepare('SELECT * FROM outputs ORDER BY economicId').all();
     const nullifiers=this.#db.prepare('SELECT * FROM nullifiers ORDER BY nullifierId').all();
     const settlements=this.#db.prepare('SELECT * FROM settlements').all();
+    const rewards=this.#db.prepare('SELECT * FROM rewards').all();let checkedRewards=0;
     for (const c of claims) {
-      const parsed=JSON.parse(c.request), request=requestBytes({binding:parsed.binding,outputs:parsed.outputs.map(({sourceNetwork,publicKey})=>({sourceNetwork,publicKey})),
-        ...(Object.hasOwn(parsed,'backing')?{backing:parsed.backing}:{})},this.#config,this.#committeeDigest);
+      const parsed=JSON.parse(c.request),original={binding:parsed.binding,outputs:parsed.outputs.map(({sourceNetwork,publicKey})=>({sourceNetwork,publicKey})),
+        ...(Object.hasOwn(parsed,'backing')?{backing:parsed.backing}:{})},request=requestBytes(original,this.#config,this.#committeeDigest);
       if (request.bytes!==c.request || request.digest!==c.requestDigest || request.binding.obligationId!==c.obligationId ||
           !['assigned','invalidated'].includes(c.status) || (c.status==='assigned' ? c.reason!=='' : !c.reason)) throw Error('custody:claim-integrity');
       const actual=outputs.filter(o=>o.obligationId===c.obligationId).map(o=>o.economicId);
@@ -187,10 +202,20 @@ export class MoneroCreditAssignment {
       else{
         hex(c.settlementDigest,32,'custody:settlement-digest');
         if(!request.nullifierId || rows.length!==1)throw Error('custody:settlement-integrity');
-        const stored=settlementBytes(JSON.parse(rows[0].settlement));
+        const settlement=JSON.parse(rows[0].settlement),stored=settlementBytes(settlement);
         if(stored.bytes!==rows[0].settlement || stored.digest!==rows[0].settlementDigest || stored.digest!==c.settlementDigest)throw Error('custody:settlement-integrity');
+        const rewardRows=rewards.filter(row=>row.obligationId===c.obligationId);
+        if(rows[0].rewardDigest===null){if(rewardRows.length)throw Error('custody:reward-integrity');}
+        else{
+          hex(rows[0].rewardDigest,32,'custody:reward-digest');
+          if(rewardRows.length!==1)throw Error('custody:reward-integrity');
+          const retained=rewardBytes(original,stored,JSON.parse(rewardRows[0].reward));
+          if(retained.bytes!==rewardRows[0].reward || retained.digest!==rewardRows[0].rewardDigest || retained.digest!==rows[0].rewardDigest)throw Error('custody:reward-integrity');
+          checkedRewards++;
+        }
       }
     }
+    if(checkedRewards!==rewards.length)throw Error('custody:reward-integrity');
   }
   #transaction(fn) {
     this.#writable(); this.#db.exec('BEGIN IMMEDIATE');
@@ -283,7 +308,7 @@ export class MoneroCreditAssignment {
         if(previous.settlement!==s.bytes || previous.settlementDigest!==s.digest)throw Error('settlement:conflict');
       }else{
         if(mode!=='reserve')throw Error('settlement:missing');
-        this.#db.prepare('INSERT INTO settlements VALUES(?,?,?)').run(r.binding.obligationId,s.digest,s.bytes);
+        this.#db.prepare('INSERT INTO settlements(obligationId,settlementDigest,settlement,rewardDigest) VALUES(?,?,?,NULL)').run(r.binding.obligationId,s.digest,s.bytes);
         this.#db.prepare('UPDATE claims SET settlementDigest=? WHERE obligationId=?').run(s.digest,r.binding.obligationId);
         this.#bump();
       }
@@ -296,6 +321,49 @@ export class MoneroCreditAssignment {
   assertSettlement(request,settlement){return this.#settlement(request,settlement,'assert');}
   /** Retained observation after invalidation never restores signing authority. */
   observeSettlement(request,settlement){return this.#settlement(request,settlement,'observe');}
+  #rewardContext(request,settlement){
+    if(this.#config.backingPolicy!=='single-deposit-v2')throw Error('reward:profile');
+    const r=requestBytes(request,this.#config,this.#committeeDigest),s=settlementBytes(settlement);
+    if(!r.nullifierId)throw Error('reward:backing-required');return {r,s};
+  }
+  #observeReward(r,s){
+    const observation=this.#observe(r),retained=this.#db.prepare('SELECT * FROM settlements WHERE obligationId=?').get(r.binding.obligationId);
+    if(!retained)throw Error('settlement:missing');
+    if(retained.settlement!==s.bytes || retained.settlementDigest!==s.digest)throw Error('settlement:conflict');
+    if(retained.rewardDigest===null)return {claimStatus:observation.status,result:{status:'unassigned'}};
+    const row=this.#db.prepare('SELECT * FROM rewards WHERE obligationId=?').get(r.binding.obligationId);
+    if(!row || row.rewardDigest!==retained.rewardDigest)throw Error('custody:reward-integrity');
+    return {claimStatus:observation.status,result:{status:'assigned',assignment:JSON.parse(row.reward)}};
+  }
+  /** Durable observation only. It never creates or restores reward authority. */
+  observeReward(request,settlement){
+    const {r,s}=this.#rewardContext(request,settlement);
+    return this.#readTransaction(()=>{this.#verify();return this.#observeReward(r,s).result;});
+  }
+  reserveReward(request,settlement,reward){
+    this.#writable();const {r,s}=this.#rewardContext(request,settlement),expected=rewardBytes(request,s,reward);
+    return this.#transaction(()=>{
+      this.#verify();const observed=this.#observeReward(r,s);
+      if(observed.claimStatus!=='assigned')throw Error('assignment:invalidated');
+      if(observed.result.status==='assigned'){
+        if(canonicalAssignment(observed.result.assignment)!==expected.bytes)throw Error('reward:conflict');
+        return {status:'existing'};
+      }
+      this.#db.prepare('INSERT INTO rewards VALUES(?,?,?)').run(r.binding.obligationId,expected.digest,expected.bytes);
+      if(this.#db.prepare('UPDATE settlements SET rewardDigest=? WHERE obligationId=? AND rewardDigest IS NULL').run(expected.digest,r.binding.obligationId).changes!==1)throw Error('reward:conflict');
+      this.#bump();return {status:'assigned'};
+    });
+  }
+  assertReward(request,settlement,reward){
+    const {r,s}=this.#rewardContext(request,settlement),expected=rewardBytes(request,s,reward);
+    return this.#readTransaction(()=>{
+      this.#verify();const observed=this.#observeReward(r,s);
+      if(observed.claimStatus!=='assigned')throw Error('assignment:invalidated');
+      if(observed.result.status!=='assigned')throw Error('reward:missing');
+      if(canonicalAssignment(observed.result.assignment)!==expected.bytes)throw Error('reward:conflict');
+      return observed.result;
+    });
+  }
   invalidate(obligationId, reason) {
     this.#writable();
     text(obligationId,'obligationId'); text(reason,'reason');
@@ -321,8 +389,9 @@ export class MoneroCreditAssignment {
       const outputs=this.#db.prepare('SELECT * FROM outputs ORDER BY economicId').all().map(row=>({...row}));
       const nullifiers=this.#db.prepare('SELECT * FROM nullifiers ORDER BY nullifierId').all().map(row=>({...row}));
       const settlements=this.#db.prepare('SELECT * FROM settlements ORDER BY obligationId').all().map(row=>({...row}));
-      return {configDigest:this.#digest,revision,claims:claims.length,outputs:outputs.length,nullifiers:nullifiers.length,settlements:settlements.length,
-        stateDigest:hash(canonicalAssignment({configDigest:this.#digest,revision,claims,outputs,nullifiers,settlements}))};
+      const rewards=this.#db.prepare('SELECT * FROM rewards ORDER BY obligationId').all().map(row=>({...row}));
+      return {configDigest:this.#digest,revision,claims:claims.length,outputs:outputs.length,nullifiers:nullifiers.length,settlements:settlements.length,rewards:rewards.length,
+        stateDigest:hash(canonicalAssignment({configDigest:this.#digest,revision,claims,outputs,nullifiers,settlements,rewards}))};
   }
   close() { if (!this.#closed) { this.#db.close(); this.#closed=true; } }
 }

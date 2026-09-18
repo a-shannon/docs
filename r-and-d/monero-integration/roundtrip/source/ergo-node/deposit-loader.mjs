@@ -20,8 +20,7 @@ function roundtripPort(specifier,parent){
   }
   if(is('event/eventOrder.ts')){
     if(specifier==='../handlers/chainHandler')return sourceURL('consumer/resolver.ts');
-    if(specifier==='../handlers/tokenHandler')return sourceURL('consumer/fixturePorts.ts');
-    if(['../configs/guardsErgoConfigs','./eventBoxes'].includes(specifier))return sourceURL('consumer/isolation.ts');
+    if(['../handlers/tokenHandler','../configs/guardsErgoConfigs','./eventBoxes'].includes(specifier))return sourceURL('consumer/rewardPorts.ts');
   }
   if(is('utils/utils.ts')&&specifier==='./constants')return sourceURL('consumer/fixturePorts.ts');
   if(['handlers/chainHandler.ts','transaction/transactionProcessor.ts','utils/constants.ts'].some(is)&&specifier.startsWith('@rosen-chains/')&&specifier!=='@rosen-chains/abstract-chain')return sourceURL('consumer/lifecycleChainFacts.ts');

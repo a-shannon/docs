@@ -69,7 +69,8 @@ participant.getProver=()=>counted??=(new Proxy(prover(),{get(target,name){const 
 const turn=participant.handleMyTurnForTx.bind(participant);
 participant.handleMyTurnForTx=async txId=>{const run=current();assert(run&&run.txId===txId,'Unbound queued transaction');
   if(!run.queued){run.queued=true;emitProcessEvent('queued',{index,session:run.session,txId});}};
-facade=createMoneroCreditSigner({participant,assignment:ledger,verify:async snapshot=>(await creditVerifier()).verifyForGuard(index,snapshot),requireFreshContribution:true});
+facade=createMoneroCreditSigner({participant,assignment:{assign:request=>active?.reward?active.reward.assign(request):ledger.assign(request),
+  invalidate:(...args)=>ledger.invalidate(...args)},verify:async snapshot=>active?.reward?active.reward.verify(snapshot):(await creditVerifier()).verifyForGuard(index,snapshot),requireFreshContribution:true});
 const nativeBox=hex=>wasm.ErgoBox.sigma_parse_bytes(Buffer.from(hex,'hex'));
 function snapshotFrom(row){
   assert(row&&Object.keys(row).sort().join(',')==='dataHex,digest,inputHex,reducedHex,requiredSign,txId');
@@ -111,12 +112,14 @@ async function withdrawal({request,anchor,context,fresh=false},reserve=false){
 await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configuration,policyDigest:configuration.policyDigest,
   configSha256,custodyPath:fs.realpathSync(custody),
   bootstrapSha256:createHash('sha256').update(bootstrap).digest('hex'),coordinatorIndex:participant.getCurrentTurnInd()},handlers:{
-  async sign({session,snapshot,indices,pausePartials=false}){
+  async sign({session,snapshot,indices,pausePartials=false,reward}){
     current();assert(!auditing,'Active backing audit');assert(!active,'A process hosts one signing attempt; restart before retry');assert.match(session,/^[0-9a-f-]{36}$/);
     assert(Array.isArray(indices)&&indices.length>=3&&indices.length<=4&&new Set(indices).size===indices.length);
     assert(indices.every(i=>Number.isInteger(i)&&i>=0&&i<4)&&indices.includes(index));assert.equal(typeof pausePartials,'boolean');
     const captured=snapshotFrom(snapshot);active={session,txId:captured.txId,indices:[...indices],pausePartials,queued:false,settled:false,seen:new Set()};
-    try{const signed=await facade.sign(captured.reduced,3,captured.inputs,captured.dataInputs);counts.completed++;
+    try{if(reward!==undefined){await prepareWithdrawalPorts();const {openRewardContribution}=await import('./reward-contribution.mjs');
+        active.reward=await openRewardContribution({input:reward,selected,configuration:config,ledger,current});}
+      const signed=await facade.sign(captured.reduced,3,captured.inputs,captured.dataInputs);counts.completed++;
       active.settled=true;return {signedHex:Buffer.from(signed.sigma_serialize_bytes()).toString('hex'),txId:signed.id().to_str(),stats:stats()};}
     catch(error){active.settled=true;facade.close();throw error;}
   },
@@ -137,6 +140,14 @@ await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configu
         readBacking:()=>sources[index].readRetainedBacking(selected.candidate,expected.backing),assertCurrent:current});}finally{auditing=false;}},
   observe(request){current();return ledger.observeAssignment(request);},
   assertAssigned(request){current();return ledger.assertAssigned(request);},
+  rewardState({request,anchor}){current();assert(!auditing&&(!active||active.settled),'Active signing session or backing audit');
+    const original=structuredClone(request),tuple=settlement(structuredClone(anchor));
+    ledger.assertAssigned(original);ledger.assertSettlement(original,tuple);const reward=ledger.observeReward(original,tuple);
+    if(reward.status==='assigned')ledger.assertReward(original,tuple,reward.assignment);return reward;},
+  async verifyReward({snapshot,reward}){current();assert(!auditing&&(!active||active.settled),'Active signing session or backing audit');auditing=true;
+    try{await prepareWithdrawalPorts();const {openRewardContribution}=await import('./reward-contribution.mjs');
+      const contribution=await openRewardContribution({input:structuredClone(reward),selected,configuration:config,ledger,current});
+      const checked=await contribution.verify(snapshotFrom(snapshot));checked.assertCurrent();return checked.assignment;}finally{auditing=false;}},
   reserveWithdrawal(input){return withdrawal(input,true);},
   assertWithdrawal(input){return withdrawal(input);},
   invalidate({obligationId,reason}){current();return ledger.invalidate(obligationId,reason);},

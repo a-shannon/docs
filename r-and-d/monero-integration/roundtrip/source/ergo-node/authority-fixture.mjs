@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {config,sourceRoot} from '../tools/config.mjs';
 import {wasm,rpc,confirmed,tree,digest} from './rosen-node.mjs';
 import {watcherSetupRequests} from './watcher-setup.mjs';
+import {isUnregisteredFundingBox} from './funding-candidates.mjs';
 
 const directory=path.join(config.runtimeDirectory,'ergo-authority');
 fs.mkdirSync(directory,{recursive:true});
@@ -33,10 +34,10 @@ export async function fund(stage,requests,mint){
     const choices=new Map();
     for(const tokenId of needed.keys()){
       const found=await rpc('/blockchain/box/unspent/byTokenId/'+tokenId+'?offset=0&limit=100');
-      for(const box of found)if(box.ergoTree===addressTree)choices.set(box.boxId,box);
+      for(const box of found)if(box.ergoTree===addressTree&&isUnregisteredFundingBox(box))choices.set(box.boxId,box);
     }
     const ordinary=await rpc('/blockchain/box/unspent/byAddress?offset=0&limit=100',address);
-    for(const box of ordinary)if(box.ergoTree===addressTree)choices.set(box.boxId,box);
+    for(const box of ordinary)if(box.ergoTree===addressTree&&isUnregisteredFundingBox(box))choices.set(box.boxId,box);
     const available=wasm.ErgoBoxes.empty();for(const box of choices.values())available.add(wasm.ErgoBox.from_json(JSON.stringify(box)));
     const target=new wasm.Tokens();for(const [id,amount]of needed)target.add(new wasm.Token(wasm.TokenId.from_str(id),wasm.TokenAmount.from_i64(wasm.I64.from_str(String(amount)))));
     const fee=1100000n,total=requests.reduce((n,r)=>n+BigInt(r.value),fee);
@@ -84,7 +85,7 @@ export async function setupAuthorityFixture(){
     }));return {...d,watchers,guardSecrets:privateKeys.guards};
   }
   const fundingAddress=fundingKey().get_address().to_base58(wasm.NetworkPrefix.Testnet),tokens={};
-  for(const [name,amount]of Object.entries({GuardNFT:1,CleanupNFT:1,RWTRepoNFT:1,RepoConfigNFT:1,RWT:1000000,Asset:1000000000,WID1:2,WID2:2})){
+  for(const [name,amount]of Object.entries({GuardNFT:1,CleanupNFT:1,RWTRepoNFT:1,RepoConfigNFT:1,MinFeeNFT:1,RWT:1000000,Asset:1000000000,WID1:2,WID2:2})){
     const issued=await fund('issue-'+name.toLowerCase(),[{address:fundingAddress,value:10000000,assets:[]}],{amount});tokens[name]=issued.mintId;
     console.log(JSON.stringify({stage:'issued-fixture-token',name,txId:issued.txId}));
   }
@@ -94,11 +95,17 @@ export async function setupAuthorityFixture(){
   contracts.Commitment=await compile('Commitment',{EVENT_TRIGGER_SCRIPT_HASH:b64(digest(contracts.EventTrigger.tree)),RWT_REPO_NFT:b64(tokens.RWTRepoNFT),REPO_CONFIG_NFT:b64(tokens.RepoConfigNFT)});
   contracts.Permit=await compile('Permit',{RWT_REPO_NFT:b64(tokens.RWTRepoNFT),COMMITMENT_SCRIPT_HASH:b64(digest(contracts.Commitment.tree))});
   const guardPublicKeys=privateKeys.guards.map(k=>Buffer.from(wasm.SecretKey.dlog_from_bytes(Buffer.from(k,'hex')).get_address().content_bytes()).toString('hex'));
-  const seed={tokens,contracts,fundingAddress};
+  const feeRegisters={R4:wasm.Constant.from_coll_coll_byte(['ergo','monero'].map(v=>Buffer.from(v))).encode_to_base16(),
+    R5:wasm.Constant.from_js([[0,0]]).encode_to_base16(),R6:wasm.Constant.from_js([['100','101']]).encode_to_base16(),
+    R7:wasm.Constant.from_js([['20','21']]).encode_to_base16(),R8:wasm.Constant.from_js([[['0','100'],['0','100']]]).encode_to_base16(),
+    R9:wasm.Constant.from_js([['0','1']]).encode_to_base16()};
+  await fund('deploy-minimum-fee',[{address:fundingAddress,value:10000000,
+    assets:[{tokenId:tokens.MinFeeNFT,amount:1},{tokenId:tokens.Asset,amount:1}],registers:feeRegisters}]);
+  const seed={tokens,contracts,fundingAddress,minimumFee:{nft:tokens.MinFeeNFT,ergoTree:tree(fundingAddress),minConfirmations:1}};
   const watchers=privateKeys.watchers.map((k,i)=>({WID:tokens['WID'+(i+1)],address:wasm.SecretKey.dlog_from_bytes(Buffer.from(k,'hex')).get_address().to_base58(wasm.NetworkPrefix.Testnet)}));
   const setup=watcherSetupRequests({deployment:seed,watchers,wasm});
   const requests=[{address:contracts.GuardSign.address,value:10000000,assets:[{tokenId:tokens.GuardNFT,amount:1}],registers:{R4:wasm.Constant.from_coll_coll_byte(guardPublicKeys.map(k=>Buffer.from(k,'hex'))).encode_to_base16(),R5:wasm.Constant.from_i32_array(Int32Array.from([3,3])).encode_to_base16()}},
-    {address:contracts.Lock.address,value:1000000000,assets:[{tokenId:tokens.Asset,amount:1000000000}]},...setup.requests];
+    {address:contracts.Lock.address,value:1000000000,assets:[{tokenId:tokens.Asset,amount:999999999}]},...setup.requests];
   const done=await fund('deploy-authority',requests),outputs=done.transaction.outputs;
   const withToken=id=>outputs.find(b=>b.assets.some(a=>a.tokenId===id));
   const deployment={...seed,threshold:3,guardPublicKeys,guard:withToken(tokens.GuardNFT),lock:outputs.find(b=>b.ergoTree===contracts.Lock.tree),

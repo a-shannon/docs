@@ -5,6 +5,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {assertExternalWork,freezeInputs} from './launcher-guards.mjs';
 import {captureProofConfiguration,proofArtifactPins} from './proof-pins.mjs';
+import {captureExternalAdapterInputs} from './external-adapter-inputs.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const sha=x=>createHash('sha256').update(x).digest('hex'),ordinal=(a,b)=>a<b?-1:a>b?1:0;
 const args=Object.create(null),allowed=new Set(['config','manifest-sha256','check-only','collect-only','profile']);
@@ -22,6 +23,7 @@ const [spec,testConfig]=profiles[profile];
 const configBytes=readFileSync(args.config),config=JSON.parse(configBytes);
 if(profile==='v2-roundtrip'&&(config.v2Return!==true||config.processSimulation!==true||config.sourceResilience===true))throw Error('V2 roundtrip requires v2Return and processSimulation without sourceResilience');
 if(profile==='deposit-adapter'&&(config.v2Return===true||config.processSimulation!==true))throw Error('Deposit adapter requires processSimulation without v2Return');
+const externalInputs=nodeProfile?captureExternalAdapterInputs(config):undefined;
 for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','ergoRuntime'])if(typeof config[key]!=='string'||!isAbsolute(config[key]))throw Error('Absolute configuration: '+key);
 const work=resolve(config.runtimeDirectory),rosen=resolve(config.rosenRoot);
 const observerFiles=profile!=='baseline'?[[config.observerBinary,config.observerSha256]]:[];
@@ -30,7 +32,7 @@ if(config.collisionExperiment!==undefined){
   observerFiles.push([config.collisionBinary,config.collisionSha256]);
 }
 for(const [file,pin] of observerFiles)if(typeof file!=='string'||!isAbsolute(file)||!/^[0-9a-f]{64}$/.test(pin)||sha(readFileSync(file))!==pin)throw Error('Observer executable pin');
-assertExternalWork(work,[root,rosen,config.ergoRuntime,config.nativeBinary,config.moneroDaemon,args.config,process.execPath]);
+assertExternalWork(work,[root,rosen,config.ergoRuntime,config.nativeBinary,config.moneroDaemon,args.config,process.execPath,...(externalInputs?.paths??[])]);
 if(observerFiles.length)assertExternalWork(work,observerFiles.map(([file])=>file));
 if(existsSync(work))throw Error('New external runtime directory required');
 for(const [pathKey,hashKey]of [['nativeBinary','nativeSha256'],['moneroDaemon','moneroDaemonSha256']])if(!/^[0-9a-f]{64}$/.test(config[hashKey])||sha(readFileSync(config[pathKey]))!==config[hashKey])throw Error('Executable pin: '+pathKey);
@@ -51,6 +53,7 @@ const declaredFiles=[...manifest.files.map(e=>({path:join(root,e.path),sha256:e.
   {path:join(root,'source-manifest.json'),sha256:args['manifest-sha256']},{path:args.config,sha256:sha(configBytes)},
   {path:config.nativeBinary,sha256:config.nativeSha256},{path:config.moneroDaemon,sha256:config.moneroDaemonSha256},{path:process.execPath,sha256:sha(readFileSync(process.execPath))},
   ...observerFiles.map(([path,sha256])=>({path,sha256})),
+  ...(externalInputs?.files??[]),
   ...['package.json','package-lock.json'].map(name=>({path:join(rosen,name),sha256:manifest.files.find(e=>e.path===name).sha256})),
   ...dependencies.map(e=>({path:join(rosen,e.path),sha256:e.sha256}))];
 const verifySourceSet=()=>{if(JSON.stringify(list(root).filter(x=>x!=='source-manifest.json').sort(ordinal))!==JSON.stringify(names))throw Error('Exact source set changed');};
@@ -60,9 +63,11 @@ const verifyProofPins=()=>{
   const actual=JSON.parse(execFileSync('wsl.exe',['-d',config.wslDistro,'--cd','/','--','python3','-c',program,JSON.stringify(proofPins)],{encoding:'utf8',windowsHide:true,timeout:30000,maxBuffer:16384}));
   if(JSON.stringify(actual)!==JSON.stringify(proofPins.map(p=>p.sha256)))throw Error('Prepared proof pin');
 };
-const frozenOptions={files:declaredFiles,paths:[root,rosen,config.ergoRuntime],gitRoot:rosen,expectedHead:'1edc2fb982de4560c5265e04e2ed8b93d00b40df',validateSets:verifySourceSet,checks:[verifyProofPins]};
+const frozenOptions={files:declaredFiles,paths:[root,rosen,config.ergoRuntime,...(externalInputs?.paths??[])],gitRoot:rosen,
+  expectedHead:'1edc2fb982de4560c5265e04e2ed8b93d00b40df',validateSets:verifySourceSet,checks:[verifyProofPins,...(externalInputs?[externalInputs.verifyStructure]:[])]};
 freezeInputs(frozenOptions);
-if(args['check-only']){console.log(JSON.stringify({verified:true,fileCount:manifest.fileCount,aggregateSha256:manifest.aggregateSha256}));process.exit(0);}
+if(args['check-only']){console.log(JSON.stringify({verified:true,fileCount:manifest.fileCount,aggregateSha256:manifest.aggregateSha256,
+  ...(externalInputs?{externalInputs:externalInputs.metadata}:{})}));process.exit(0);}
 mkdirSync(work);const fixture=join(work,'fixture'),runtime=join(work,'runtime'),trace=join(work,'trace');mkdirSync(fixture);mkdirSync(runtime);mkdirSync(trace);
 for(const entry of manifest.files){const target=join(fixture,entry.path);mkdirSync(dirname(target),{recursive:true});copyFileSync(join(root,entry.path),target);}
 copyFileSync(join(root,'source-manifest.json'),join(fixture,'source-manifest.json'));
@@ -77,7 +82,7 @@ const runId=randomUUID(),cwd=join(fixture,'consumer');
 const env={...process.env,ROUNDTRIP_CONFIG:runtimeConfig,ROUNDTRIP_PROOF_CONFIG:proofConfig,WSLENV:[process.env.WSLENV,'ROUNDTRIP_PROOF_CONFIG'].filter(Boolean).join(':'),PARTICIPANT_SHA256:config.nativeSha256,MONERO_NODE_NATIVE_SHA256:config.nativeSha256,PARTICIPANT_BIN:config.nativeBinary,W1HB_RUN_ID:runId,W1HB_TRACE_DIR:trace,W1HC_SPEC:spec,NODE_OPTIONS:'--experimental-vm-modules --import ./observe.mjs '+(nodeProfile?'':'--import tsx ')+'--import '+pathToFileURL(join(fixture,'ergo-node/deposit-register.mjs')).href};
 if(nodeProfile)env.MONERO_ADAPTER_LOCAL_TEST='1';
 const command=nodeProfile?['--test',join(fixture,'consumer',spec)]:[join(rosen,'node_modules/vitest/vitest.mjs'),args['collect-only']?'list':'run','--config',testConfig,...(args['collect-only']?[]:['--reporter','verbose'])];
-writeFileSync(join(work,'execution-before.json'),JSON.stringify({runId,profile,manifestSha256:args['manifest-sha256'],aggregateSha256:manifest.aggregateSha256,nodeSha256:sha(readFileSync(process.execPath)),nativeSha256:config.nativeSha256,moneroDaemonSha256:config.moneroDaemonSha256,...(observerFiles.length?{observerSha256:config.observerSha256}:{}),...(config.collisionExperiment?{collisionExperiment:config.collisionExperiment,collisionSha256:config.collisionSha256}:{}),command},null,2),{flag:'wx'});
+writeFileSync(join(work,'execution-before.json'),JSON.stringify({runId,profile,manifestSha256:args['manifest-sha256'],aggregateSha256:manifest.aggregateSha256,nodeSha256:sha(readFileSync(process.execPath)),nativeSha256:config.nativeSha256,moneroDaemonSha256:config.moneroDaemonSha256,...(observerFiles.length?{observerSha256:config.observerSha256}:{}),...(config.collisionExperiment?{collisionExperiment:config.collisionExperiment,collisionSha256:config.collisionSha256}:{}),...(externalInputs?{externalInputs:externalInputs.metadata}:{}),command},null,2),{flag:'wx'});
 const child=spawn(process.execPath,command,{cwd,env,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe']}),stdout=[],stderr=[];
 child.stdout.on('data',x=>stdout.push(Buffer.from(x)));child.stderr.on('data',x=>stderr.push(Buffer.from(x)));
 const code=await new Promise((ok,bad)=>{child.once('error',bad);child.once('close',ok);});
@@ -86,5 +91,6 @@ let unchanged=false,verificationFailure;
 try{unchanged=closure.verify();}catch(error){
   verificationFailure={phase:'post-run',category:error?.code==='ETIMEDOUT'?'read-timeout':'input-verification-failed',code:['ETIMEDOUT','ENOENT','EACCES','EPERM'].includes(error?.code)?error.code:'VERIFICATION_FAILED'};
 }
-writeFileSync(join(work,'execution-after.json'),JSON.stringify({runId,exitCode:code,inputsUnchanged:unchanged,...(verificationFailure?{verificationFailure}:{})}),{flag:'wx'});
+writeFileSync(join(work,'execution-after.json'),JSON.stringify({runId,exitCode:code,inputsUnchanged:unchanged,
+  ...(externalInputs?{externalInputs:externalInputs.metadata}:{}),...(verificationFailure?{verificationFailure}:{})}),{flag:'wx'});
 console.log(JSON.stringify({exitCode:code,inputsUnchanged:unchanged,aggregateSha256:manifest.aggregateSha256}));process.exitCode=code===0&&unchanged?0:1;

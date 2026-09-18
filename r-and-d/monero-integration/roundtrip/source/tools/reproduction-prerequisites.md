@@ -65,6 +65,51 @@ extracted daemon, the official Ergo 6.0.3 JAR, and the public devnet configurati
 from Ergo commit `28ebb184b0c90ee9adebe1111eb6aa3244798ba9`. Versions, URLs and
 SHA-256 values are fixed in the script. Downloaded executables are not launched.
 
+## Build the two adapter packages
+
+The adapter profiles also require the public scanner and sign-protocols forks.
+Choose absent absolute `$scannerDirectory` and `$signDirectory` outside the
+source and runtime directories. Use the same pinned npm version as above; the
+commands below execute npm 11.6.2 explicitly. Select an absolute caller-owned
+`$adapterBuildDirectory` and use a dedicated cache:
+
+```powershell
+$env:npm_config_cache = Join-Path $adapterBuildDirectory 'npm-cache'
+npm exec --yes --package=npm@11.6.2 -- npm --version
+git -c core.autocrlf=false clone --no-checkout https://github.com/a-shannon/scanner.git $scannerDirectory
+git -C $scannerDirectory config core.autocrlf false
+git -C $scannerDirectory checkout --detach 2e0382d97a6e0a7bb6fb0e5927ad56af44d2f0ae
+Push-Location $scannerDirectory
+npm exec --yes --package=npm@11.6.2 -- npm ci --ignore-scripts
+npm exec --yes --package=npm@11.6.2 -- npm run build
+Push-Location node_modules/sqlite3
+node ../prebuild-install/bin.js -r napi -t 6
+Pop-Location
+npm exec --yes --package=npm@11.6.2 -- npm run test --workspace=@rosen-bridge/monero-observation-extractor -- tests/actions/candidateStore.spec.ts
+Pop-Location
+
+git -c core.autocrlf=false clone --no-checkout https://github.com/a-shannon/sign-protocols.git $signDirectory
+git -C $signDirectory config core.autocrlf false
+git -C $signDirectory checkout --detach 2fdaf3af3897d9c2b1c7e5e6c7d57d0415d808b0
+Push-Location $signDirectory
+npm exec --yes --package=npm@11.6.2 -- npm ci --ignore-scripts
+node node_modules/patch-package/index.js
+npm exec --yes --package=npm@11.6.2 -- npm run build --workspace=@rosen-bridge/communication
+npm exec --yes --package=npm@11.6.2 -- npm run build --workspace=@rosen-bridge/detection
+npm exec --yes --package=npm@11.6.2 -- npm run build --workspace=@rosen-bridge/encryption
+npm exec --yes --package=npm@11.6.2 -- npm run build --workspace=@rosen-bridge/ergo-multi-sig
+Pop-Location
+```
+
+Check each command's exit status before proceeding. The explicit winston patch
+reports its upstream version-label mismatch against locked winston 3.19.0 but
+applies successfully. The narrow sign-protocols build avoids the unrelated
+TSS service's POSIX-only Go build command. LF is part of this byte-reproduction
+recipe: inline TypeScript source maps otherwise change the emitted hashes.
+The six-file multisig runtime aggregate must be
+`ac1ff3995a4bf299dd2bccb28b8c03141ced9f0a34fb7e28f766a34435637282`,
+using the [source README's digest recipe](../README.md#reproduce-the-deposit-adapter-candidate).
+
 ## Create the isolated Ergo funding runtime
 
 Load `prepared-windows.json` into `$prepared` (combine the non-overlapping fields
@@ -96,9 +141,18 @@ $configuration = @{
     ergoRuntime = $ergoDirectory
     ergoRecipient = $ready.recipient
     wslDistro = $distro
-    collisionExperiment = 'decodable-copy-first'
+    scannerAdapterRoot = Join-Path $scannerDirectory 'packages/observation-extractors/monero-observation-extractor'
+    scannerAdapterCommit = '2e0382d97a6e0a7bb6fb0e5927ad56af44d2f0ae'
+    contributionPackage = @{
+        root = Join-Path $signDirectory 'packages/ergo-multi-sig'
+        commit = '2fdaf3af3897d9c2b1c7e5e6c7d57d0415d808b0'
+        sha256 = 'ac1ff3995a4bf299dd2bccb28b8c03141ced9f0a34fb7e28f766a34435637282'
+    }
+    processSimulation = $true
+    v2Return = $true
+    sourceResilience = $false
 }
-foreach ($name in @('nativeBinary','nativeSha256','observerBinary','observerSha256','collisionBinary','collisionSha256','moneroDaemon','moneroDaemonSha256')) {
+foreach ($name in @('nativeBinary','nativeSha256','observerBinary','observerSha256','moneroDaemon','moneroDaemonSha256')) {
     $configuration[$name] = $prepared.$name
 }
 foreach ($name in @('proofBinary','proofBinarySha256','proofLibrary','proofLibrarySha256','proofSharedLibraries')) {
@@ -106,11 +160,21 @@ foreach ($name in @('proofBinary','proofBinarySha256','proofLibrary','proofLibra
 }
 if (Test-Path -LiteralPath $configurationFile) { throw 'Choose an absent configuration file' }
 $configuration | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configurationFile -Encoding utf8NoBOM
-node .\tools\launch-roundtrip.mjs --config $configurationFile --manifest-sha256 $manifestSha256 --profile watcher-authority
+node .\tools\launch-roundtrip.mjs --config $configurationFile --manifest-sha256 $manifestSha256 --profile v2-roundtrip --check-only true
+node .\tools\launch-roundtrip.mjs --config $configurationFile --manifest-sha256 $manifestSha256 --profile v2-roundtrip
 ```
 
-The other copy-first case uses `raw-copy-first`; `raw-before-credit` exercises
-the existing immediate-deposit path. Each run needs a new output directory.
+Both check-only and execution require clean scoped adapter sources at the
+declared commits. The successful-return profile and source-quarantine profile
+are separate campaigns; each needs a new output directory.
+
+To reproduce a historical copy-first case instead, create a separate configuration
+with the binary, proof and Ergo fields above, omit the three V2 mode fields,
+add `collisionBinary` and `collisionSha256` from `$prepared`, and choose
+`collisionExperiment: 'decodable-copy-first'` or `'raw-copy-first'`. Use
+`--profile watcher-authority`. These historical runs are not prerequisites for
+the current complete V2 campaign.
+
 The launcher retains its execution status, unchanged-input result and test logs
 outside the source package. The runtime includes private spending capabilities;
 share the public qualification receipts rather than the runtime directory.

@@ -10,11 +10,72 @@ const hash32=value=>assert(typeof value==='string'&&/^[0-9a-f]{64}$/.test(value)
 const atomic=value=>{assert(typeof value==='string'&&/^(0|[1-9][0-9]{0,19})$/.test(value)&&BigInt(value)<=0xffffffffffffffffn,'V2 withdrawal amount');return BigInt(value);};
 const eventFields=['height','fromChain','toChain','fromAddress','toAddress','amount','bridgeFee','networkFee',
   'sourceChainTokenId','targetChainTokenId','sourceTxId','sourceChainHeight','sourceBlockId','WIDsHash','WIDsCount'];
+const feeAuthorityFields=['version','network','nodeVersion','minFeeNFT','ergoTokenId','expectedErgoTree','fromChain','toChain','sourceChainHeight',
+  'minConfirmations','boxId','boxBytes','transactionId','blockId','inclusionHeight'];
+const feeSelectorFields=['version','network','nodeVersion','minFeeNFT','ergoTokenId','expectedErgoTree','fromChain','toChain','sourceChainHeight','minConfirmations'];
+const feeConfigFields=['bridgeFee','networkFee','rsnRatio','rsnRatioDivisor','feeRatio','feeRatioDivisor'];
+
+function retainedFeeSnapshot(deployment,event,value,label){
+  assert(value&&typeof value==='object'&&!Array.isArray(value),'V2 retained fee '+label);
+  assert.equal(Object.keys(value).sort().join(','),'authority,digest,feeConfig','V2 retained fee '+label+' shape');
+  const {authority,feeConfig,digest}=value;
+  assert(authority&&typeof authority==='object'&&!Array.isArray(authority),'V2 retained fee '+label+' authority');
+  assert.equal(Object.keys(authority).sort().join(','),[...feeAuthorityFields].sort().join(','),'V2 retained fee '+label+' authority shape');
+  assert(feeConfig&&typeof feeConfig==='object'&&!Array.isArray(feeConfig),'V2 retained fee '+label+' config');
+  assert.equal(Object.keys(feeConfig).sort().join(','),[...feeConfigFields].sort().join(','),'V2 retained fee '+label+' config shape');
+  for(const field of feeConfigFields)atomic(feeConfig[field]);
+  assert(atomic(feeConfig.rsnRatioDivisor)>0n&&atomic(feeConfig.feeRatioDivisor)>0n,'V2 retained fee denominators');
+  assert.equal(authority.version,1,'V2 retained fee version');assert.equal(authority.network,'devnet','V2 retained fee network');
+  assert.equal(authority.nodeVersion,'6.0.3','V2 retained fee node version');
+  const configured=deployment.minimumFee;assert(configured,'V2 retained fee deployment');
+  assert.equal(authority.minFeeNFT,configured.nft,'V2 retained fee NFT');assert.equal(authority.ergoTokenId,deployment.tokens.Asset,'V2 retained fee asset');
+  assert.equal(authority.expectedErgoTree,configured.ergoTree,'V2 retained fee script');assert.equal(authority.minConfirmations,configured.minConfirmations,'V2 retained fee confirmations');
+  assert.equal(authority.fromChain,event.fromChain,'V2 retained fee from chain');assert.equal(authority.toChain,event.toChain,'V2 retained fee to chain');
+  assert.equal(authority.sourceChainHeight,Number(event.sourceChainHeight),'V2 retained fee source height');
+  for(const field of ['minFeeNFT','ergoTokenId','boxId','transactionId','blockId'])hash32(authority[field]);
+  assert(typeof authority.expectedErgoTree==='string'&&/^(?:[0-9a-f]{2}){1,4096}$/.test(authority.expectedErgoTree),'V2 retained fee script');
+  assert(typeof authority.boxBytes==='string'&&/^(?:[0-9a-f]{2})+$/.test(authority.boxBytes),'V2 retained fee box bytes');
+  assert(Number.isSafeInteger(authority.sourceChainHeight)&&authority.sourceChainHeight>=1&&Number.isSafeInteger(authority.minConfirmations)&&authority.minConfirmations>=1&&
+    Number.isSafeInteger(authority.inclusionHeight)&&authority.inclusionHeight>=1,'V2 retained fee integer');
+  hash32(digest);assert.equal(digest,hash(canonicalAssignment({authority,feeConfig})),'V2 retained fee digest');
+  return structuredClone(value);
+}
+
+/** Reward-only currentness: the retained historical row stays immutable while
+ * a freshly authenticated MinimumFee NFT successor may have a new box identity. */
+export async function verifyRetainedWithdrawalFeeAuthority(deployment,event,retained,captureFeeAuthority=captureWithdrawalFeeAuthority){
+  assert.equal(typeof captureFeeAuthority,'function');
+  const expected=retainedFeeSnapshot(deployment,event,structuredClone(retained),'snapshot');
+  const current=retainedFeeSnapshot(deployment,event,await captureFeeAuthority(deployment,event),'current');
+  const selectors=value=>Object.fromEntries(feeSelectorFields.map(field=>[field,value.authority[field]]));
+  assert.deepEqual(selectors(current),selectors(expected),'V2 retained fee selectors changed');
+  assert.deepEqual(current.feeConfig,expected.feeConfig,'V2 retained fee historical terms changed');
+  return expected;
+}
 
 /** Read-only composition. Ports are locally configured implementations, never
  * caller verdicts. The caller owns exact ledger membership and fresh unspent
  * Monero currentness on both sides of this asynchronous verification. */
-export function createV2WithdrawalAuthorityVerifier({rpc,wasm,verifyReturnAuthority,captureRequest,decodeSelection,snapshotCreditSigning,tree}){
+export function effectiveWithdrawalFees(event,feeConfig){
+  const max=(a,b)=>a>b?a:b,gross=atomic(event.amount),fees=Object.fromEntries(Object.entries(feeConfig).map(([k,v])=>[k,atomic(v)]));
+  assert(fees.feeRatioDivisor>0n&&fees.rsnRatioDivisor>0n,'V2 fee denominators');
+  const bridge=max(max(atomic(event.bridgeFee),fees.bridgeFee),gross*fees.feeRatio/fees.feeRatioDivisor);
+  const network=max(atomic(event.networkFee),fees.networkFee),net=gross-bridge-network;
+  assert(net>0n,'V2 payout positive amount');return {bridgeFee:bridge.toString(),networkFee:network.toString(),netAtomic:net.toString()};
+}
+
+/** The deployment is operator configuration, compared with each guard's own file. */
+export async function captureWithdrawalFeeAuthority(deployment,event){
+  assert.equal(event.fromChain,'ergo');assert.equal(event.toChain,'monero');
+  assert.equal(event.sourceChainTokenId,deployment.tokens.Asset);
+  const configured=deployment.minimumFee;assert(configured,'V2 minimum-fee deployment');
+  const [{captureMinimumFeeAuthority},{rpc}]=await Promise.all([import('./minimum-fee-authority.mjs'),import('./rosen-node.mjs')]);
+  return captureMinimumFeeAuthority({nodeUrl:'http://127.0.0.1:19051',minFeeNFT:configured.nft,ergoTokenId:deployment.tokens.Asset,
+    expectedErgoTree:configured.ergoTree,minConfirmations:configured.minConfirmations,fromChain:event.fromChain,toChain:event.toChain,
+    sourceChainHeight:Number(event.sourceChainHeight)},{rpc});
+}
+
+export function createV2WithdrawalAuthorityVerifier({rpc,wasm,verifyReturnAuthority,captureRequest,decodeSelection,snapshotCreditSigning,tree,captureFeeAuthority=captureWithdrawalFeeAuthority}){
   for(const port of [rpc,verifyReturnAuthority,captureRequest,decodeSelection,snapshotCreditSigning,tree])assert.equal(typeof port,'function');
   const nativeBox=value=>wasm.ErgoBox.sigma_parse_bytes(Buffer.from(value,'hex'));
   const txBytes=value=>hex(wasm.Transaction.from_json(text(value)));
@@ -78,7 +139,15 @@ export function createV2WithdrawalAuthorityVerifier({rpc,wasm,verifyReturnAuthor
     // a withdrawal. The caller separately binds the retained settlement/final.
     return Object.freeze(opened.identity);
   }
-  async function verifyWithdrawal(value){
+  const strictFeePolicy={
+    async open(input,event){const fee=await captureFeeAuthority(input.deployment,event);assert.deepEqual(fee,input.feeAuthority,'V2 fee authority changed');return fee;},
+    async close(input,event,opened){assert.deepEqual(await captureFeeAuthority(input.deployment,event),opened,'V2 fee authority changed during verification');},
+  };
+  const rewardFeePolicy={
+    async open(input,event){await verifyRetainedWithdrawalFeeAuthority(input.deployment,event,input.feeAuthority,captureFeeAuthority);return structuredClone(input.feeAuthority);},
+    async close(input,event){await verifyRetainedWithdrawalFeeAuthority(input.deployment,event,input.feeAuthority,captureFeeAuthority);},
+  };
+  async function joinedWithdrawal(value,feePolicy){
     const input=structuredClone(value),opened=await inspectCredit(input);
     const {assignment,redemption,returnReceipt,terms,deployment,sourceContext:context}=input,backing=assignment.backing;
     validateReturnTerms(terms);
@@ -99,9 +168,12 @@ export function createV2WithdrawalAuthorityVerifier({rpc,wasm,verifyReturnAuthor
     const expectedSource={event:Object.fromEntries(eventFields.map(name=>[name,String(event[name])])),
       triggerTransactionId:trusted.transaction.id,triggerBoxId:trusted.trigger.boxId,wids:trusted.wids};
     assert.deepEqual(document.source,expectedSource,'V2 withdrawal complete source');
-    const amount=atomic(backing.creditedAtomic)-atomic(terms.bridgeFee)-atomic(terms.networkFee);assert(amount>0n,'V2 payout positive amount');
+    const feeAuthority=await feePolicy.open(input,event);
+    assert.deepEqual(document.profile.fees,feeAuthority.feeConfig,'V2 authoritative fee profile');
+    assert.equal(document.profile.configurationId,'minimum-fee:'+feeAuthority.digest,'V2 fee authority identity');
+    const fees=effectiveWithdrawalFees(event,feeAuthority.feeConfig),amount=atomic(fees.netAtomic);
     assert.equal(document.gross,backing.creditedAtomic,'V2 payout gross');
-    assert.equal(document.chargedBridgeFee,terms.bridgeFee,'V2 payout bridge fee');assert.equal(document.chargedNetworkFee,terms.networkFee,'V2 payout network fee');
+    assert.equal(document.chargedBridgeFee,fees.bridgeFee,'V2 payout bridge fee');assert.equal(document.chargedNetworkFee,fees.networkFee,'V2 payout network fee');
     assert.equal(projection.amount,amount.toString(),'V2 payout amount');assert.equal(projection.address,terms.toAddress,'V2 payout recipient');
     assert.equal(projection.network,context.nativeNetwork,'V2 payout network');assert.equal(projection.sourceNetwork,context.sourceNetwork,'V2 payout source network');
     assert.equal(projection.ceiling,context.maxMinerFeeAtomic,'V2 payout miner ceiling');
@@ -114,10 +186,13 @@ export function createV2WithdrawalAuthorityVerifier({rpc,wasm,verifyReturnAuthor
     for(const [name,expected] of Object.entries({txid:backing.txId,outputIndex:String(backing.outputIndex),globalIndex:String(backing.globalIndex),
       publicKey:backing.outputKey,amount:backing.amountAtomic}))assert.equal(selected[name],expected,'V2 selected backing '+name);
     await closeCredit(input,opened);
+    await feePolicy.close(input,event,feeAuthority);
     return Object.freeze({...opened.identity,redemptionTxId:redemption.txId,returnTriggerBoxId:trusted.trigger.boxId,eventId:event.eventId,
       requestDigest:projection.requestDigest,selectionDigest:hash(selectionBytes),recipient:projection.address,amountAtomic:projection.amount});
   }
-  return Object.freeze({verifyWithdrawal,verifyRetainedCredit});
+  async function verifyWithdrawal(value){return joinedWithdrawal(value,strictFeePolicy);}
+  async function verifyRewardWithdrawal(value){return joinedWithdrawal(value,rewardFeePolicy);}
+  return Object.freeze({verifyWithdrawal,verifyRewardWithdrawal,verifyRetainedCredit});
 }
 
 async function productionVerifier(){
@@ -128,4 +203,5 @@ async function productionVerifier(){
     captureRequest:captureUnapprovedMoneroPayoutRequest,decodeSelection:decodeNativeSelection});
 }
 export async function verifyV2Withdrawal(value){const input=structuredClone(value);return (await productionVerifier()).verifyWithdrawal(input);}
+export async function verifyV2RewardWithdrawal(value){const input=structuredClone(value);return (await productionVerifier()).verifyRewardWithdrawal(input);}
 export async function verifyV2RetainedCredit(value){const input=structuredClone(value);return (await productionVerifier()).verifyRetainedCredit(input);}

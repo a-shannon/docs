@@ -12,15 +12,20 @@ before each native guard contribution. This candidate is not production qualifie
 Prepare the existing native, proof and Rosen prerequisites below. Additionally,
 build the Monero extractor package from scanner commit
 `2e0382d97a6e0a7bb6fb0e5927ad56af44d2f0ae` and the Ergo multisig package from
-sign-protocols commit `fd41b5df91d79bc0fc74373a397372edfd3efa84`.
+sign-protocols commit `2fdaf3af3897d9c2b1c7e5e6c7d57d0415d808b0`.
 These changes are published in the `a-shannon/scanner` and
 `a-shannon/sign-protocols` forks. Set `scannerAdapterRoot` to the former package's
-root, and `contributionPackage` to `{root, sha256}` for the latter package.
+root, set `scannerAdapterCommit` to the scanner commit above, and set
+`contributionPackage` to `{root, sha256, commit}` for the latter package.
 The runtime package digest is SHA-256 of the UTF-8 concatenation
 `path + NUL + file SHA-256 + NUL + decimal byte length + LF`, in this fixed order:
 `package.json`, `dist/const.js`, `dist/index.js`, `dist/multiSigHandler.js`,
 `dist/multiSigUtils.js`, `dist/types.js`. The tested aggregate is
-`f0ddaf9e6b1a00557f55c239529e418f5d76f13b2a63c81ca5cbfd483a9effe1`.
+`ac1ff3995a4bf299dd2bccb28b8c03141ced9f0a34fb7e28f766a34435637282`.
+Use the explicit LF checkout and locked build in the
+[preparation recipe](tools/reproduction-prerequisites.md#build-the-two-adapter-packages).
+Inline source maps include source line endings, so other checkout conventions
+produce different runtime hashes despite equivalent TypeScript logic.
 The loader checks the exact bytes and resolves external package dependencies
 through the prepared Rosen distribution, including its shared WASM instance.
 
@@ -39,6 +44,15 @@ node tools/launch-roundtrip.mjs --config <absolute-config-file> --manifest-sha25
 The launcher verifies original and copied inputs before and after execution and
 keeps node, holder and proof material outside the source package. Both adapter
 profiles support `--check-only true` and refuse `--collect-only true`.
+
+For adapter profiles, the receipt binds 14 direct scanner/multisig runtime files
+plus the installed dependency graphs, including CommonJS packages and the
+TypeScript loader. It records source commits separately from built bytes and
+checks package resolution targets, metadata, file sets and hashes before and
+after execution. Runtime output cannot overlap those inputs. New runtime imports
+must extend this declared closure; the qualification report records the observed
+load comparison for the exercised profile. Operating-system shared libraries
+remain part of the declared Windows/WSL environment.
 
 Set `processSimulation: true` in that external configuration for the V2
 [multiprocess campaign](consumer/processAdapterScenario.mjs). It starts two
@@ -135,8 +149,25 @@ lost submission replies and restart of all four guards after payout. Recovery
 checks the retained settlement and existing native transaction; it cannot grant
 a fresh withdrawal authorization for spent backing. Signing and submission must
 each occur once. The external `adapter-*/v2-return-result.json` records the payout
-and accounting at redemption, reservation and settlement. Return watcher counters
+and accounting at redemption, reservation, settlement and reward completion. Return watcher counters
 in that report are sampled after restart, not during initial observation.
+
+The return then uses the actual Rosen EventOrder and ErgoChain reward path.
+All four guards bind the confirmed Monero payment to the retained withdrawal,
+recheck its recipient, amount and confirmations, and atomically retain one reward
+assignment in their SQLite ledgers. The owner persists the exact signed Ergo
+transaction before submission. The campaign deliberately loses its submission
+reply, restarts all four guards and recovers the same bytes without another
+signature. Rosen's TransactionProcessor completes the reward transaction and
+event. Ledger schema 3 is required; older schemas are refused without migration.
+
+The minimum-fee reader reconstructs the configured NFT/asset fee box from complete
+node pagination and applies its historical row at the source height. New
+withdrawals use the maximum of declared, minimum and proportional fees before
+approval. Underquoted deposits refuse rather than change their authenticated
+intent. Reward recovery accepts a successor fee box only when the retained
+historical fee policy remains identical. The live fixture exercises proportional
+fees; historical fee-box succession has focused regression coverage.
 
 Keep the source-reorganization campaign separate: `deposit-adapter` with
 `sourceResilience: true` and `v2Return: false` tests permanent quarantine of a
@@ -153,9 +184,10 @@ node --experimental-vm-modules --import tsx --test ergo-node/watcher-return-runt
 Set `ROUNDTRIP_CONFIG` to the external configuration for the loader-dependent
 checks and `WATCHER_DEPENDENCY_ROOT` to the prepared Rosen root for watcher tests.
 The [qualification report](../adapter-qualification.md#complete-local-v2-roundtrip)
-records exact transaction evidence and limitations. Fee subsidy from fixture
-reserve inputs, pending reward distribution, shared administration and the
-separately pending multisig review remain explicit boundaries.
+records exact transaction evidence and limitations. Fixture reserves subsidize
+the miner fee; shared administration and production fee-token redemption remain
+outside this local qualification. The [multisig review packet](../multisig-review.md)
+records the completed independent local implementation review and its scope.
 
 This experimental source package joins an actual isolated Monero deposit and native transaction proof to a real local Ergo credit, redemption of that exact credited box, and a separate-holder Monero payout. The `baseline` profile retains the original local operator trigger fixture. The `watcher-authority` profile uses two independently checked observations and actual Rosen commitment/reveal transactions in both directions, plus four guard instances with separate permanent output-assignment ledgers and actual three-of-four Ergo signatures. Both profiles use isolated chains and fixture tokens.
 
@@ -188,7 +220,7 @@ Create a caller-owned JSON configuration outside the package with these fields:
 | `proofBinary`, `proofBinarySha256` | Absolute WSL helper path and independent SHA-256 |
 | `proofLibrary`, `proofLibrarySha256` | Absolute WSL wallet library path and independent SHA-256 |
 | `proofSharedLibraries` | Complete absolute-path/hash list of non-system shared libraries emitted by the proof build |
-| `scannerAdapterRoot`, `contributionPackage` | Adapter package root and pinned multisig package configuration described above; required for the adapter profiles |
+| `scannerAdapterRoot`, `scannerAdapterCommit`, `contributionPackage` | Adapter package root/source commit and multisig `{root, sha256, commit}` configuration described above; required for the adapter profiles |
 | `processSimulation`, `v2Return`, `sourceResilience` | Explicit adapter modes described above; the successful V2 return and quarantine campaign are separate runs |
 
 Run from this source directory, replacing the placeholders:
@@ -245,7 +277,7 @@ Use the same command with `--check-only true` for read-only pin validation. `--c
 
 ## Output agreement
 
-Monero deposit observations use `rosen-monero-output:v1:<sha256>` in the existing
+Earlier experiment profiles use `rosen-monero-output:v1:<sha256>` in the existing
 `fromAddress` field. This is an origin descriptor, not a sender or refund address.
 The digest commits the authenticated single-output backing: chain genesis,
 vault, transaction and output indices, output key, associated key image, amount,
@@ -264,8 +296,12 @@ rejected before credit signing. This is not a production migration mechanism.
 
 The [output-agreement results](../output-agreement.md) distinguish focused
 structural tests, real Rosen commitment checks and complete local-chain runs.
+The current V2 adapter uses `rosen-monero-output:v2:<sha256>` and commits its
+native output receipt, holder-certificate digest and complete destination intent.
+Its watcher novelty checks consult retained guard custody before publication;
+the [adapter report](../adapter-qualification.md) describes that current contract.
 
-## Multiple-operation accounting
+## Earlier multiple-operation accounting profile
 
 The `economic-reconciliation` profile runs two separately backed, one-shot vault
 operations on the same isolated chains. It credits and redeems the first deposit,
@@ -301,6 +337,9 @@ and mining costs are excluded. Fee-coverage variance is not profitability.
 
 This profile does not add reusable pooled vaults, fee-token redemption, return
 reward distribution, global reserve accounting or production solvency checks.
+The current `v2-roundtrip` profile additionally completes one operation's reward
+distribution and converts retained return fees into issued fee-token liabilities;
+their required backing remains included in the reconciliation.
 
 The package includes reusable consumer, deposit policy, funding selection and native tests. Some historical fixture tests exercise earlier native host modes; they require the corresponding prepared binary, and are not the supported roundtrip launch command. Runtime custody, node data, keys, donor proof material and compiled dependencies are not source-package inputs.
 ## Deposit delivery experiment

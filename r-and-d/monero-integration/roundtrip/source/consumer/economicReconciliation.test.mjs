@@ -19,11 +19,35 @@ const clone=value=>structuredClone(value);
 const reject=(mutate,expected=/economic:/,label='')=>{const value=operation();mutate(value);assert.throws(()=>reconcileEconomicOperations([value]),typeof expected==='string'?/economic:/:expected,label||String(expected));};
 const rejectExact=(mutate,message,stage='settled')=>{const value=operation(stage);mutate(value);assert.throws(()=>reconcileEconomicOperations([value]),error=>error instanceof Error&&error.message===message);};
 
+function rewardedOperation(){
+  const value=operation(),settlement=value.withdrawal.settlement;
+  settlement.rewardState='completed';settlement.reward={txId:h(400),paymentTxId:settlement.txId,redemptionTxId:value.redemption.txId,assetId:value.assetId,distributedFeeTokenAtomic:'80'};
+  return value;
+}
+test('confirmed rewards convert retained fees into token liabilities without releasing backing',()=>{
+  const before=reconcileEconomicOperations([operation()]).totals,after=reconcileEconomicOperations([rewardedOperation()]).totals;
+  assert.equal(after.retainedReturnFeeAtomic,'0');assert.equal(after.issuedReturnFeeTokenAtomic,'80');
+  for(const key of ['feeBackingRequirementAtomic','selectedResidualAtomic','accountedBackingAtomic','paidMinerFeeAtomic','feeCoverageVarianceAtomic'])assert.equal(after[key],before[key]);
+});
+test('completed status alone cannot settle rewards, and each receipt join is required',()=>{
+  for(const mutate of [v=>delete v.withdrawal.settlement.reward,v=>v.withdrawal.settlement.reward.paymentTxId=h(999),v=>v.withdrawal.settlement.reward.redemptionTxId=h(999),v=>v.withdrawal.settlement.reward.assetId=h(999),v=>v.withdrawal.settlement.reward.distributedFeeTokenAtomic='79',v=>v.withdrawal.settlement.reward.txId=v.credit.txId,v=>v.withdrawal.settlement.reward.txId=v.redemption.txId,v=>v.withdrawal.settlement.rewardState='pending-reward']){
+    const value=rewardedOperation();mutate(value);assert.throws(()=>reconcileEconomicOperations([value]),/economic:/);
+  }
+});
+test('one reward transaction cannot discharge two independent return operations',()=>{
+  const first=rewardedOperation(),second=operation('settled',1),s=second.withdrawal.settlement;
+  s.rewardState='completed';s.reward={...first.withdrawal.settlement.reward,paymentTxId:s.txId,redemptionTxId:second.redemption.txId};
+  assert.throws(()=>reconcileEconomicOperations([first,second]),/duplicate:reward-tx/);
+});
+
 test('reconciles every lifecycle state using decimal-string BigInt arithmetic',()=>{
   const settled=operation('settled'),deposited=operation('deposited',1),credited=operation('credited',2),redeemed=operation('redeemed',3),reserved=operation('reserved',4);
   credited.deposit.amountAtomic='2000';credited.credit.recipientAtomic='1700';credited.credit.bridgeFeeAtomic='200';credited.credit.networkFeeAtomic='100';credited.credit.issuedFeeTokenAtomic='300';
   reserved.deposit.amountAtomic='1500';reserved.credit.recipientAtomic='1300';reserved.credit.bridgeFeeAtomic='120';reserved.credit.networkFeeAtomic='80';reserved.credit.issuedFeeTokenAtomic='200';reserved.redemption.amountAtomic='1300';reserved.redemption.bridgeFeeAtomic='60';reserved.redemption.networkFeeAtomic='40';reserved.withdrawal.inputs[0].amountAtomic='500';reserved.withdrawal.inputs[1].amountAtomic='1500';reserved.withdrawal.recipientAtomic='1200';reserved.withdrawal.minerFeeAtomic='25';reserved.withdrawal.changeAtomic='775';
   const result=reconcileEconomicOperations([settled,deposited,credited,redeemed,reserved]);
+  // These five pre-reward fixtures retain their former accounting values.
+  for(const row of result.operations){assert.equal(row.issuedReturnFeeTokenAtomic,'0');delete row.issuedReturnFeeTokenAtomic;}
+  assert.equal(result.totals.issuedReturnFeeTokenAtomic,'0');
   assert.equal(result.scope,'selected-input-reconciliation-v1');
   assert.deepEqual(result.operations.map(row=>row.state),['settled','deposited','credited','redeemed','reserved']);
   for(const row of result.operations)for(const key of amounts)assert.match(row[key],/^-?(?:0|[1-9][0-9]*)$/);

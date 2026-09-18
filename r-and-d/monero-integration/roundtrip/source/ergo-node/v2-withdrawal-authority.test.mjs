@@ -46,14 +46,20 @@ function fixture(){
     WIDsHash:h(52),WIDsCount:2,eventId:h(53)};
   const trusted={event,transaction:{id:h(54),inclusionHeight:111},trigger:{boxId:h(55)},wids:[h(56),h(57)]};
   const source={event:Object.fromEntries(eventFields.map(k=>[k,String(event[k])])),triggerTransactionId:h(54),triggerBoxId:h(55),wids:[h(56),h(57)]};
-  const document={source,profile:{sourceNetwork:'ergo',destinationNetwork:'testnet'},gross:'9880',chargedBridgeFee:'100',chargedNetworkFee:'20',netAtomicAmount:'9760',maxMinerFeeAtomic:'1000000000000'};
+  const feeAuthority={authority:{version:1,network:'devnet',nodeVersion:'6.0.3',minFeeNFT:h(68),ergoTokenId:h(4),expectedErgoTree:'10010100',
+    fromChain:'ergo',toChain:'monero',sourceChainHeight:109,minConfirmations:1,boxId:h(70),boxBytes:'00',transactionId:h(69),blockId:h(67),inclusionHeight:90},
+    feeConfig:{bridgeFee:'100',networkFee:'20',rsnRatio:'0',rsnRatioDivisor:'100',feeRatio:'0',feeRatioDivisor:'10000'}};
+  feeAuthority.digest=hash(canonicalAssignment({authority:feeAuthority.authority,feeConfig:feeAuthority.feeConfig}));
+  const document={source,profile:{sourceNetwork:'ergo',destinationNetwork:'testnet',configurationId:'minimum-fee:'+feeAuthority.digest,fees:clone(feeAuthority.feeConfig)},gross:'9880',chargedBridgeFee:'100',chargedNetworkFee:'20',netAtomicAmount:'9760',maxMinerFeeAtomic:'1000000000000'};
   const request={canonicalRequest:JSON.stringify(document),eventId:h(53),instructionDigest:h(58),requestDigest:hash(JSON.stringify(document))};
   const selected={network:'testnet',vaultSpend:h(3),vaultView:h(12),inputs:[{txid:h(6),outputIndex:'1',globalIndex:'8888',publicKey:h(8),amount:'10000'},
     {txid:h(60),outputIndex:'0',globalIndex:'8889',publicKey:h(61),amount:'5000'}]};
-  const state={returnCalls:0,creditReads:0,rpcRoutes:[],beforeReturn:()=>{},capturePatch:{},decodePatch:{},info:{network:'devnet',appVersion:'6.0.3',peersCount:0}};
-  const input={assignment,snapshot,credit,redemption,terms,deployment:{tokens:{Asset:h(4)}},returnReceipt:{fixture:true},selection:JSON.stringify(selected),request,
+  const state={returnCalls:0,creditReads:0,feeReads:0,rpcRoutes:[],beforeReturn:()=>{},afterFeeCapture:()=>{},capturePatch:{},decodePatch:{},info:{network:'devnet',appVersion:'6.0.3',peersCount:0}};
+  const input={assignment,snapshot,credit,redemption,terms,feeAuthority:clone(feeAuthority),deployment:{tokens:{Asset:h(4)},minimumFee:{nft:h(68),ergoTree:'10010100',minConfirmations:1}},returnReceipt:{fixture:true},selection:JSON.stringify(selected),request,
     sourceContext:{genesis:h(1),vaultSpend:h(3),vaultAddress:'vault',nativeNetwork:'testnet',sourceNetwork:'ergo',maxMinerFeeAtomic:'1000000000000'}};
   const ports={wasm,snapshotCreditSigning:capture,tree:address=>'tree:'+address,
+    captureFeeAuthority:async(deployment,sourceEvent)=>{assert.deepEqual(deployment,input.deployment);assert.deepEqual(sourceEvent,trusted.event);state.feeReads++;
+      const captured=clone(feeAuthority);await state.afterFeeCapture(state.feeReads);return captured;},
     rpc:async route=>{state.rpcRoutes.push(route);if(route==='/info')return clone(state.info);assert.equal(route,'/blockchain/transaction/byId/'+h(30));state.creditReads++;return clone(primary);},
     verifyReturnAuthority:async value=>{state.returnCalls++;assert.deepEqual(value,{returnReceipt:input.returnReceipt,redemption:input.redemption,terms:input.terms,deployment:input.deployment});await state.beforeReturn();return clone(trusted);},
     captureRequest:async value=>{const doc=JSON.parse(value.canonicalRequest);assert.equal(value.requestDigest,hash(value.canonicalRequest));return {request:clone(value),eventId:value.eventId,
@@ -62,8 +68,79 @@ function fixture(){
   const verifier=createV2WithdrawalAuthorityVerifier(ports);
   const editRequest=fn=>{const doc=JSON.parse(request.canonicalRequest);fn(doc);request.canonicalRequest=JSON.stringify(doc);request.requestDigest=hash(request.canonicalRequest);};
   const editSelection=fn=>{const value=JSON.parse(input.selection);fn(value);input.selection=JSON.stringify(value);};
-  return {input,verifier,ports,state,primary,trusted,editRequest,editSelection};
+  const rehashFee=()=>feeAuthority.digest=hash(canonicalAssignment({authority:feeAuthority.authority,feeConfig:feeAuthority.feeConfig}));
+  return {input,verifier,ports,state,primary,trusted,feeAuthority,rehashFee,editRequest,editSelection};
 }
+
+for(const [name,feePatch,bridge,network,net] of [
+  ['minimum bridge',{bridgeFee:'101'},'101','20','9759'],
+  ['minimum network',{networkFee:'21'},'100','21','9759'],
+  ['proportional bridge',{feeRatio:'200'},'197','20','9663'],
+])test('accepts independently sourced '+name+' effective charges',async()=>{
+  const f=fixture();Object.assign(f.feeAuthority.feeConfig,feePatch);f.rehashFee();f.input.feeAuthority=clone(f.feeAuthority);
+  f.editRequest(doc=>{doc.profile.configurationId='minimum-fee:'+f.feeAuthority.digest;doc.profile.fees=clone(f.feeAuthority.feeConfig);
+    doc.chargedBridgeFee=bridge;doc.chargedNetworkFee=network;doc.netAtomicAmount=net;});
+  assert.equal((await f.verifier.verifyWithdrawal(f.input)).amountAtomic,net);
+});
+test('rejects internally consistent substituted fee profile',async()=>{
+  const f=fixture();f.editRequest(doc=>{doc.profile.fees.bridgeFee='101';doc.chargedBridgeFee='101';doc.netAtomicAmount='9759';});
+  await assert.rejects(f.verifier.verifyWithdrawal(f.input),/V2 authoritative fee profile/);
+});
+test('rejects a fee snapshot changed after request construction',async()=>{
+  const f=fixture();f.feeAuthority.digest=h(72);
+  await assert.rejects(f.verifier.verifyWithdrawal(f.input),/V2 fee authority changed/);
+});
+test('reward verification accepts a fresh NFT successor with the same retained historical terms',async()=>{
+  const f=fixture();Object.assign(f.feeAuthority.authority,{boxId:h(72),boxBytes:'01',transactionId:h(73),blockId:h(74),inclusionHeight:110});f.rehashFee();
+  const result=await f.verifier.verifyRewardWithdrawal(f.input);
+  assert.equal(result.amountAtomic,'9760');assert.equal(result.requestDigest,f.input.request.requestDigest);assert.equal(f.state.feeReads,2);
+});
+test('reward verification rejects changed historical fees, selectors, or retained digest',async()=>{
+  for(const mutate of [
+    f=>{f.feeAuthority.feeConfig.bridgeFee='101';f.rehashFee();},
+    f=>{f.feeAuthority.authority.minFeeNFT=h(99);f.rehashFee();},
+    f=>{f.input.feeAuthority.digest=h(99);},
+  ]){const f=fixture();mutate(f);await assert.rejects(f.verifier.verifyRewardWithdrawal(f.input),/V2 retained fee/);}
+});
+test('reward verification recaptures fee terms at close and never reprices retained credit',async()=>{
+  const f=fixture();f.state.afterFeeCapture=reads=>{if(reads===1){f.feeAuthority.feeConfig.networkFee='21';f.rehashFee();}};
+  await assert.rejects(f.verifier.verifyRewardWithdrawal(f.input),/V2 retained fee/);
+  const retained=fixture();Object.assign(retained.feeAuthority.authority,{boxId:h(72),boxBytes:'01',transactionId:h(73),blockId:h(74),inclusionHeight:110});retained.rehashFee();
+  assert.equal((await retained.verifier.verifyRewardWithdrawal(retained.input)).amountAtomic,'9760');
+});
+test('new withdrawal verification still rejects a successor box identity',async()=>{
+  const f=fixture();f.feeAuthority.authority.boxId=h(72);f.rehashFee();
+  await assert.rejects(f.verifier.verifyWithdrawal(f.input),/V2 fee authority changed/);
+});
+test('reward verification retains the complete request and selection join',async()=>{
+  const request=fixture();request.editRequest(document=>document.source.triggerBoxId=h(99));
+  await assert.rejects(request.verifier.verifyRewardWithdrawal(request.input),/V2 withdrawal complete source/);
+  const selection=fixture();selection.editSelection(value=>value.inputs[0].amount='9999');
+  await assert.rejects(selection.verifier.verifyRewardWithdrawal(selection.input),/V2 selected backing amount/);
+});
+
+for(const [name,patch,net] of [['minimum bridge',{bridgeFee:'101'},'9759'],['minimum network',{networkFee:'21'},'9759'],['ratio',{feeRatio:'200'},'9663']])
+test('real EventOrder producer and V2 consumer agree on '+name,async()=>{
+  const [{terms,recipient},{configureFixtureTokens},{MoneroChain},{setFixtureChain},{buildUnapprovedMoneroPayout},
+    {captureUnapprovedMoneroPayoutRequest},{default:EventSerializer}]=await Promise.all([
+    import('../consumer/projectionFixture.ts'),import('../consumer/fixturePorts.ts'),import('../consumer/adapter.ts'),import('../consumer/resolver.ts'),
+    import('../guard-service/src/withdrawal/moneroWithdrawalOrder.ts'),import('../guard-service/src/withdrawal/moneroWithdrawalNativeProjection.ts'),
+    import('../guard-service/src/event/eventSerializer.ts')]);
+  const f=fixture(),data=terms();Object.assign(f.feeAuthority.feeConfig,patch);f.rehashFee();f.input.feeAuthority=clone(f.feeAuthority);
+  f.input.terms.toAddress=recipient;f.trusted.event.toAddress=recipient;f.trusted.event.eventId=EventSerializer.getId(f.trusted.event);
+  data.source={event:Object.fromEntries(eventFields.map(k=>[k,f.trusted.event[k]])),triggerTransactionId:f.trusted.transaction.id,
+    triggerBoxId:f.trusted.trigger.boxId,wids:f.trusted.wids};
+  data.profile.tokens[0].ergo.tokenId=h(4);data.profile.fees=clone(f.feeAuthority.feeConfig);
+  data.profile.configurationId='minimum-fee:'+f.feeAuthority.digest;data.profile.maxMinerFeeAtomic=f.input.sourceContext.maxMinerFeeAtomic;
+  data.profile.sourceNetwork=f.input.sourceContext.sourceNetwork;
+  await configureFixtureTokens(data.profile.tokens);setFixtureChain(await MoneroChain.create(data.profile.tokens));
+  f.input.request=await buildUnapprovedMoneroPayout(data.source,data.profile);
+  const actual=createV2WithdrawalAuthorityVerifier({...f.ports,captureRequest:captureUnapprovedMoneroPayoutRequest});
+  assert.equal((await actual.verifyWithdrawal(f.input)).amountAtomic,net);
+  const changed=clone(data.profile);changed.fees.bridgeFee='200';
+  f.input.request=await buildUnapprovedMoneroPayout(data.source,changed);
+  await assert.rejects(actual.verifyWithdrawal(f.input),/V2 authoritative fee profile/);
+});
 test('binds confirmed credited occurrence, independently verified return and exact native selection/request',async()=>{
   const f=fixture(),result=await f.verifier.verifyWithdrawal(f.input);
   assert.equal(result.creditTransactionId,h(30));assert.equal(result.creditBoxId,h(40));assert.equal(result.redemptionTxId,h(50));

@@ -4,7 +4,7 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
-import {captureContributionPackage} from './contribution-package.mjs';
+import {captureContributionPackage,contributionPackageFiles} from './contribution-package.mjs';
 const names=['package.json','dist/const.js','dist/index.js','dist/multiSigHandler.js','dist/multiSigUtils.js','dist/types.js'];
 const sha=value=>createHash('sha256').update(value).digest('hex');
 function fixture(){
@@ -14,9 +14,11 @@ function fixture(){
   return {root,sha256};
 }
 test('fixed package closure verifies and rejects undeclared modules and wrong pins',()=>{
-  const cfg=fixture(),pin=captureContributionPackage(cfg);pin.verify();assert(pin.read(pin.entry).length>0);
+  const cfg=fixture(),pin=captureContributionPackage({...cfg,commit:'1'.repeat(40)});pin.verify();assert(pin.read(pin.entry).length>0);
+  assert.deepEqual(pin.files.map(row=>row.name),contributionPackageFiles);assert(pin.files.every(row=>row.path.startsWith(pin.root)&&/^[0-9a-f]{64}$/.test(row.sha256)));
   assert.throws(()=>pin.read(pin.prefix+'dist/unreviewed.js'),/undeclared/);
   assert.throws(()=>captureContributionPackage({...cfg,sha256:'00'.repeat(32)}),/pin/);
+  assert.throws(()=>captureContributionPackage({...cfg,commit:'00'}),/commit/);
   assert.throws(()=>captureContributionPackage({...cfg,extra:1}),/configuration/);
 });
 for(const file of names)test('package mutation refuses '+file,()=>{

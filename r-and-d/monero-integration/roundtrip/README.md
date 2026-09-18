@@ -2,19 +2,22 @@
 
 A. Shannon · 18 September 2026
 
-**Deposit adapter qualification:** the scanner, native output/certificate reader,
-watcher jobs and fresh guard authorization now have a connected local execution.
+**Complete local V2 roundtrip:** the scanner, native output/certificate reader,
+watcher jobs and fresh guard authorization connect deposit, credit, redemption,
+Monero payout and confirmed Ergo reward distribution.
 Read the [adapter qualification report](adapter-qualification.md) for the code,
 validation and remaining production gates. Production qualification is still open.
 
 The [historical failure coverage](burn-coverage.md) distinguishes both
 multiple-counting mechanisms from repeated economic backing. The
-[multisig review packet](multisig-review.md) prepares the remaining independent
-review of the optional contribution hook.
+[multisig review packet](multisig-review.md) records the completed independent
+local review of the optional contribution hook and the corrected overlap case.
 
-**Latest increment: output novelty before watcher publication.** The V2
-watchers consult retained guard custody before proposing or publishing an event.
-See the [novelty and recovery checks](adapter-qualification.md#output-novelty-before-watcher-publication).
+**Latest increment: fees, reward custody and completion.** The V2 path reads the
+configured on-chain fee policy, applies proportional withdrawal fees, retains
+one reward assignment per withdrawal and recovers the confirmed reward after a
+lost reply and four-guard restart. See the
+[current qualification](adapter-qualification.md#complete-local-v2-roundtrip).
 
 **Explicit output and intent agreement.** Read the
 [output agreement report](output-agreement.md) for the watcher/guard binding,
@@ -42,9 +45,9 @@ return uses one signing call, two original-holder contributions and one Monero
 submission. It recovers a deliberately lost submission reply and reaches durable
 settlement after the configured confirmation depth.
 
-A fresh run of the final [replay package](source/README.md) also passed, with
-its declared source, dependency, binary and configuration inputs unchanged.
-The exact manifest and both receipts are linked from the report.
+The [replay package](source/README.md) provides the source, exact prerequisites
+and launcher. The qualification report distinguishes current evidence from the
+earlier frozen campaigns and their narrower declared input sets.
 
 This experiment connects the current Monero protocol to Rosen's Ergo credit and payment workflow on controlled local nodes. Its source package contains the separate Monero participants, deposit policy, durable accounting, Rosen integration, actual Ergo transactions and recovery checks.
 
@@ -52,4 +55,4 @@ The experiment addresses a more demanding question than whether a multisignature
 
 Read the [technical report](technical-report.md) for the execution path, security boundaries, evidence and remaining work. The [source package](source/README.md) documents its prepared prerequisites and replay command. The [earlier preliminary study](../preliminary-study/README.md) remains the design and migration background.
 
-The scope is a local integration prototype. The original baseline uses local operator triggers; the successor runs the pinned watcher jobs with bounded node/database ports. Four credit guards are separate instances in one JavaScript host; the four Monero holders and native source readers use separate processes. Assets are fixture tokens. A successful run does not establish full watcher-daemon integration, independently operated custody, permissionless deposit submission, pooled-vault solvency, sustainable fee pricing or FCMP++/Carrot migration.
+The scope is a local integration prototype. The original baseline uses local operator triggers; V2 runs pinned watcher jobs in two processes per direction and four guard processes with separate stores. Four Monero holders use separate native processes with a two-holder signing threshold. The three-of-four Ergo signing threshold is a separate control. Assets are fixture tokens. A successful run does not establish autonomous production-service deployment, independently operated custody, permissionless deposit submission, pooled-vault solvency, sustainable fee pricing or FCMP++/Carrot migration.

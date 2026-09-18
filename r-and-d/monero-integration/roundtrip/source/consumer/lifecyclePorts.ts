@@ -8,6 +8,7 @@ const database = () => { if (!lifecycleState.database) throw Error('Lifecycle DB
 export const DatabaseAction = { getInstance: () => ({
   getActiveTransactions: () => database().dataSource.manager.find(TransactionEntity, { where: { status: Not('completed') }, relations: ['event', 'order'] }),
   setTxStatus: (txId: string, status: string) => database().dataSource.manager.update(TransactionEntity, { txId }, { status }),
+  setEventStatus: (id: string, status: string) => database().setEventStatus(id, status),
   updateTxLastCheck: (txId: string, lastCheck: number) => database().dataSource.manager.update(TransactionEntity, { txId }, { lastCheck }),
   setEventStatusToPending: (id: string, status: string) => database().dataSource.manager.update(ConfirmedEventEntity, { id }, { status, firstTry: null } as any),
 }) };
