@@ -38,6 +38,16 @@ It identifies both implemented experimental behavior and integration gaps.
 | Event distinguishability | One qualifying unlocked vault output is accepted per deposit transaction. Keep the raw txid and existing request ID; additionally commit the selected output and full intent in the event's origin descriptor. Separate ledger uniqueness checks cover output keys and associated key images across txids. |
 | Fee handling | Use Rosen's effective bridge/network charges, including configured minima and proportional bridge fees, and bind the resulting recipient amount and miner-fee ceiling before signing. An uncertain signed payment retains its inputs and liability; a changed fee estimate must not silently authorize another payment. The published V2 run uses fixed fixture charges and subsidized reserves; authoritative fee-box integration, completed return rewards and sustainable pricing are not established by that run. |
 
+One deposit-policy decision remains: the current intent authenticates exact fees
+and credited amount. If its quote is below the applicable Rosen minimum, this
+profile must refuse admission rather than change that authenticated amount.
+Ordinary RCS processing can instead raise effective fees and reduce the payment.
+Rosen should approve either that refusal policy or a revised intent that
+authorizes the effective-fee calculation. The present proof profile does not
+establish equivalent automatic adjustment; existing credits must never be
+repriced. Withdrawal construction can use the ordinary effective-fee calculation
+before its payment request is approved.
+
 ## Deposit: agree on one output before credit
 
 A transaction-level amount or wallet balance is insufficient authority for an
