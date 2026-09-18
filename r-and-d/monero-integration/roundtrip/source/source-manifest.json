@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 402,
-  "aggregateSha256": "0c0adbb91f24722373ec69c6fc29166d5e204a57e7c5f8986d5098b0f44d260c",
+  "fileCount": 421,
+  "aggregateSha256": "8b802ae5f926552caebb65ffd02615c46c627bb7a3e5069d1ce0401b60a6d37b",
   "files": [
     {
       "path": "README.md",
-      "bytes": 14499,
-      "sha256": "f1674e647a2a3349ac0a478c1af1c07e725335659d9be9c8bab87f61aa5bfdeb"
+      "bytes": 16793,
+      "sha256": "e25c260aebadf68f43916d43a298c1c7c7d05c08ebd0830a03d2b1f919f3d98f"
     },
     {
       "path": "consumer/adapter.ts",
@@ -135,6 +135,11 @@
       "sha256": "1f472daf1df384f5647701d21ba4f2d87cbf1d512a0597ae375776348c885120"
     },
     {
+      "path": "consumer/depositAdapter.live.mjs",
+      "bytes": 19053,
+      "sha256": "b3a0bfd2485780b2ea4fc13a01465bedc09927917be555d0de82b779f59c3b22"
+    },
+    {
       "path": "consumer/depositDelivery.config.ts",
       "bytes": 240,
       "sha256": "fd1fa84439242ce6eb36cf8593db90b33f8fb5837eb22a3a260567fd295f3131"
@@ -193,6 +198,16 @@
       "path": "consumer/fixturePorts.ts",
       "bytes": 462,
       "sha256": "2d63acc6a230f9091c5af62f496e0ea50ff3ccb60bf0f598656d2e6db26a5f05"
+    },
+    {
+      "path": "consumer/freshDepositAdmission.mjs",
+      "bytes": 11993,
+      "sha256": "e148a5545f7a7fb2c138bd0e3b5889087310834085a51a9979b66b4b2874c777"
+    },
+    {
+      "path": "consumer/freshDepositAdmission.test.mjs",
+      "bytes": 7940,
+      "sha256": "2e4fa7c28e3f59567e51174f9928d36051e3b44f7a93207b50c13950488d7f89"
     },
     {
       "path": "consumer/gate-fixture.config.ts",
@@ -270,6 +285,16 @@
       "sha256": "dd7b525570ac8d7891681800f6b8e1e79c7d1beb88416ab913b74f981b422d5a"
     },
     {
+      "path": "consumer/nativeDepositDiscovery.mjs",
+      "bytes": 3815,
+      "sha256": "524e36e566b56e7aec9aed3cfdfee33c441d012a04d1492175642faae1e0ea03"
+    },
+    {
+      "path": "consumer/nativeDepositDiscovery.test.mjs",
+      "bytes": 2621,
+      "sha256": "134ae0d60876cf3f64872bc6657137172d52f3580299c6a1ed95913b59796880"
+    },
+    {
       "path": "consumer/nativePin.ts",
       "bytes": 401,
       "sha256": "005639cbe3d6ceae46b6b83848233dcb24e6377de349d34ccbe3a8684b9e42c7"
@@ -331,8 +356,8 @@
     },
     {
       "path": "consumer/participantSigning.mjs",
-      "bytes": 13873,
-      "sha256": "0c61b50d41815ffece6889b49fa15f1cd9d1e13d69ef39667b0c95d90f0d6b50"
+      "bytes": 17854,
+      "sha256": "74f6332b2cd63b818c7e50e763886b9de5459db7164ca8828dab9a587c3d043f"
     },
     {
       "path": "consumer/participantSigningFaults.spec.ts",
@@ -501,8 +526,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 14139,
-      "sha256": "7ce01566262f838c8e0a9ecd3d14a8c3777b45d0aac1f09ec2d72f762f45bb0c"
+      "bytes": 16125,
+      "sha256": "6f589c0af9bc903514c5be5b98d1284786309c45fd66e2d3ccf9b949e96bfbef"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -546,8 +571,8 @@
     },
     {
       "path": "ergo-node/credit-committee.mjs",
-      "bytes": 10988,
-      "sha256": "6cacba512a451aca01a029238a515d5d97e2aa476da578a08fb4b504fa839f20"
+      "bytes": 11672,
+      "sha256": "0570c1eca07bb9c6df81e0913466ca460bee7d0ddb98071790e173025eecca6e"
     },
     {
       "path": "ergo-node/credit-committee.test.mjs",
@@ -591,13 +616,23 @@
     },
     {
       "path": "ergo-node/deposit-loader.mjs",
-      "bytes": 1152,
-      "sha256": "32a865d33f3cfae98d211b040a06bc5aa18297c9f73f7203d4f4fcbdc94e0ab4"
+      "bytes": 1875,
+      "sha256": "9ffd7d39c3a44a2c22c34a3f3f62df0875233eebff35945f0f860512ecb40991"
     },
     {
       "path": "ergo-node/deposit-register.mjs",
       "bytes": 97,
       "sha256": "a7536fbdc13335e7097a42033b10c9c69b1c618912b357895d0ca11bacf23e52"
+    },
+    {
+      "path": "ergo-node/fresh-credit-source.mjs",
+      "bytes": 5398,
+      "sha256": "42ea8e77ebf6b803559cb13c8ddb6b6b2d9edd73f1394b2b7c4b7878af0ffcd8"
+    },
+    {
+      "path": "ergo-node/fresh-credit-source.test.mjs",
+      "bytes": 7049,
+      "sha256": "394db26fd8279893b89a83d3629b0f5f03d19a008d6941e5ef604c38ee732677"
     },
     {
       "path": "ergo-node/loader.mjs",
@@ -1186,13 +1221,18 @@
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.mjs",
-      "bytes": 17741,
-      "sha256": "bd92fea600c1d2de1af3adb69dcfe854022f4f32058938540e405544d14fcd84"
+      "bytes": 19877,
+      "sha256": "657a645d91395d1c4922550cf5ed145994764b651654cb5f922098acd5ac7ac9"
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.test.mjs",
       "bytes": 19868,
       "sha256": "a89db0f0cb4d4ced2f4de35927151c547b205d343b24e989fddd355506b8fc53"
+    },
+    {
+      "path": "guard-service/src/db/moneroCreditAssignmentV2.test.mjs",
+      "bytes": 9792,
+      "sha256": "6f083e0324997862a2c5fdc6803c123af24e429a8620b751107ef107f8b287c4"
     },
     {
       "path": "guard-service/src/db/moneroWithdrawalReservation.ts",
@@ -1246,13 +1286,18 @@
     },
     {
       "path": "guard-service/src/deposit/moneroCreditSigner.mjs",
-      "bytes": 6533,
-      "sha256": "03cdd07b03d86991489b0afb9705d44c925a7f73122f515b7a97e7ea742af2b4"
+      "bytes": 9017,
+      "sha256": "e6128460925ad2f51e9cec467beab953593c5151ed45e938a82b648ad6c893c3"
     },
     {
       "path": "guard-service/src/deposit/moneroCreditSigner.test.mjs",
       "bytes": 5886,
       "sha256": "ea1730d42899eae8ea623df062042832744bf2baf15a758f5c103a07a14bbde5"
+    },
+    {
+      "path": "guard-service/src/deposit/moneroCreditSignerFresh.test.mjs",
+      "bytes": 6143,
+      "sha256": "9618e7464713d0af9ef277fd3ffa4c1742b6e36c6658639d06958eceb4071c46"
     },
     {
       "path": "guard-service/src/event/eventBoxes.ts",
@@ -1566,8 +1611,8 @@
     },
     {
       "path": "native/src/bin/monero_participant.rs",
-      "bytes": 2221,
-      "sha256": "3251962395ff729311387ed052c24a345f7dec7208f878face02bd663f3dc094"
+      "bytes": 3210,
+      "sha256": "1190c0f1596a0a43ee3dc69f0851fd64a01dc55b7a519102582566ceb5aa8c2b"
     },
     {
       "path": "native/src/bin/synthetic_candidate_host.rs",
@@ -1600,24 +1645,54 @@
       "sha256": "25b3773be47df00c6764ac6394636a466e21aea6157f5e44b321ae47a72bf2ea"
     },
     {
+      "path": "native/src/deposit_block.rs",
+      "bytes": 7649,
+      "sha256": "3386c7fab9ae371d6c947eb27fdb5e94b2d9ac52a8384e0522186c21ed1ae9ce"
+    },
+    {
+      "path": "native/src/deposit_block_tests.rs",
+      "bytes": 19272,
+      "sha256": "02dc9b008c54504cbf1876ad65529b1779a9f6cbd416813ac36f66a4066fd53d"
+    },
+    {
+      "path": "native/src/deposit_discovery.rs",
+      "bytes": 3310,
+      "sha256": "76ebaf952309da6c447408493765fe0048d3420e07383080044485f21b42c668"
+    },
+    {
+      "path": "native/src/deposit_discovery_tests.rs",
+      "bytes": 6962,
+      "sha256": "9b092b1534df500968ea6eb18e672636f574f8f7537f2b71812fbacf6f9b6245"
+    },
+    {
+      "path": "native/src/deposit_observer.rs",
+      "bytes": 12594,
+      "sha256": "652099cfe675bcc2e4b0096c9d99483c9ab20354ab446b83abc3252903917fdf"
+    },
+    {
+      "path": "native/src/deposit_observer_tests.rs",
+      "bytes": 19953,
+      "sha256": "89ab8124384b2c3917331acf50419c7560b2869ca1d783d76eb42057ee9f1811"
+    },
+    {
       "path": "native/src/host.rs",
       "bytes": 8678,
       "sha256": "e253f7ac06e203d4c8cc444ff890c37a67b78d60cd2d5c11b819f666156cc64f"
     },
     {
       "path": "native/src/key_image.rs",
-      "bytes": 12699,
-      "sha256": "1b51c4b7be545ee8a59aa1027b4353b648ad48901dfd0ee8d1d37be750eef7f1"
+      "bytes": 14567,
+      "sha256": "dc99e73d3c81d1e22ed60f9c292eda386a504625e0ace9325872e1b5d33e47e6"
     },
     {
       "path": "native/src/key_image_tests.rs",
-      "bytes": 2948,
-      "sha256": "d2654ee47a1613f0268a3c70329d6d914965568411cdd50306783907cbd3425b"
+      "bytes": 6095,
+      "sha256": "f6f1a77dbd3c9a9d50279e7889d530039dec2fa8b7225dc1069c6616974b7760"
     },
     {
       "path": "native/src/lib.rs",
-      "bytes": 13978,
-      "sha256": "ecd2b291cda0636df13153b7baa2ad56f97874000af2794419bfa20e32b207a0"
+      "bytes": 14193,
+      "sha256": "8d39c3b2682d05971723427f5592ccce4d6ca3b8de21a5a7c24d6d2154a3dd6d"
     },
     {
       "path": "native/src/node_funding.rs",
@@ -1653,6 +1728,16 @@
       "path": "native/src/retained_host.rs",
       "bytes": 21803,
       "sha256": "34e0309f0b0a50c10e8f72d001fa0b7ab0c8a58b809e20532edbfb5f167853c3"
+    },
+    {
+      "path": "native/src/source_certificate.rs",
+      "bytes": 10922,
+      "sha256": "840253635a34bb55633479176eb99f05b167d090fe8495eb307d78bd755804c5"
+    },
+    {
+      "path": "native/src/source_certificate_tests.rs",
+      "bytes": 13471,
+      "sha256": "786fedd6789c7f691a64a7283a511d419e1ea270a00453a217cc3426c8c73a7e"
     },
     {
       "path": "native/src/synthetic_keeper.rs",
@@ -1938,6 +2023,16 @@
       "path": "tools/config.mjs",
       "bytes": 1155,
       "sha256": "769e4cceea9aef909f9241710a8cf01198217f2bacb0ad58d5dace9ff851db23"
+    },
+    {
+      "path": "tools/contribution-package.mjs",
+      "bytes": 2203,
+      "sha256": "ec63ebced5a523a4f32344b8324e153996f24b3884e61a6b97e9d3f32ae6d3b8"
+    },
+    {
+      "path": "tools/contribution-package.test.mjs",
+      "bytes": 1969,
+      "sha256": "259322584e0f25a80a1ac7d064338339635e66d5893c8f729ee4e63d9da09c2d"
     },
     {
       "path": "tools/launch-roundtrip.mjs",

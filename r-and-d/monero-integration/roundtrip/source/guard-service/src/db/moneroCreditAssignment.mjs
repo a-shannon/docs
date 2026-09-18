@@ -31,7 +31,7 @@ export function canonicalAssignment(value) {
 function configBytes(config) {
   const backed=Object.hasOwn(config ?? {},'backingPolicy');
   shape(config, ['custodyDomain','guardKey','committeeKeys','quorum','maxFaults','activationId','policyEpoch','policyDigest',...(backed?['backingPolicy']:[])], 'config');
-  if(backed && config.backingPolicy!=='single-deposit-v1')throw Error('config:backing-policy');
+  if(backed && !['single-deposit-v1','single-deposit-v2'].includes(config.backingPolicy))throw Error('config:backing-policy');
   for (const name of ['custodyDomain','activationId','policyEpoch']) text(config[name], name);
   hex(config.policyDigest, 32, 'policyDigest');
   if (!Array.isArray(config.committeeKeys) || config.committeeKeys.length !== 4 ||
@@ -52,8 +52,33 @@ export function committeeConfigDigest(config) {
   const {guardKey: _guardKey, ...common}=config;
   return hash(canonicalAssignment(common));
 }
+/** Exact stable descriptor from fresh native/proof admission, not its mutable snapshot.
+ * Monero's committee digest is retained separately from the Ergo binding digest.
+ * Source verification remains the guard's responsibility before assignment. */
+function v2BackingNullifier(backing, outputs, binding) {
+  shape(backing, ['version','genesis','committeeDigest','vaultSpend','vaultAddress',
+    'intentHash','txId','blockHash','blockHeight','outputIndex','globalIndex',
+    'outputKey','keyImage','amountAtomic','destinationNetwork','destinationAsset',
+    'recipient','creditedAtomic'], 'backing');
+  if (backing.version !== 2) throw Error('backing:version');
+  for (const name of ['genesis','committeeDigest','vaultSpend','intentHash','txId',
+    'blockHash','outputKey','keyImage','destinationAsset']) hex(backing[name],32,'backing:'+name);
+  for (const name of ['vaultAddress','destinationNetwork','recipient']) text(backing[name],'backing:'+name);
+  for (const name of ['blockHeight','outputIndex','globalIndex']) {
+    if (!Number.isSafeInteger(backing[name]) || backing[name] < 0 || Object.is(backing[name],-0))
+      throw Error('backing:'+name+':safe-integer');
+  }
+  for (const name of ['amountAtomic','creditedAtomic']) {
+    if (typeof backing[name] !== 'string' || !/^[1-9][0-9]{0,19}$/.test(backing[name]) ||
+        BigInt(backing[name]) > 18446744073709551615n) throw Error('backing:'+name+':uint64');
+  }
+  if (outputs.length !== 1 || backing.outputKey !== outputs[0].publicKey ||
+      backing.intentHash !== binding.sourceIntentDigest) throw Error('backing:request-binding');
+  // Neither committee epoch nor block occurrence may reset economic uniqueness.
+  return `monero:key-image:${backing.genesis}:${backing.vaultSpend}:${backing.keyImage}`;
+}
 function requestBytes(request, config, committeeDigest) {
-  const backed=config.backingPolicy==='single-deposit-v1';
+  const backed=['single-deposit-v1','single-deposit-v2'].includes(config.backingPolicy);
   shape(request, ['binding','outputs',...(backed?['backing']:[])], 'request');
   shape(request.binding, ['obligationId','creditTransactionDigest','sourceIntentDigest','triggerBoxId','policyDigest','committeeDigest'], 'binding');
   const b = request.binding;
@@ -70,7 +95,9 @@ function requestBytes(request, config, committeeDigest) {
   }).sort((a,b) => a.economicId < b.economicId ? -1 : a.economicId > b.economicId ? 1 : 0);
   if (new Set(outputs.map(o => o.economicId)).size !== outputs.length) throw Error('outputs:duplicate');
   let nullifierId;
-  if(backed){
+  if(config.backingPolicy==='single-deposit-v2'){
+    nullifierId=v2BackingNullifier(request.backing,outputs,b);
+  }else if(backed){
     const x=request.backing;
     shape(x,['version','genesis','vaultSpend','vaultAddress','intentHash','txid','outputIndex','globalIndex','publicKey','keyImage','amountAtomic','destinationNetwork','destinationAsset','recipient','creditedAtomic'],'backing');
     if(x.version!==1)throw Error('backing:version');
@@ -151,6 +178,7 @@ export class MoneroCreditAssignment {
       const rows=settlements.filter(s=>s.obligationId===c.obligationId);
       if(c.settlementDigest===null){if(rows.length)throw Error('custody:settlement-integrity');}
       else{
+        if(this.#config.backingPolicy==='single-deposit-v2')throw Error('settlement:profile');
         hex(c.settlementDigest,32,'custody:settlement-digest');
         if(!request.nullifierId || rows.length!==1)throw Error('custody:settlement-integrity');
         const stored=settlementBytes(JSON.parse(rows[0].settlement));
@@ -215,6 +243,7 @@ export class MoneroCreditAssignment {
   }
   #settlement(request,settlement,mode){
     this.#live();
+    if(this.#config.backingPolicy==='single-deposit-v2')throw Error('settlement:profile');
     const r=requestBytes(request,this.#config,this.#committeeDigest),s=settlementBytes(settlement);
     if(!r.nullifierId)throw Error('settlement:backing-required');
     return this.#transaction(()=>{

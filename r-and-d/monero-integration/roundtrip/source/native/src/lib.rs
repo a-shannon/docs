@@ -384,6 +384,13 @@ pub mod synthetic_keeper;
 pub mod participant;
 #[cfg(feature = "participant-host")]
 mod participant_envelope;
+#[cfg(feature = "participant-host")]
+pub mod source_certificate;
+pub mod deposit_block;
+#[cfg(feature = "participant-host")]
+pub mod deposit_observer;
+#[cfg(feature = "participant-host")]
+pub mod deposit_discovery;
 
 /// Read-only public fixed-view observation on the isolated local fixture chain.
 #[cfg(feature = "participant-host")]

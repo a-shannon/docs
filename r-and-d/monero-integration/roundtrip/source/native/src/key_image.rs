@@ -27,7 +27,7 @@ pub struct LocalContext {
     pub session: [u8;32], pub retained_intent: [u8;32],
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InputIdentity { transaction: [u8;32], index: u64, chain_index: u64, p: [u8;32] }
 impl InputIdentity {
     fn from_output(o: &WalletOutput) -> Self { Self { transaction: o.transaction(), index: o.index_in_transaction(), chain_index: o.index_on_blockchain(), p: o.key().compress().to_bytes() } }
@@ -35,6 +35,15 @@ impl InputIdentity {
     pub fn output_key(&self) -> [u8;32] { self.p }
     pub fn transaction(&self) -> [u8;32] { self.transaction }
     pub fn index(&self) -> u64 { self.index }
+    pub fn chain_index(&self) -> u64 { self.chain_index }
+}
+
+/// Public epoch material supplied by the caller's configured authority, never by a proof row.
+#[derive(Clone)]
+pub struct PublicImageCommittee {
+    pub group: [u8;32],
+    pub threshold: u16,
+    pub roster: Vec<(u16, [u8;32])>,
 }
 
 #[cfg(test)]
@@ -103,20 +112,37 @@ fn untweaked(keys: &ThresholdKeys<Ed25519>) -> Result<()> {
 impl LocalImageSession {
     pub fn capture(context: LocalContext, keys: &ThresholdKeys<Ed25519>, selected: Vec<Participant>, outputs: &[WalletOutput]) -> Result<Self> {
         untweaked(keys)?;
+        // Preserve the original holder API's requirement that it belongs to the subset.
+        if !selected.contains(&keys.params().i()) { return Err(Error::Subset); }
+        let public=PublicImageCommittee {
+            group: keys.original_group_key().to_bytes(), threshold: keys.params().t(),
+            roster: (1..=keys.params().n()).map(|n| (n, keys.original_verification_share(Participant::new(n).unwrap()).to_bytes())).collect(),
+        };
+        Self::capture_public(context, &public, selected, outputs)
+    }
+    /// Reconstruct verifier state without a threshold secret share. Ownership/offset comes
+    /// from the independently scanned WalletOutput; this method grants no chain authority.
+    pub fn capture_public(context: LocalContext, public: &PublicImageCommittee, selected: Vec<Participant>, outputs: &[WalletOutput]) -> Result<Self> {
         if [context.network_genesis,context.epoch,context.epoch_manifest,context.session,context.retained_intent].contains(&[0;32]) { return Err(Error::Context); }
         if outputs.is_empty() || outputs.len()>16 { return Err(Error::InputCount); }
+        if public.roster.is_empty() || public.roster.len()>usize::from(u16::MAX) || public.threshold==0 || usize::from(public.threshold)>public.roster.len() { return Err(Error::Epoch); }
+        if public.roster.iter().enumerate().any(|(slot,(id,_))|usize::from(*id)!=slot+1) { return Err(Error::Epoch); }
         // Require canonical subset order instead of silently normalizing caller data.
-        if selected.windows(2).any(|s|s[0]>=s[1]) { return Err(Error::Subset); }
-        let view=keys.view(selected.clone()).map_err(|_|Error::Subset)?;
-        let group=point(keys.original_group_key().to_bytes())?;
-        let roster=(1..=keys.params().n()).map(|n| {
-            let id=Participant::new(n).ok_or(Error::Epoch)?;
-            Ok((id,point(keys.original_verification_share(id).to_bytes())?))
+        if selected.len()<usize::from(public.threshold) || selected.len()>public.roster.len() || selected.windows(2).any(|s|s[0]>=s[1]) || selected.iter().any(|i|usize::from(u16::from(*i))>public.roster.len()) { return Err(Error::Subset); }
+        let group=point(public.group)?;
+        let roster=public.roster.iter().map(|(n,v)| {
+            Ok((Participant::new(*n).ok_or(Error::Epoch)?,point(*v)?))
         }).collect::<Result<Vec<_>>>()?;
-        let subset=selected.iter().map(|i|Ok((*i,view.interpolation_factor(*i).ok_or(Error::Subset)?))).collect::<Result<Vec<_>>>()?;
-        let public_sum: EdwardsPoint=subset.iter().map(|(i,l)|keys.original_verification_share(*i) * l).sum();
+        // Same public Lagrange interpolation as dkg 0.6.1; its helper is private.
+        let subset=selected.iter().map(|i| {
+            let x=Scalar::from(u64::from(u16::from(*i)));
+            let (mut numerator,mut denominator)=(Scalar::ONE,Scalar::ONE);
+            for j in &selected { if i!=j { let y=Scalar::from(u64::from(u16::from(*j))); numerator*=y; denominator*=y-x; } }
+            let inverse=Option::<Scalar>::from(denominator.invert()).ok_or(Error::Subset)?;
+            Ok((*i,numerator*inverse))
+        }).collect::<Result<Vec<_>>>()?;
+        let public_sum: EdwardsPoint=subset.iter().map(|(i,l)|roster[usize::from(u16::from(*i)-1)].1 * l).sum();
         if public_sum!=group { return Err(Error::Epoch); }
-        drop(view);
         let mut identities=HashSet::new(); let mut points=HashSet::new(); let mut chain_indices=HashSet::new();
         let mut inputs=Vec::new();
         for o in outputs {
@@ -130,7 +156,7 @@ impl LocalImageSession {
             let h=point(monero_ed25519::Point::biased_hash(identity.p).compress().to_bytes())?;
             inputs.push(InputState { identity,h,offset });
         }
-        let mut session=Self { context,group,threshold:keys.params().t(),roster,subset,inputs,binding:Vec::new() };
+        let mut session=Self { context,group,threshold:public.threshold,roster,subset,inputs,binding:Vec::new() };
         session.binding=session.encode_binding(); Ok(session)
     }
     fn encode_binding(&self) -> Vec<u8> {

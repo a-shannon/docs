@@ -3,6 +3,7 @@ import { isAbsolute, join } from 'node:path';
 import { createECDH } from 'node:crypto';
 import { MoneroCreditAssignment, canonicalAssignment, committeeConfigDigest, assignmentConfigDigest } from '../guard-service/src/db/moneroCreditAssignment.mjs';
 import { createMoneroCreditSigner, snapshotCreditSigning } from '../guard-service/src/deposit/moneroCreditSigner.mjs';
+import { captureContributionPackage } from '../tools/contribution-package.mjs';
 
 const committeeCustody=new WeakMap();
 /** Only an actual committee handle can expose its retained claim operations. */
@@ -15,7 +16,7 @@ export function captureCreditCommittee(handle){
 /** Fixed four-member local transport. Source verification remains guard-owned;
  * persistent assignments are never released by timeout or transport cleanup. */
 export async function createCreditCommittee({ directory, deployment, verifyForGuard, getStateContext,
-    policyDigest, activationId, custodyDomain, policyEpoch='1', backingPolicy, timeoutMs=60000 }) {
+    policyDigest, activationId, custodyDomain, policyEpoch='1', backingPolicy, contributionPackage, timeoutMs=60000 }) {
   if (!isAbsolute(directory ?? '') || typeof verifyForGuard!=='function' || typeof getStateContext!=='function' ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs<100 || timeoutMs>60000 || deployment?.threshold!==3 ||
       !Array.isArray(deployment.guardPublicKeys) || deployment.guardPublicKeys.length!==4 ||
@@ -30,11 +31,15 @@ export async function createCreditCommittee({ directory, deployment, verifyForGu
       if (key.getPublicKey('hex','compressed')!==keys[i]) throw Error(); }
     catch { throw Error('credit-committee:key-binding'); }
   }
-  const {MultiSigHandler,MultiSigUtils}=await import('@rosen-bridge/ergo-multi-sig');
+  const requireFreshContribution=backingPolicy==='single-deposit-v2';
+  const implementation=requireFreshContribution?captureContributionPackage(contributionPackage):undefined;
+  const {MultiSigHandler,MultiSigUtils}=await import(implementation?.entry??'@rosen-bridge/ergo-multi-sig');
+  implementation?.verify();
   const {ECDSA}=await import('@rosen-bridge/encryption');
   const {DummyLogger}=await import('@rosen-bridge/abstract-logger');
   // The package's protocol envelope version is tied to this exact implementation.
-  const bootstrap=canonicalAssignment({domain:'rosen-monero-credit-committee',version:1,protocolVersion:'3.0.1',configs});
+  const bootstrap=canonicalAssignment({domain:'rosen-monero-credit-committee',version:1,protocolVersion:'3.0.1',configs,
+    ...(implementation?{contributionPackageSha256:implementation.sha256}:{})});
   const manifest=join(directory,'committee-bootstrap.json');
   let fresh=false;
   if (existsSync(directory)) {
@@ -84,10 +89,16 @@ export async function createCreditCommittee({ directory, deployment, verifyForGu
     for(let i=0;i<4;i++)ledgers.push(fresh?MoneroCreditAssignment.create(files[i],configs[i]):MoneroCreditAssignment.open(files[i],configs[i]));
     for(let i=0;i<4;i++) {
       const enc=new ECDSA(secrets[i]);
+      let facade;
       const participant=new MultiSigHandler({logger:new DummyLogger(),multiSigUtilsInstance:new MultiSigUtils(getStateContext),
         messageEnc:enc,secretHex:secrets[i],txSignTimeout:60,turnTime:600,
         submit:(message,recipients)=>enqueue(i,message,recipients),
-        guardDetection:{activeGuards:async()=>peerIds.map((peerId,index)=>({peerId,index}))},commGuardsPk:[...keys],ergoGuardPks:[...keys]});
+        guardDetection:{activeGuards:async()=>peerIds.map((peerId,index)=>({peerId,index}))},commGuardsPk:[...keys],ergoGuardPks:[...keys],
+        ...(requireFreshContribution?{beforeContribution:async request=>{
+          implementation.verify();
+          await facade.refreshContribution(request);
+          implementation.verify();
+        }}:{})});
       if(participant.protocolVersion!=='3.0.1' || participant.getPk()!==keys[i] || await enc.getPk()!==keys[i]) throw Error('credit-committee:implementation-pin');
       // Instrument only operation counts; never inspect or publish native hints.
       const prover=participant.getProver.bind(participant);let counted;
@@ -109,7 +120,8 @@ export async function createCreditCommittee({ directory, deployment, verifyForGu
         }
       };
       participants.push({participant,turn});
-      facades.push(createMoneroCreditSigner({participant,assignment:ledgers[i],verify:snapshot=>verifyForGuard(i,snapshot)}));
+      facade=createMoneroCreditSigner({participant,assignment:ledgers[i],verify:snapshot=>verifyForGuard(i,snapshot),requireFreshContribution});
+      facades.push(facade);
     }
   } catch(error) {
     closed=true;facades.forEach(f=>f.close());ledgers.forEach(l=>l.close());throw error;

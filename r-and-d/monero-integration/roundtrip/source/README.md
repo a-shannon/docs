@@ -2,6 +2,46 @@
 
 Author: A. Shannon
 
+The [deposit adapter qualification report](../adapter-qualification.md) covers
+the newer scanner-to-watcher-to-guard path. It adds native block/output and retained
+certificate replay, delayed evidence admission, and fresh verification immediately
+before each native guard contribution. This candidate is not production qualified.
+
+### Reproduce the deposit adapter candidate
+
+Prepare the existing native, proof and Rosen prerequisites below. Additionally,
+build the Monero extractor package from scanner commit
+`2e0382d97a6e0a7bb6fb0e5927ad56af44d2f0ae` and the Ergo multisig package from
+sign-protocols commit `fd41b5df91d79bc0fc74373a397372edfd3efa84`.
+These changes are published in the `a-shannon/scanner` and
+`a-shannon/sign-protocols` forks. Set `scannerAdapterRoot` to the former package's
+root, and `contributionPackage` to `{root, sha256}` for the latter package.
+The runtime package digest is SHA-256 of the UTF-8 concatenation
+`path + NUL + file SHA-256 + NUL + decimal byte length + LF`, in this fixed order:
+`package.json`, `dist/const.js`, `dist/index.js`, `dist/multiSigHandler.js`,
+`dist/multiSigUtils.js`, `dist/types.js`. The tested aggregate is
+`f0ddaf9e6b1a00557f55c239529e418f5d76f13b2a63c81ca5cbfd483a9effe1`.
+The loader checks the exact bytes and resolves external package dependencies
+through the prepared Rosen distribution, including its shared WASM instance.
+
+Use a new `runtimeDirectory` for each complete run and a funded, owned isolated
+Ergo devnet. Existing deployments have consumed fixture funds and are not fresh
+test inputs. The test manages its own two isolated Monero daemons; the operator
+retains responsibility for the separately started Ergo node.
+
+With `ROUNDTRIP_CONFIG` set to the absolute configuration filename, set
+`MONERO_ADAPTER_LOCAL_TEST=1`. Export the proof fields through
+`ROUNDTRIP_PROOF_CONFIG` and include that variable in `WSLENV`, as the existing
+launcher does. Then run:
+
+```text
+node --experimental-vm-modules --import ./ergo-node/deposit-register.mjs ./consumer/depositAdapter.live.mjs
+```
+
+This direct qualification command is separate from the older roundtrip launcher
+profiles. It preserves private node, holder and proof material outside the source
+package. Its V2 deposit ledger explicitly refuses the older V1 withdrawal join.
+
 This experimental source package joins an actual isolated Monero deposit and native transaction proof to a real local Ergo credit, redemption of that exact credited box, and a separate-holder Monero payout. The `baseline` profile retains the original local operator trigger fixture. The `watcher-authority` profile uses two independently checked observations and actual Rosen commitment/reveal transactions in both directions, plus four guard instances with separate permanent output-assignment ledgers and actual three-of-four Ergo signatures. Both profiles use isolated chains and fixture tokens.
 
 The original signing and proof algorithms are retained. A public fixed-view native reader and the watcher/guard composition extend the baseline. `relocation-only-changes.json` records the historical baseline relocation; it does not describe these subsequent changes. `source-manifest.json` binds the current exact file set, sizes, and ordinal aggregate. Its SHA-256 must be obtained independently from the reviewed package.

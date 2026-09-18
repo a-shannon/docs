@@ -10,6 +10,62 @@ import {fundPreparedDeposit} from './participantDepositFunding.mjs';
 const hex32=()=>randomBytes(32).toString('hex');
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 const liveVaults=new WeakMap();
+
+/** Export public replay bytes after holder inspection. This does not enroll the
+ * epoch: consumers must independently pin the returned committee configuration. */
+export function encodeParticipantDepositCertificate({init,ready,identities,genesis,config,envelopes,keyImage}) {
+  const hash = value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+  if (!hash(genesis) || !hash(keyImage) || !Array.isArray(ready) || ready.length !== 4 ||
+      !Array.isArray(identities) || identities.length !== 4 || !Array.isArray(envelopes) || envelopes.length !== 2 ||
+      init.threshold !== 2 || !hash(init.epoch) || !hash(init.ceremony)) throw Error('Participant certificate context');
+  const authorityIdentities = identities.map(({id,publicKey},slot) => {
+    if (id !== slot + 1 || typeof publicKey !== 'string' || !/^0[23][0-9a-f]{64}$/.test(publicKey)) {
+      throw Error('Participant certificate identity');
+    }
+    return {id,publicKey};
+  });
+  if (canonical(init.roster) !== canonical(authorityIdentities) ||
+      new Set(authorityIdentities.map(row => row.publicKey)).size !== 4) throw Error('Participant certificate roster');
+  const roster = {groupKey:ready[0].groupKey,verificationShares:structuredClone(ready[0].verificationShares)};
+  if (!hash(roster.groupKey) || !Array.isArray(roster.verificationShares) || roster.verificationShares.length !== 4 ||
+      roster.verificationShares.some((row,slot) => row.id !== slot + 1 || !hash(row.publicKey))) {
+    throw Error('Participant certificate public shares');
+  }
+  const domainDigest = (domain,value) => createHash('sha256').update(domain).update(Buffer.from([0])).update(canonical(value)).digest('hex');
+  const rosterDigest = domainDigest('rosen-monero/local-dkg-roster/v1',roster);
+  for (let slot = 0; slot < 4; slot++) {
+    const row = ready[slot];
+    if (row.id !== slot + 1 || row.threshold !== 2 || row.n !== 4 || row.epoch !== init.epoch ||
+        row.ceremony !== init.ceremony || row.rosterDigest !== rosterDigest ||
+        canonical({groupKey:row.groupKey,verificationShares:row.verificationShares}) !== canonical(roster)) {
+      throw Error('Participant certificate readiness');
+    }
+  }
+  if (config.type !== 'inspect-source' || config.genesis !== genesis || config.epoch !== init.epoch ||
+      config.ceremony !== init.ceremony || config.rosterDigest !== rosterDigest ||
+      (config.sourcePolicy !== undefined && config.sourcePolicy !== 'authenticated-backing-v1')) {
+    throw Error('Participant certificate configuration');
+  }
+  const committee = {genesis,epoch:init.epoch,ceremony:init.ceremony,threshold:2,
+    profile:'ed25519-shamir-untweaked-standard',roster,identities:authorityIdentities,
+    sourcePolicy:config.sourcePolicy ?? null};
+  const committeeDigest = domainDigest('rosen-monero/source-certificate-committee/v1',committee);
+  const shared = structuredClone(config); delete shared.type;
+  const binding = domainDigest('rosen-monero/local-source-config/v1',shared);
+  for (let slot = 0; slot < 2; slot++) {
+    const envelope = envelopes[slot];
+    if (envelope.type !== 'inspection-peer' || envelope.from !== slot + 1 || envelope.to !== 2 - slot ||
+        envelope.round !== 1 || envelope.sequence !== 1 || envelope.binding !== binding ||
+        ['ceremony','epoch','rosterDigest','genesis','inspection'].some(name => envelope[name] !== config[name])) {
+      throw Error('Participant certificate envelope');
+    }
+  }
+  const certificate = canonical({version:1,committeeDigest,config,envelopes,keyImage}) + '\n';
+  if (Buffer.byteLength(certificate) > 65536 || !/^[\x00-\x7f]*$/.test(certificate)) {
+    throw Error('Participant certificate bound');
+  }
+  return Object.freeze({committee:structuredClone(committee),certificate});
+}
 function checkFinal(frame){
   if(typeof frame!=='string'||frame.length>32768||!frame.endsWith('\n'))throw Error('Participant final bound');
   const rows=frame.slice(0,-1).split('\n');
@@ -89,8 +145,10 @@ export async function inspectParticipantDeposit(vault,{fault,sourcePolicy,snapsh
     }
     const withoutId=({id,...report})=>report;
     if(canonical(withoutId(reports[0]))!==canonical(withoutId(reports[1])))throw Error('Participant source disagreement');
+    const replay = encodeParticipantDepositCertificate({init:ceremony.init,ready:ceremony.ready,identities:ceremony.identities,
+      genesis:vault.genesis,config:shared,envelopes:proofs,keyImage:reports[0].keyImage});
     // Only public source data leaves the issuer. The private scalar remains a file capability for the proof helper.
-    return Object.freeze({deposit:Object.freeze({...deposit}),observation:Object.freeze({...reports[0]}),
+    return Object.freeze({deposit:Object.freeze({...deposit}),observation:Object.freeze({...reports[0]}),...replay,
       publicScan:Object.freeze({groupPublicKey:vault.groupKey,genesis:vault.genesis,snapshot:structuredClone(capturedSnapshot),source:structuredClone(funded.source),keyImage:reports[0].keyImage,...(sourcePolicy?{sourcePolicy}:{})}),
       donorProofKeyPath:join(state.depositDirectory,'donor-tx-key.private')});
   }catch(error){await ceremony.close();throw error;}

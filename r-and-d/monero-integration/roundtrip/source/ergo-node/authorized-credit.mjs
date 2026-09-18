@@ -17,6 +17,7 @@ import {makeIndependentDepositProviders,independentlyDecideDeposit} from '../con
 import {captureAuthenticatedDepositSource,moneroCreditOrigin} from '../consumer/authenticatedDepositSource.mjs';
 import {issueBackingClaim} from '../consumer/backingClaim.mjs';
 import {verifyDeliveryMode} from '../consumer/depositDelivery.mjs';
+import {captureFreshCreditSource} from './fresh-credit-source.mjs';
 
 const require=createRequire(path.join(config.rosenRoot,'package.json'));
 const load=relative=>import(pathToFileURL(path.join(config.rosenRoot,relative)).href);
@@ -44,11 +45,20 @@ export function creditOrder(candidate,deployment,wids){
 const orderKey=order=>text(order.map(row=>({...row,address:tree(row.address)})));
 
 /** Local raw-source -> actual trigger/order/reduction verifier for each guard. */
-export async function openAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment,loadRequest}){
-  verifyDeliveryMode(source.context?.configuration?.depositData,loadRequest);
-  const authenticatedSource=captureAuthenticatedDepositSource(source);
+export async function openAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment,loadRequest,freshAdmission}){
+  const freshMode=freshAdmission!==undefined;
+  let authenticatedSource,freshSource;
+  if(!freshMode){
+    verifyDeliveryMode(source.context?.configuration?.depositData,loadRequest);
+    authenticatedSource=captureAuthenticatedDepositSource(source);
+  }
   assert(path.isAbsolute(directory));fs.mkdirSync(directory,{recursive:true});
-  const request=structuredClone(rawRequest),receipt=structuredClone(watcherReceipt);
+  const request=freshMode?undefined:structuredClone(rawRequest),receipt=structuredClone(watcherReceipt);
+  if(freshMode){
+    assert.equal(source,undefined,'Fresh source cannot use legacy source');assert.equal(rawRequest,undefined,'Fresh source cannot use legacy request');
+    assert.equal(loadRequest,undefined,'Fresh source cannot use legacy loader');
+    freshSource=await captureFreshCreditSource({freshAdmission,watcherReceipt:receipt});
+  }
   const d=structuredClone({...deployment,guardSecrets:undefined,watchers:deployment.watchers.map(({secretKey,...watcher})=>watcher)});
   const {DefaultLogger,DummyLogger}=await load('node_modules/@rosen-bridge/abstract-logger/dist/index.js');DefaultLogger.init(new DummyLogger());
   const {TokenMap}=await load('node_modules/@rosen-bridge/tokens/dist/index.js');
@@ -58,25 +68,36 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
   const {DataSource}=await load('node_modules/@rosen-bridge/extended-typeorm/dist/index.js');
   const {default:EventTriggerExtractor}=await load('node_modules/@rosen-bridge/watcher-data-extractor/dist/extractor/eventTriggerExtractor.js');
   const extractor=new EventTriggerExtractor('local-authority',new DataSource({type:'sqlite',database:':memory:'}),'node','',d.contracts.EventTrigger.address,d.tokens.RWT,d.contracts.Permit.address,d.contracts.Fraud.address,undefined,false);
-  const policyDigest=hash(canonicalAssignment({profile:'local-four-guard-backed-credit-v1',configuration:source.context.configuration,feePolicy:source.context.feePolicy,
-    guardBoxId:d.guard.boxId,tokens:d.tokens,contracts:Object.fromEntries(Object.entries(d.contracts).map(([name,c])=>[name,c.tree]))}));
-  const custodyDomain='local-monero-genesis:'+source.publicScan.genesis,activationId='ergo-guard:'+d.guard.boxId;
-  const configs=d.guardPublicKeys.map(guardKey=>({custodyDomain,guardKey,committeeKeys:d.guardPublicKeys,quorum:3,maxFaults:1,activationId,policyEpoch:'1',policyDigest,backingPolicy:'single-deposit-v1'}));
-  const assignmentRequest=(candidate,snapshot)=>({binding:{obligationId:candidate.depositId,creditTransactionDigest:snapshot.digest,sourceIntentDigest:candidate.intentHash,
+  const policyDigest=hash(canonicalAssignment(freshMode?{profile:'local-four-guard-backed-credit-v2',scope:freshSource.scope,genesis:freshSource.genesis,
+    guardBoxId:d.guard.boxId,tokens:d.tokens,contracts:Object.fromEntries(Object.entries(d.contracts).map(([name,c])=>[name,c.tree]))}:
+    {profile:'local-four-guard-backed-credit-v1',configuration:source.context.configuration,feePolicy:source.context.feePolicy,
+      guardBoxId:d.guard.boxId,tokens:d.tokens,contracts:Object.fromEntries(Object.entries(d.contracts).map(([name,c])=>[name,c.tree]))}));
+  const custodyDomain='local-monero-genesis:'+(freshMode?freshSource.genesis:source.publicScan.genesis),activationId='ergo-guard:'+d.guard.boxId;
+  const backingPolicy=freshMode?'single-deposit-v2':'single-deposit-v1';
+  const configs=d.guardPublicKeys.map(guardKey=>({custodyDomain,guardKey,committeeKeys:d.guardPublicKeys,quorum:3,maxFaults:1,activationId,policyEpoch:'1',policyDigest,backingPolicy}));
+  const assignmentRequest=(candidate,snapshot,backing)=>({binding:{obligationId:candidate.depositId,creditTransactionDigest:snapshot.digest,sourceIntentDigest:candidate.intentHash,
     triggerBoxId:receipt.trigger.boxId,policyDigest,committeeDigest:committeeConfigDigest(configs[0])},outputs:candidate.outputs.map(o=>({sourceNetwork:candidate.sourceNetwork,publicKey:o.publicKey})),
-    backing:captureAuthenticatedDepositSource(source).backing});
-  const readers=configs.map((_,i)=>makeIndependentDepositProviders({source,binary:config.observerBinary,sha256:config.observerSha256,runtimeDirectory:config.runtimeDirectory,observerId:'guard-'+i}));
+    backing:freshMode?structuredClone(backing):captureAuthenticatedDepositSource(source).backing});
+  const readers=freshMode?freshSource.readers:configs.map((_,i)=>makeIndependentDepositProviders({source,binary:config.observerBinary,sha256:config.observerSha256,runtimeDirectory:config.runtimeDirectory,observerId:'guard-'+i}));
+  const runSource=freshMode?freshSource.initial:undefined,runCandidate=freshMode?runSource.decision:source.decision;
+  const runObservation=freshMode?runSource.observation:receipt.observation,runBacking=freshMode?runSource.backing:undefined;
   let live=true,committee;
   const network=new ErgoNodeNetwork({nodeBaseUrl:'http://127.0.0.1:19051',logger:new DummyLogger()});
   const chain=new ErgoChain(network,{fee:1100000n,confirmations:{payment:1,cold:1,manual:1,arbitrary:1},addresses:{lock:d.contracts.Lock.address,permit:d.contracts.Permit.address,fraud:d.contracts.Fraud.address,cold:d.fundingAddress},rwtId:d.tokens.RWT,minBoxValue:1000000n,eventTxConfirmation:1},new TokenMap(),{
     isInSign:id=>committee.isInSign(id),sign:(...args)=>committee.sign(...args)});
   async function verifyForGuard(index,snapshot){
     assert(live,'Closed source authority');
-    authenticatedSource.current();
-    const supplied=loadRequest===undefined?request:await loadRequest();
-    const candidate=await independentlyDecideDeposit({source,rawRequest:supplied,providers:readers[index].providers});
-    if(candidate.status!=='accepted')throw Error('Guard source '+candidate.status+':'+candidate.reason);
-    const expected=creditObservation(candidate,source);assert.equal(candidate.destinationAsset,d.tokens.Asset);
+    let candidate,expected,backing,freshRead;
+    if(freshMode){
+      freshRead=await freshSource.read(index);candidate=freshRead.decision;expected=freshRead.observation;backing=freshRead.backing;
+    }else{
+      authenticatedSource.current();
+      const supplied=loadRequest===undefined?request:await loadRequest();
+      candidate=await independentlyDecideDeposit({source,rawRequest:supplied,providers:readers[index].providers});
+      if(candidate.status!=='accepted')throw Error('Guard source '+candidate.status+':'+candidate.reason);
+      expected=creditObservation(candidate,source);
+    }
+    assert.equal(candidate.destinationAsset,d.tokens.Asset);
     assert.deepEqual(expected,receipt.observation,'Guard source event agreement');
     const tx=wasm.ReducedTransaction.sigma_parse_bytes(Buffer.from(snapshot.reducedHex,'hex')),inputs=snapshot.inputHex.map(nativeBox),data=snapshot.dataHex.map(nativeBox);
     assert.equal(snapshot.requiredSign,3);assert.equal(data.length,1);assert.equal(data[0].box_id().to_str(),d.guard.boxId);
@@ -102,20 +123,26 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
     verifyCreditOutputs({unsigned:tx.unsigned_tx(),inputs,order:creditOrder(candidate,d,wids),lockTree:d.contracts.Lock.tree,feeTree:ErgoChain.feeBoxErgoTree,assetId:d.tokens.Asset});
     const recomputed=wasm.ReducedTransaction.from_unsigned_tx(tx.unsigned_tx(),boxes(inputs),boxes(data),await stateContext());
     assert.equal(hex(recomputed),snapshot.reducedHex,'Independent Ergo reduction');
-    await source.current();authenticatedSource.current();assert(live,'Closed source authority');
-    return {assignment:assignmentRequest(candidate,snapshot),assertCurrent(){authenticatedSource.current();assert(live,'Closed source authority');}};
+    if(freshMode)await freshSource.revalidate(index,freshRead);
+    else {await source.current();authenticatedSource.current();}
+    assert(live,'Closed source authority');
+    const assignment=assignmentRequest(candidate,snapshot,backing);
+    const assertCurrent=()=>{if(freshMode)freshSource.current();else authenticatedSource.current();assert(live,'Closed source authority');};
+    return {assignment,assertCurrent,...(freshMode?{async revalidate(){assertCurrent();const refreshed=await freshSource.revalidate(index,freshRead);assertCurrent();
+      return {assignment:assignmentRequest(refreshed.decision,snapshot,refreshed.backing),assertCurrent};}}:{})};
   }
-  committee=await createCreditCommittee({directory:path.join(directory,'guards'),deployment,verifyForGuard,getStateContext:stateContext,policyDigest,activationId,custodyDomain,backingPolicy:'single-deposit-v1'});
+  committee=await createCreditCommittee({directory:path.join(directory,'guards'),deployment,verifyForGuard,getStateContext:stateContext,policyDigest,activationId,custodyDomain,backingPolicy,
+    ...(freshMode?{contributionPackage:config.contributionPackage}:{})});
   let confirmedAssignment;
   return {verifyForGuard,readers,chain,async close(){live=false;await committee.close();},get counts(){return committee.counts;},checkpoints:()=>committee.checkpoints(),
-    backingClaim(){authenticatedSource.current();assert(live && confirmedAssignment,'Backing requires confirmed credit');return issueBackingClaim(committee,confirmedAssignment);},
-    invalidate:reason=>committee.invalidate(source.decision.depositId,reason),async run(){
+    backingClaim(){if(freshMode)throw Error('V2 backing withdrawals require a reviewed payout join');authenticatedSource.current();assert(live && confirmedAssignment,'Backing requires confirmed credit');return issueBackingClaim(committee,confirmedAssignment);},
+    invalidate:reason=>committee.invalidate(runCandidate.depositId,reason),async run(){
       const file=path.join(directory,'signed-credit.json'),candidateFile=path.join(directory,'candidate.json');
       let record,payment;
       if(fs.existsSync(candidateFile))payment=ErgoTransaction.fromJson(fs.readFileSync(candidateFile,'utf8'));
       else {
         assert(!fs.existsSync(file),'Credit recovery missing candidate');
-        const generated=await chain.generateTransaction(receipt.observation.requestId,TransactionType.payment,creditOrder(source.decision,d,receipt.commitments.map(c=>c.WID)),[],[],[hex(wasm.ErgoBox.from_json(text(receipt.trigger)))],[hex(wasm.ErgoBox.from_json(text(await rpc('/utxo/byId/'+d.guard.boxId))))]);
+        const generated=await chain.generateTransaction(runObservation.requestId,TransactionType.payment,creditOrder(runCandidate,d,receipt.commitments.map(c=>c.WID)),[],[],[hex(wasm.ErgoBox.from_json(text(receipt.trigger)))],[hex(wasm.ErgoBox.from_json(text(await rpc('/utxo/byId/'+d.guard.boxId))))]);
         payment=generated;retainCreditRecord(candidateFile,payment.toJson());
       }
       assert.equal(payment.eventId,receipt.observation.requestId);assert.equal(payment.txType,TransactionType.payment);
@@ -127,14 +154,14 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
         record={txId:native.id().to_str(),signedHex:hex(native),transaction:JSON.parse(native.to_json()),policyDigest,committee:committee.configurations(),counts:committee.counts};
         retainCreditRecord(file,JSON.stringify(record));
       }
-      const result=await recoverCredit({record,snapshot,policyDigest,request:assignmentRequest(source.decision,snapshot),committee,
+      const result=await recoverCredit({record,snapshot,policyDigest,request:assignmentRequest(runCandidate,snapshot,runBacking),committee,
         validateSigned(row,expected){const native=wasm.Transaction.sigma_parse_bytes(Buffer.from(row.signedHex,'hex'));assert.equal(native.id().to_str(),expected.txId);
           assert.equal(hex(native),hex(wasm.Transaction.from_json(text(row.transaction))));},
         async lookupConfirmed(id){try{const tx=await rpc('/blockchain/transaction/byId/'+id);return tx.numConfirmations>=1?tx:undefined;}catch(error){if(!String(error).includes('404'))throw error;}},
         async verifyFresh(snap,expected){const checks=await Promise.all(configs.map((_,i)=>verifyForGuard(i,snap)));
           for(const check of checks){assert.equal(canonicalAssignment(check.assignment),canonicalAssignment(expected),'Credit recovery obligation');check.assertCurrent();}},
         async submit(row){try{assert.equal(await rpc('/transactions',row.transaction),row.txId);}catch(error){await confirmed(row.txId);}},waitConfirmed:confirmed});
-      if(result.status==='confirmed')confirmedAssignment=assignmentRequest(source.decision,snapshot);
-      return {...record,...result,checkpoints:committee.checkpoints(),sourceReceipts:readers.map(r=>r.receipts())};
+      if(result.status==='confirmed')confirmedAssignment=assignmentRequest(runCandidate,snapshot,runBacking);
+      return {...record,...result,checkpoints:committee.checkpoints(),sourceReceipts:freshMode?[]:readers.map(r=>r.receipts())};
     }};
 }

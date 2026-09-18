@@ -1,6 +1,11 @@
 # Monero → Ergo → Monero: local integration experiment
 
-A. Shannon · 17 September 2026
+A. Shannon · 18 September 2026
+
+**Deposit adapter qualification:** the scanner, native output/certificate reader,
+watcher jobs and fresh guard authorization now have a connected local execution.
+Read the [adapter qualification report](adapter-qualification.md) for the code,
+validation and remaining production gates. Production qualification is still open.
 
 **Latest increment: explicit output and intent agreement.** Read the
 [output agreement report](output-agreement.md) for the watcher/guard binding,

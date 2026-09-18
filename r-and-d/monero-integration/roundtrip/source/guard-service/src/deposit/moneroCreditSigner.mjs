@@ -33,26 +33,66 @@ export function snapshotCreditSigning(tx, requiredSign, boxes, dataBoxes = []) {
  * Assignment is permanent economic state. The returned facade exposes no prover.
  * This adapter is scoped to Monero credit and fixed four-member custody.
  */
-export function createMoneroCreditSigner({participant,assignment,verify}) {
+export function createMoneroCreditSigner({participant,assignment,verify,requireFreshContribution=false}) {
   if (!participant || wrapped.has(participant) || typeof verify !== 'function' ||
       typeof participant.getProver !== 'function' || typeof participant.sign !== 'function')
     throw Error('credit-sign:composition');
+  if (typeof requireFreshContribution !== 'boolean' ||
+      (requireFreshContribution && participant.contributionValidationVersion !== 1))
+    throw Error('credit-sign:contribution-implementation');
   wrapped.add(participant);
   const originalProver = participant.getProver.bind(participant);
   const originalSign = participant.sign.bind(participant);
   const requests = new Map(), capabilities = new Map();
   let closed = false, proxy;
 
-  function assertContribution(tx) {
-    if (closed) throw Error('credit-sign:closed');
-    const reducedHex = hex(tx), capability = capabilities.get(hash(reducedHex));
-    if (!capability || capability.reducedHex !== reducedHex) throw Error('credit-sign:unissued');
+  function assertRetained(capability) {
     capability.assertCurrent();
     const retained = assignment.assign(capability.request);
     if (retained.status !== 'existing') throw Error('credit-sign:assignment-' + retained.status);
+    capability.assertCurrent();
+  }
+
+  async function refreshContribution(request) {
+    if (closed || !requireFreshContribution) throw Error('credit-sign:fresh-unavailable');
+    if (!request || Object.keys(request).sort().join(',') !== 'kind,reducedHex,txId' ||
+        !['commitment','coordinator-sign','peer-sign'].includes(request.kind) ||
+        typeof request.reducedHex !== 'string') throw Error('credit-sign:fresh-request');
+    const key = hash(request.reducedHex), capability = capabilities.get(key);
+    if (!capability || capability.failed || capability.reducedHex !== request.reducedHex ||
+        capability.txId !== request.txId) throw Error('credit-sign:fresh-binding');
+    // A second callback may not leave the first callback's authorization usable.
+    capability.permit = undefined;
+    if (capability.refreshing) { capability.failed = true; throw Error('credit-sign:fresh-concurrent'); }
+    capability.refreshing = true;
+    try {
+      const fresh = await capability.revalidate();
+      if (closed || capability.failed || capabilities.get(key) !== capability ||
+          !fresh || typeof fresh.assertCurrent !== 'function' ||
+          canonicalAssignment(fresh.assignment) !== capability.canonicalRequest)
+        throw Error('credit-sign:fresh-verification');
+      capability.assertCurrent = fresh.assertCurrent;
+      assertRetained(capability);
+      capability.permit = request.kind === 'commitment'
+        ? 'generate_commitments_for_reduced_transaction' : 'sign_reduced_transaction_multi';
+    } catch (error) {
+      capability.failed = true; capability.permit = undefined; throw error;
+    } finally { capability.refreshing = false; }
+  }
+
+  function assertContribution(tx, nativeMethod) {
+    if (closed) throw Error('credit-sign:closed');
+    const reducedHex = hex(tx), capability = capabilities.get(hash(reducedHex));
+    if (!capability || capability.reducedHex !== reducedHex) throw Error('credit-sign:unissued');
+    if (requireFreshContribution) {
+      const permit = capability.permit;
+      capability.permit = undefined;
+      if (capability.failed || capability.refreshing || permit !== nativeMethod)
+        throw Error('credit-sign:fresh-permit');
+    }
     // Synchronous check and contribution are adjacent; no external await opens
     // a known-invalidation gap after the final durable assignment check.
-    capability.assertCurrent();
+    assertRetained(capability);
   }
   participant.getProver = () => {
     if (!proxy) {
@@ -60,7 +100,7 @@ export function createMoneroCreditSigner({participant,assignment,verify}) {
       proxy = new Proxy(prover,{get(target,name) {
         const method = Reflect.get(target,name,target);
         if (name === 'generate_commitments_for_reduced_transaction' || name === 'sign_reduced_transaction_multi')
-          return (tx,...args) => { assertContribution(tx); return method.call(target,tx,...args); };
+          return (tx,...args) => { assertContribution(tx,name); return method.call(target,tx,...args); };
         if (typeof method === 'function') return method.bind(target);
         return method;
       }});
@@ -82,14 +122,17 @@ export function createMoneroCreditSigner({participant,assignment,verify}) {
         digest:snapshot.digest,txId:snapshot.txId,reducedHex:snapshot.reducedHex,
         inputHex:Object.freeze([...snapshot.inputHex]),dataHex:Object.freeze([...snapshot.dataHex]),requiredSign,
       }));
-      if (closed || !result || typeof result.assertCurrent !== 'function') throw Error('credit-sign:verification');
+      if (closed || !result || typeof result.assertCurrent !== 'function' ||
+          (requireFreshContribution && typeof result.revalidate !== 'function')) throw Error('credit-sign:verification');
       const request = structuredClone(result.assignment);
       if (request.binding.creditTransactionDigest !== snapshot.digest) throw Error('credit-sign:verifier-binding');
       result.assertCurrent();
       const retained = assignment.assign(request);
       if (!['assigned','existing'].includes(retained.status)) throw Error('credit-sign:assignment-' + retained.status);
       result.assertCurrent();
-      capabilities.set(hash(snapshot.reducedHex),{reducedHex:snapshot.reducedHex,request,assertCurrent:result.assertCurrent});
+      capabilities.set(hash(snapshot.reducedHex),{reducedHex:snapshot.reducedHex,txId:snapshot.txId,
+        request,canonicalRequest:canonicalAssignment(request),assertCurrent:result.assertCurrent,revalidate:result.revalidate,
+        refreshing:false,failed:false,permit:undefined});
       try { return await originalSign(snapshot.reduced,requiredSign,snapshot.inputs,snapshot.dataInputs); }
       finally { capabilities.delete(hash(snapshot.reducedHex)); }
     });
@@ -103,6 +146,7 @@ export function createMoneroCreditSigner({participant,assignment,verify}) {
   participant.sign = sign;
   return Object.freeze({
     sign,
+    refreshContribution,
     isInSign: txId => participant.isInSign(txId),
     handleMessage: (message,peerId) => participant.handleMessage(message,peerId),
     handleMyTurn: () => participant.handleMyTurn(),

@@ -45,3 +45,50 @@ fn identity_epoch_group_and_identity_roster_share_fail_closed() {
         assert!(matches!(LocalImageSession::capture(s.context.clone(),&key,vec![id(1),id(2)],&outputs),Err(Error::Point)));
     }
 }
+
+fn public(k:&Keys) -> PublicImageCommittee {
+    let key=&k[&id(1)];
+    PublicImageCommittee { group:key.original_group_key().to_bytes(),threshold:key.params().t(),
+        roster:(1..=key.params().n()).map(|n|(n,key.original_verification_share(id(n)).to_bytes())).collect() }
+}
+#[test]
+fn public_constructor_matches_pinned_dkg_interpolation_and_transcript() {
+    let (k,s)=setup();let outputs=funding::fund(&k,1);let public=public(&k);
+    for selection in [vec![id(1),id(2)],vec![id(1),id(3)],vec![id(2),id(4)],vec![id(1),id(2),id(4)],vec![id(1),id(2),id(3),id(4)]] {
+        let holder=&k[&selection[0]];
+        let view=holder.view(selection.clone()).unwrap();
+        let local=LocalImageSession::capture(s.context.clone(),holder,selection.clone(),&outputs).unwrap();
+        let replay=LocalImageSession::capture_public(s.context.clone(),&public,selection,&outputs).unwrap();
+        assert_eq!(local.binding,replay.binding);
+        for (i,coefficient) in &replay.subset { assert_eq!(Some(*coefficient),view.interpolation_factor(*i)); }
+        let proof_rows=replay.subset.iter().map(|(i,_)|local.prove(&mut OsRng,&k[i]).unwrap().remove(0)).collect::<Vec<_>>();
+        assert_eq!(local.verify(&proof_rows).unwrap().inputs[0].image,replay.verify(&proof_rows).unwrap().inputs[0].image);
+    }
+}
+#[test]
+fn public_constructor_rejects_noncanonical_rosters_and_subsets_without_panics() {
+    let (k,s)=setup();let outputs=funding::fund(&k,1);let base=public(&k);
+    for selected in [vec![],vec![id(1)],vec![id(2),id(1)],vec![id(1),id(1)],vec![id(1),id(5)]] {
+        assert!(matches!(LocalImageSession::capture_public(s.context.clone(),&base,selected,&outputs),Err(Error::Subset)));
+    }
+    for mode in 0..7 {
+        let mut malformed=base.clone();
+        match mode { 0=>malformed.threshold=0,1=>malformed.threshold=5,2=>malformed.roster.clear(),
+            3=>malformed.roster.swap(0,1),4=>malformed.roster[1].0=1,5=>malformed.roster[0].0=0,
+            _=>malformed.roster[3].0=5 }
+        assert!(matches!(LocalImageSession::capture_public(s.context.clone(),&malformed,vec![id(1),id(2)],&outputs),Err(Error::Epoch)));
+    }
+    let mut wrong=base.clone();wrong.group=(Ed25519::generator()*Scalar::from(123u64)).to_bytes();
+    assert!(matches!(LocalImageSession::capture_public(s.context.clone(),&wrong,vec![id(1),id(2)],&outputs),Err(Error::Epoch)));
+    let mut wrong=base;wrong.roster[0].1=EdwardsPoint::identity().to_bytes();
+    assert!(matches!(LocalImageSession::capture_public(s.context.clone(),&wrong,vec![id(1),id(2)],&outputs),Err(Error::Point)));
+}
+#[test]
+fn unselected_public_roster_share_is_still_transcript_bound() {
+    let (k,s)=setup();let outputs=funding::fund(&k,1);let mut public=public(&k);
+    let original=LocalImageSession::capture(s.context.clone(),&k[&id(1)],vec![id(1),id(2)],&outputs).unwrap();
+    let proof_rows=rows(&k,&original);
+    public.roster[3].1=(Ed25519::generator()*Scalar::from(123u64)).to_bytes();
+    let altered=LocalImageSession::capture_public(s.context.clone(),&public,vec![id(1),id(2)],&outputs).unwrap();
+    assert!(matches!(altered.verify(&proof_rows),Err(Error::Proof)));
+}
