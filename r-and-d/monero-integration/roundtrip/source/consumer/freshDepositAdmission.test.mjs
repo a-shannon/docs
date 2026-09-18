@@ -25,7 +25,7 @@ function fixture(){
     blockHash:h(6),blockHeight:4097,outputIndex:1,globalIndex:8888,outputKey:h(7),commitment:h(9),amountAtomic:'10000',keyImage:h(10),depositData:[memo]};
   const packet={blockHex:'bb',blockHash:h(6),height:4097,miner:{txId:h(11),transactionHex:'aa',outputIndices:[8886]},
     transactions:[{txId:h(5),transactionHex:'aabb',outputIndices:[8887,8888]}]};
-  const state={tip:4106,spent:0,unlocked:true,sourceHash:h(6),tipHash:h(12),proofGood:true,proofCalls:0,nativeCalls:0,
+  const state={tip:4106,spent:0,unlocked:true,sourceHash:h(6),tipHash:h(12),proofGood:true,proofReceived:'10000',proofCalls:0,nativeCalls:0,
     outputPatch:{},nativePatch:{},beforeProof:()=>{}};
   const network={
     getBlockPacket:async()=>structuredClone(packet),getCurrentHeight:async()=>state.tip,
@@ -36,7 +36,7 @@ function fixture(){
   const observer={async observe(received,certificate,txId,index,signal){state.nativeCalls++;signal.throwIfAborted();assert.deepEqual(received,packet);
     assert.equal(certificate,'test-certificate\n');assert.equal(txId,h(5));assert.equal(index,1);return {...output,...state.nativePatch};}};
   const options={network,observer,configuration,deliveryDirectory:dir,certificateDirectory:dir,
-    async verifyProof(request){state.proofCalls++;await state.beforeProof();return {...request,sourcePin:NATIVE_SOURCE_PIN,good:state.proofGood,received:'10000'};},
+    async verifyProof(request){state.proofCalls++;await state.beforeProof();return {...request,sourcePin:NATIVE_SOURCE_PIN,good:state.proofGood,received:state.proofReceived};},
     async validateRecipient(recipient){assert.equal(recipient,'test-recipient');}};
   const adapter=createFreshDepositAdmission(options);candidate.scope=adapter.scope;
   const proofFile=join(dir,h(5)+'.proof');
@@ -65,6 +65,18 @@ test('ordinary chain growth while proof verification runs remains admissible',as
 test('a later valid proof is not poisoned by the first invalid proof',async()=>{
   const f=fixture();f.state.proofGood=false;assert.deepEqual(await f.verify(),{status:'pending'});
   f.state.proofGood=true;assert.equal((await f.verify()).status,'accepted');assert.equal(f.state.proofCalls,2);
+});
+
+test('an inflated payment report cannot override the single native output amount',async()=>{
+  const f=fixture();
+  f.state.proofReceived='20000';
+  await assert.rejects(f.inspect(),/Admission policy refused/);
+  assert.equal(f.state.nativeCalls,1);assert.equal(f.state.proofCalls,1);
+  assert.equal(f.output.amountAtomic,'10000');
+  f.state.proofReceived='10000';
+  const accepted=await f.inspect();
+  assert.equal(accepted.observation.amount,'10000');
+  assert.equal(accepted.backing.creditedAtomic,'9880');
 });
 for(const [name,mutate] of [
   ['captured bytes',f=>f.candidate.transactionHex='cc'],

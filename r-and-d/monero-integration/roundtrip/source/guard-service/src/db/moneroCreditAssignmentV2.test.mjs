@@ -160,6 +160,46 @@ test('v2 P and I uniqueness survives occurrence, committee changes and invalidat
   assert.equal(reopened.assign(independent).status, 'assigned');
 });
 
+for (const amount of ['500', '1000', '1500']) {
+  test(`v2 retains one credit for repeated output backing with later amount ${amount}`, t => {
+    // Custody boundary only: native ownership, image association and payment proof
+    // remain the caller's prerequisites. No wallet report is credit authority.
+    const f = fixture(t), first = request('original'), later = request('later');
+    Object.assign(later.binding, {creditTransactionDigest: h(41),
+      sourceIntentDigest: h(42), triggerBoxId: h(43)});
+    Object.assign(later.backing, {intentHash: h(42), txId: h(44), blockHash: h(45),
+      blockHeight: 4200, outputIndex: 2, globalIndex: 6000,
+      amountAtomic: amount, creditedAtomic: (BigInt(amount) - 120n).toString()});
+    assert.notEqual(later.backing.txId, first.backing.txId);
+    assert.equal(later.backing.outputKey, first.backing.outputKey);
+    assert.equal(later.backing.keyImage, first.backing.keyImage);
+    // The later descriptor is acceptable to an empty ledger; rejection below
+    // must depend on retained economic identity, not malformed request fields.
+    assert.equal(fixture(t).create().assign(later).status, 'assigned');
+    let ledger = f.create();
+    assert.equal(ledger.assign(first).status, 'assigned');
+    const assigned = ledger.checkpoint();
+    assert.equal(ledger.assign(later).status, 'conflict');
+    assert.deepEqual(ledger.checkpoint(), assigned);
+    ledger.close();ledger = f.open();
+    assert.equal(ledger.assign(later).status, 'conflict');
+    assert.deepEqual(ledger.checkpoint(), assigned);
+    ledger.invalidate('original', 'source-reorganization');
+    const invalidated = ledger.checkpoint();ledger.close();ledger = f.open();
+    assert.equal(ledger.assign(later).status, 'conflict');
+    assert.deepEqual(ledger.checkpoint(), invalidated);
+    const db = new DatabaseSync(f.file);
+    try {
+      const rows = db.prepare('SELECT request,status FROM claims').all();
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].status, 'invalidated');
+      assert.deepEqual(JSON.parse(rows[0].request).backing, first.backing);
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM outputs').get().n, 1);
+      assert.equal(db.prepare('SELECT COUNT(*) AS n FROM nullifiers').get().n, 1);
+    } finally { db.close(); }
+  });
+}
+
 test('v2 configuration is explicit and never migrates existing v1 or unbacked custody', t => {
   const f = fixture(t), ledger = f.create(); ledger.assign(request()); ledger.close();
   for (const cfg of [{...config, backingPolicy: 'single-deposit-v1'},

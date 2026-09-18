@@ -128,7 +128,57 @@ struct Fixture {
     output: WalletOutput,
     anchor_variants: Vec<String>,
 }
-fn fixture_with_outputs(count: usize) -> Fixture {
+
+#[derive(Clone, Copy, Debug)]
+enum TransactionKeyLayout {
+    Standard,
+    RepeatedPrimary,
+    AdditionalOnly,
+    AdditionalBeforePrimary,
+}
+
+fn apply_transaction_key_layout(tx: &mut Transaction, layout: TransactionKeyLayout) {
+    if matches!(layout, TransactionKeyLayout::Standard) {
+        return;
+    }
+
+    let output_count = tx.prefix().outputs.len();
+    let original = tx.prefix().extra.clone();
+    let mut remainder = original.as_slice();
+    let genuine = match ExtraField::read(&mut remainder).unwrap() {
+        ExtraField::PublicKey(key) => key,
+        _ => panic!("fixture transaction must begin with its primary key"),
+    };
+    let genuine_field = ExtraField::PublicKey(genuine.clone()).serialize();
+    let primary_len = original.len() - remainder.len();
+    assert_eq!(primary_len, genuine_field.len());
+
+    tx.prefix_mut().extra = match layout {
+        TransactionKeyLayout::Standard => unreachable!(),
+        TransactionKeyLayout::RepeatedPrimary => {
+            let mut varied = original;
+            varied.extend(genuine_field);
+            varied
+        }
+        TransactionKeyLayout::AdditionalOnly | TransactionKeyLayout::AdditionalBeforePrimary => {
+            let dummy = CompressedPoint::from((G * CurveScalar::from(19u64)).compress().to_bytes());
+            assert_ne!(dummy, genuine);
+            let mut varied = ExtraField::PublicKey(dummy).serialize();
+            // Every legacy-address output was derived with the genuine primary key, so it is also
+            // a valid output-indexed additional key for each output in this fixture.
+            varied.extend(
+                ExtraField::PublicKeys(vec![genuine.clone(); output_count]).serialize(),
+            );
+            varied.extend_from_slice(&original[primary_len..]);
+            if matches!(layout, TransactionKeyLayout::AdditionalBeforePrimary) {
+                varied.extend(genuine_field);
+            }
+            varied
+        }
+    };
+}
+
+fn fixture_with_outputs(count: usize, key_layout: TransactionKeyLayout) -> Fixture {
     let keys = support::distributed_keys();
     let key = &keys[&id(1)];
     let vault = pair(Point::from(key.group_key().0), 7);
@@ -144,7 +194,7 @@ fn fixture_with_outputs(count: usize) -> Fixture {
         .remove(0);
     let mut seed = Zeroizing::new([0; 32]);
     OsRng.fill_bytes(seed.as_mut());
-    let tx = SignableTransaction::new(
+    let mut tx = SignableTransaction::new(
         RctType::ClsagBulletproofPlus,
         seed,
         vec![ring(&acquired)],
@@ -161,6 +211,10 @@ fn fixture_with_outputs(count: usize) -> Fixture {
         &Zeroizing::new(Scalar::from(CurveScalar::from(11u64))),
     )
     .unwrap();
+    // These post-signature extra variants deliberately make a synthetic transaction which a
+    // daemon has not admitted. They test native byte parsing and observer admission only; they do
+    // not establish Monero consensus validity or replay a historical vulnerable-wallet artifact.
+    apply_transaction_key_layout(&mut tx, key_layout);
     let selected = block(miner(&donor, 4097), std::slice::from_ref(&tx));
     let scanned = deposit_block::scan(
         &vault,
@@ -295,7 +349,7 @@ fn fixture_with_outputs(count: usize) -> Fixture {
 }
 fn fixture() -> &'static Fixture {
     static F: OnceLock<Fixture> = OnceLock::new();
-    F.get_or_init(|| fixture_with_outputs(1))
+    F.get_or_init(|| fixture_with_outputs(1, TransactionKeyLayout::Standard))
 }
 fn observe(request: &Value) -> R<Value> {
     let mut output = vec![];
@@ -403,15 +457,53 @@ fn deposit_observer_rejects_each_packet_identity_index_and_configuration_fault()
     }
 }
 #[test]
+fn deposit_observer_counts_one_owned_output_once_across_multiple_transaction_keys() {
+    // RepeatedPrimary can only match through a primary key. AdditionalOnly has no genuine primary,
+    // so its successful observation can only match through the output-indexed additional key.
+    for key_layout in [
+        TransactionKeyLayout::RepeatedPrimary,
+        TransactionKeyLayout::AdditionalOnly,
+        TransactionKeyLayout::AdditionalBeforePrimary,
+    ] {
+        let f = fixture_with_outputs(1, key_layout);
+        let result = observe(&f.request).unwrap();
+        assert_eq!(result["txId"], f.request["txId"], "{key_layout:?}");
+        assert_eq!(
+            result["outputIndex"],
+            f.output.index_in_transaction(),
+            "{key_layout:?}"
+        );
+        assert_eq!(
+            result["globalIndex"],
+            f.output.index_on_blockchain(),
+            "{key_layout:?}"
+        );
+        assert_eq!(
+            result["outputKey"],
+            wire::hex(&f.output.key().compress().to_bytes()),
+            "{key_layout:?}"
+        );
+        assert_eq!(result["amountAtomic"], "10000000000", "{key_layout:?}");
+    }
+}
+
+#[test]
 fn deposit_observer_refuses_multiple_owned_outputs_in_selected_transaction() {
-    let f = fixture_with_outputs(2);
-    source_certificate::replay(
-        &f.manifest,
-        f.request["certificate"].as_str().unwrap().as_bytes(),
-        &f.output,
-    )
-    .unwrap();
-    refused(&f.request);
+    for key_layout in [
+        TransactionKeyLayout::Standard,
+        TransactionKeyLayout::RepeatedPrimary,
+        TransactionKeyLayout::AdditionalOnly,
+        TransactionKeyLayout::AdditionalBeforePrimary,
+    ] {
+        let f = fixture_with_outputs(2, key_layout);
+        source_certificate::replay(
+            &f.manifest,
+            f.request["certificate"].as_str().unwrap().as_bytes(),
+            &f.output,
+        )
+        .unwrap();
+        refused(&f.request);
+    }
 }
 #[test]
 fn deposit_observer_wire_bounds_and_extra_framing_fail_closed() {

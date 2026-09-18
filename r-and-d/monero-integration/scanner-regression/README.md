@@ -1,13 +1,15 @@
 # Offline Monero scanner regressions
 
-A. Shannon · 17 September 2026
+A. Shannon · 18 September 2026
 
-Four tests exercise the actual `monero-wallet = 0.2.0` scanner:
+Six tests exercise the actual `monero-wallet = 0.2.0` scanner:
 
 - one owned output has the expected amount and locator;
 - a repeated primary transaction public key does not duplicate that output or amount;
 - two equal-value owned outputs retain distinct one-time output keys and local/global indexes;
-- repeating the primary key also preserves both distinct outputs.
+- repeating the primary key also preserves both distinct outputs;
+- a dummy primary with genuine indexed additional keys exercises the additional-key path;
+- distinct dummy/genuine primaries plus genuine additional keys still produce one receipt per output.
 
 From this directory, run `cargo test --locked`. With the locked dependencies
 already cached, `cargo test --offline --locked` runs without network access.
@@ -27,12 +29,35 @@ and global-index anchor. Those choices test scanner output accounting; they do
 not establish consensus validity of modified transactions, verify an OutProofV2,
 or execute the bridge's full native admission path.
 
-In the unchanged bridge source, `scan_deposit` requires exactly one scanned
-output and binds its amount, key and local/global indexes to the supplied
+The current native observer requires exactly one owned output in the selected
+transaction and binds its amount, key and local/global indexes to the supplied
 transaction and canonical block. The separate
 [output-agreement report](../roundtrip/output-agreement.md) describes the
-actual-node evidence. Passing these four scanner tests does not establish
+actual-node evidence. Passing these scanner tests does not establish
 complete coverage of Monero's historical client vulnerabilities.
+
+## Historical mechanism coverage
+
+The [coverage matrix](../roundtrip/burn-coverage.md) separates repeated primary
+keys, the additional-key multiple-counting variant, and repeated economic
+backing across transactions. The additional-only control is essential: the
+pinned Rust scanner visits all primaries before the indexed additional key,
+irrespective of their serialized order.
+
+Two isolated dependency mutations were checked against these six tests:
+
+| Change to a scratch copy of `monero-wallet 0.2.0/src/scan.rs` | Result |
+| --- | --- |
+| Remove the `break` immediately after `res.push(WalletOutput { ... })` | Three failures: both repeated-primary cases and the combined primary/additional case; three controls pass. |
+| Remove that `break` and deduplicate `tx_keys` by point equality before scanning | Only the combined primary/additional case fails; all four former tests and the additional-only control pass. |
+
+The second mutation demonstrates the missing discriminator in the former suite.
+For replay, copy this test crate and the locked dependency into a scratch tree,
+add `[patch.crates-io] monero-wallet = { path = "wallet" }` to the scratch
+manifest, and apply one change above to that copied dependency. Run
+`cargo test --offline` once to resolve the local patch, then use
+`cargo test --offline --locked`. Do not modify the registry cache or the normal
+dependency. These mutations are sensitivity tests, not dependency findings.
 
 ## Additional audit
 
@@ -43,7 +68,7 @@ boundary. Two independent reviewers covered native admission and credit custody;
 the coordinating review inspected source/guard and signing joins. No additional
 externally reachable defect was demonstrated in those boundaries.
 
-The focused checks passed: 5 public-observer tests, 18 guard-mediator and complete
+At that earlier checkpoint, the focused checks passed: 5 public-observer tests, 18 guard-mediator and complete
 output-policy tests, 3 participant-I/O authority tests, 19 ledger tests, 11
 credit-recovery tests, and these 4 scanner tests. The 56 existing checks ran
 against unchanged published source. The scanner probe is a separate test crate;

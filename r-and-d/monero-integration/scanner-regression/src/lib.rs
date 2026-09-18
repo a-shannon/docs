@@ -11,7 +11,10 @@ mod tests {
         Scalar::read(&mut hex::decode(bytes.trim()).unwrap().as_slice()).unwrap()
     }
 
-    fn scan(owned_outputs: usize, repeat_primary_key: bool) -> Vec<WalletOutput> {
+    #[derive(Clone, Copy)]
+    enum KeyLayout { Standard, RepeatedPrimary, AdditionalOnly, AdditionalAndPrimary }
+
+    fn scan(owned_outputs: usize, layout: KeyLayout) -> Vec<WalletOutput> {
         let spend = scalar(include_str!("../fixtures/spend_key.hex"));
         let view = scalar(include_str!("../fixtures/view_key.hex"));
         let spend_dalek: curve25519_dalek::scalar::Scalar = spend.into();
@@ -37,10 +40,37 @@ mod tests {
             .unwrap().keys().unwrap();
         assert_eq!(primary.len(), 1);
         assert!(additional.is_none());
-        if repeat_primary_key {
-            prefix.extra.extend(ExtraField::PublicKey(primary[0].compress()).serialize());
-            let (keys, _) = Extra::read(&mut prefix.extra.as_slice()).unwrap().keys().unwrap();
-            assert_eq!(keys, vec![primary[0], primary[0]]);
+        match layout {
+            KeyLayout::Standard => {},
+            KeyLayout::RepeatedPrimary => {
+                prefix.extra.extend(ExtraField::PublicKey(primary[0].compress()).serialize());
+                let (keys, _) = Extra::read(&mut prefix.extra.as_slice()).unwrap().keys().unwrap();
+                assert_eq!(keys, vec![primary[0], primary[0]]);
+            },
+            KeyLayout::AdditionalOnly | KeyLayout::AdditionalAndPrimary => {
+                // Distinct primary keys bypass a primary-key-only deduplication rule.
+                // The AdditionalOnly control forces the indexed additional-key path:
+                // this scanner visits every primary before the additional key.
+                let dummy = Point::from(ED25519_BASEPOINT_POINT);
+                assert_ne!(dummy, primary[0]);
+                let mut input = prefix.extra.as_slice();
+                let mut fields = Vec::new();
+                while !input.is_empty() { fields.push(ExtraField::read(&mut input).unwrap()); }
+                fields.retain(|field| !matches!(field,
+                    ExtraField::PublicKey(_) | ExtraField::PublicKeys(_)));
+                prefix.extra = ExtraField::PublicKey(dummy.compress()).serialize();
+                prefix.extra.extend(ExtraField::PublicKeys(
+                    vec![primary[0].compress(); prefix.outputs.len()]).serialize());
+                for field in fields { prefix.extra.extend(field.serialize()); }
+                if matches!(layout, KeyLayout::AdditionalAndPrimary) {
+                    prefix.extra.extend(ExtraField::PublicKey(primary[0].compress()).serialize());
+                }
+                let (keys, additional) = Extra::read(&mut prefix.extra.as_slice()).unwrap().keys().unwrap();
+                assert_eq!(additional.unwrap(), vec![primary[0]; owned_outputs]);
+                assert_eq!(keys, if matches!(layout, KeyLayout::AdditionalAndPrimary) {
+                    vec![dummy, primary[0]]
+                } else { vec![dummy] });
+            },
         }
         // Scanner receives a caller-supplied transaction hash and global-index anchor.
         // No claim is made that modified bytes correspond to the original fixture hash.
@@ -60,22 +90,22 @@ mod tests {
 
     #[test]
     fn single_owned_output_baseline() {
-        let outputs = scan(1, false);
+        let outputs = scan(1, KeyLayout::Standard);
         assert_eq!(outputs.len(), 1);
         assert_eq!(outputs[0].index_in_transaction(), 0);
         assert_eq!(outputs.iter().map(|o| o.commitment().amount).sum::<u64>(), 10_000);
     }
     #[test]
     fn repeated_primary_key_does_not_duplicate_single_output_or_amount() {
-        let baseline = scan(1, false);
-        let repeated = scan(1, true);
+        let baseline = scan(1, KeyLayout::Standard);
+        let repeated = scan(1, KeyLayout::RepeatedPrimary);
         assert_eq!(repeated.len(), 1);
         assert_eq!(repeated, baseline);
         assert_eq!(repeated.iter().map(|o| o.commitment().amount).sum::<u64>(), 10_000);
     }
     #[test]
     fn equal_value_owned_outputs_have_distinct_keys_and_locators() {
-        let outputs = scan(2, false);
+        let outputs = scan(2, KeyLayout::Standard);
         assert_eq!(outputs.len(), 2);
         assert_eq!(outputs.iter().map(|o| o.index_in_transaction()).collect::<Vec<_>>(), vec![0, 1]);
         assert_ne!(outputs[0].key(), outputs[1].key());
@@ -85,9 +115,25 @@ mod tests {
     }
     #[test]
     fn repeated_primary_key_preserves_both_distinct_equal_value_outputs() {
-        let baseline = scan(2, false);
-        let repeated = scan(2, true);
+        let baseline = scan(2, KeyLayout::Standard);
+        let repeated = scan(2, KeyLayout::RepeatedPrimary);
         assert_eq!(repeated.len(), 2);
         assert_eq!(repeated, baseline);
+    }
+
+    #[test]
+    fn additional_key_path_preserves_each_output_once() {
+        for count in [1, 2] {
+            assert_eq!(scan(count, KeyLayout::AdditionalOnly), scan(count, KeyLayout::Standard));
+        }
+    }
+
+    #[test]
+    fn distinct_primary_and_additional_keys_do_not_multiply_receipts() {
+        for count in [1, 2] {
+            let outputs = scan(count, KeyLayout::AdditionalAndPrimary);
+            assert_eq!(outputs, scan(count, KeyLayout::Standard));
+            assert_eq!(outputs.iter().map(|o| o.commitment().amount).sum::<u64>(), 10_000 * count as u64);
+        }
     }
 }

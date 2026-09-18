@@ -12,6 +12,8 @@ deployment profile are controlled fixtures.
 
 ## Review the code
 
+- [Historical failure coverage](burn-coverage.md): separate repeated-primary, additional-key and duplicated-backing regressions, with their evidence limits.
+- [Multisig review packet](multisig-review.md): exact five-file candidate diff, authorization points and focused replay commands.
 - [Scanner and native reader](https://github.com/a-shannon/scanner/tree/2e0382d97a6e0a7bb6fb0e5927ad56af44d2f0ae/packages/observation-extractors/monero-observation-extractor): durable capture, separate admission leases, daemon agreement, original block anchoring and bounded native replay.
 - [Optional multisig authorization hook](https://github.com/a-shannon/sign-protocols/commit/fd41b5df91d79bc0fc74373a397372edfd3efa84): revalidation before commitments and both partial-signature paths, with retained transaction, committee and turn checks. Final independent re-review of the last fixes is pending.
 - [Rust output reconstruction](source/native/src/deposit_block.rs), [certificate replay](source/native/src/source_certificate.rs) and [offline observer](source/native/src/deposit_observer.rs): exact block/transaction bytes, selected local/global output index, amount, vault ownership and holder-authorized key image.

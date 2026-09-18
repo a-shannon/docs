@@ -7,6 +7,11 @@ watcher jobs and fresh guard authorization now have a connected local execution.
 Read the [adapter qualification report](adapter-qualification.md) for the code,
 validation and remaining production gates. Production qualification is still open.
 
+The [historical failure coverage](burn-coverage.md) distinguishes both
+multiple-counting mechanisms from repeated economic backing. The
+[multisig review packet](multisig-review.md) prepares the remaining independent
+review of the optional contribution hook.
+
 **Latest increment: explicit output and intent agreement.** Read the
 [output agreement report](output-agreement.md) for the watcher/guard binding,
 isolated negative tests and exact replay results.

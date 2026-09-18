@@ -2,7 +2,7 @@
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
   "fileCount": 436,
-  "aggregateSha256": "a3af42df74601102c1f99d3c31b9d4044a90d766a1bd59e4fcd3b23c4d975334",
+  "aggregateSha256": "3373ad21899c66034d1e0b19079fa85e08a9ce8995e276567a20a5db42aac678",
   "files": [
     {
       "path": "README.md",
@@ -206,8 +206,8 @@
     },
     {
       "path": "consumer/freshDepositAdmission.test.mjs",
-      "bytes": 7940,
-      "sha256": "2e4fa7c28e3f59567e51174f9928d36051e3b44f7a93207b50c13950488d7f89"
+      "bytes": 8489,
+      "sha256": "f662057ab822971fd8456129e6711576bb78d3b5cc76153c1e28e3feeb56dd71"
     },
     {
       "path": "consumer/gate-fixture.config.ts",
@@ -1281,8 +1281,8 @@
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignmentV2.test.mjs",
-      "bytes": 9792,
-      "sha256": "6f083e0324997862a2c5fdc6803c123af24e429a8620b751107ef107f8b287c4"
+      "bytes": 12088,
+      "sha256": "9228767c9b1685f9af6587487499878b2892dbeae5563edeb41c0f60d45675aa"
     },
     {
       "path": "guard-service/src/db/moneroWithdrawalReservation.ts",
@@ -1721,8 +1721,8 @@
     },
     {
       "path": "native/src/deposit_observer_tests.rs",
-      "bytes": 19953,
-      "sha256": "89ab8124384b2c3917331acf50419c7560b2869ca1d783d76eb42057ee9f1811"
+      "bytes": 23767,
+      "sha256": "47980cd940353c083bb55b1949f25d85f1a6a24bd1ad3932536edbebe052e1c9"
     },
     {
       "path": "native/src/host.rs",
