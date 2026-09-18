@@ -74,8 +74,15 @@ test('recovery reads refuse missing, conflicting and invalidated claims without 
 });
 test('partial retained claim fails read-only integrity check and remains partial',t=>{
   const file=fixture(t),l=Ledger.create(file,config),request=make('partial');l.assign(request);
-  const external=new DatabaseSync(file);external.exec('DELETE FROM outputs');external.close();const before=l.checkpoint();
-  assert.throws(()=>l.observeAssignment(request),/custody:output-integrity/);assert.deepEqual(l.checkpoint(),before);
+  const external=new DatabaseSync(file);
+  try{
+    external.exec('DELETE FROM outputs');
+    const rows=()=>['metadata','claims','outputs','nullifiers','settlements'].map(table=>external.prepare('SELECT * FROM '+table).all());
+    const before=rows();
+    assert.throws(()=>l.observeAssignment(request),/custody:output-integrity/);
+    assert.throws(()=>l.checkpoint(),/custody:output-integrity/);
+    assert.deepEqual(rows(),before);
+  }finally{external.close();}
 });
 test('disk failure on a later output rolls back every claim row',t=>{
   const file=fixture(t),l=Ledger.create(file,config);t.after(()=>l.close());const external=new DatabaseSync(file);

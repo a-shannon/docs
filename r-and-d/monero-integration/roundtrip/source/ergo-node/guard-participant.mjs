@@ -6,6 +6,7 @@ import {createRequire} from 'node:module';
 import {serveProcessRpc,emitProcessEvent} from '../tools/process-rpc.mjs';
 import {readParticipantConfig} from '../tools/participant-config.mjs';
 import {auditCreditBacking} from './credit-backing-audit.mjs';
+import {openGuardCustody} from './credit-custody.mjs';
 
 const file=process.env.PARTICIPANT_CONFIG;
 assert(path.isAbsolute(file??''),'Absolute participant configuration required');
@@ -20,11 +21,10 @@ const ownKey=createECDH('secp256k1');ownKey.setPrivateKey(Buffer.from(selected.s
 assert.equal(ownKey.getPublicKey('hex','compressed'),selected.deployment.guardPublicKeys[selected.index]);
 process.env.ROUNDTRIP_CONFIG=selected.roundtripConfig;
 await import('./deposit-register.mjs');
-const [{config},{openProcessSource},{openCreditVerifier},{stateContext},{captureContributionPackage},ledgerModule,signerModule]=await Promise.all([
+const [{config},{openProcessSource},{openCreditVerifier},{stateContext},{captureContributionPackage},signerModule]=await Promise.all([
   import('../tools/config.mjs'),import('./process-source.mjs'),import('./authorized-credit.mjs'),import('./authority-fixture.mjs'),
-  import('../tools/contribution-package.mjs'),import('../guard-service/src/db/moneroCreditAssignment.mjs'),
+  import('../tools/contribution-package.mjs'),
   import('../guard-service/src/deposit/moneroCreditSigner.mjs')]);
-const {MoneroCreditAssignment,canonicalAssignment}=ledgerModule;
 const {createMoneroCreditSigner,snapshotCreditSigning}=signerModule;
 const sources=await Promise.all(Array.from({length:4},()=>openProcessSource(selected.source)));
 const verifier=await openCreditVerifier({directory:path.join(selected.directory,'verification'),deployment:selected.deployment,
@@ -34,18 +34,8 @@ const {MultiSigHandler,MultiSigUtils}=await import(implementation.entry);impleme
 const require=createRequire(path.join(config.rosenRoot,'package.json')),wasm=require('ergo-lib-wasm-nodejs');
 const {ECDSA}=await import('@rosen-bridge/encryption'),{DummyLogger}=await import('@rosen-bridge/abstract-logger');
 const index=selected.index,keys=[...selected.deployment.guardPublicKeys],peerIds=keys.map((_,i)=>'process-credit-guard-'+i);
-const configuration=verifier.configurations()[index],custody=path.join(selected.directory,'custody');
-const bootstrap=canonicalAssignment({version:1,index,configuration,contributionPackageSha256:implementation.sha256});
-const manifest=path.join(custody,'bootstrap.json'),database=path.join(custody,'ledger.sqlite');
-fs.mkdirSync(custody,{recursive:true});let ledger;
-if(fs.existsSync(manifest)){
-  assert.equal(fs.readFileSync(manifest,'utf8'),bootstrap,'Guard bootstrap drift');assert(fs.existsSync(database),'Missing retained guard ledger');
-  ledger=MoneroCreditAssignment.open(database,configuration);
-}else{
-  assert.equal(fs.readdirSync(custody).length,0,'Unidentified guard custody');
-  const fd=fs.openSync(manifest,'wx');try{fs.writeFileSync(fd,bootstrap);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
-  ledger=MoneroCreditAssignment.create(database,configuration);
-}
+const configuration=verifier.configurations()[index];
+const {ledger,bootstrap,custody}=openGuardCustody({directory:selected.directory,index,configuration,contributionPackageSha256:implementation.sha256});
 let active,closed=false,auditing=false,facade;const gates=new Map(),counts={commitments:0,partialSigns:0,completed:0,messagesSent:0,messagesReceived:0};
 const current=()=>{assert(!closed,'Closed guard process');return active;};
 const stats=()=>({index,pid:process.pid,counts:{...counts},checkpoint:ledger.checkpoint(),proofCalls:sources.reduce((n,s)=>n+s.proofCalls,0),

@@ -11,6 +11,8 @@ import {openProcessSource} from '../ergo-node/process-source.mjs';
 import {retainCreditRecord} from '../ergo-node/credit-recovery.mjs';
 import {snapshotCreditSigning} from '../guard-service/src/deposit/moneroCreditSigner.mjs';
 import {rpc,confirmed} from '../ergo-node/rosen-node.mjs';
+import {freshCreditConfigurations,openGuardCustody} from '../ergo-node/credit-custody.mjs';
+import {captureContributionPackage} from '../tools/contribution-package.mjs';
 
 const require=createRequire(path.join(config.rosenRoot,'package.json')),wasm=require('ergo-lib-wasm-nodejs');
 const {TransactionType}=await import(pathToFileURL(path.join(config.rosenRoot,'packages/abstract-chain/dist/index.js')));
@@ -33,10 +35,20 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     const roundtripConfig=path.join(home,'roundtrip.json');write(roundtripConfig,{...config,runtimeDirectory:runtime});
     return {home,proof,roundtripConfig,source:{...structuredClone(sourceDescriptor),deliveryDirectory:inbox,certificateDirectory:inbox}};
   }
+  // These are the actual future guard stores. Missing custody is never an empty view.
+  const guardHomes=[0,1,2,3].map(i=>provision('guard',i));
+  const bootstrapSource=await openProcessSource(sourceDescriptor);let configurations;
+  try{configurations=freshCreditConfigurations({deployment:publicDeployment,scope:bootstrapSource.scope,genesis:sourceDescriptor.genesis});}
+  finally{bootstrapSource.close();}
+  const implementation=captureContributionPackage(config.contributionPackage);implementation.verify();
+  const creditEntries=guardHomes.map((h,index)=>{
+    const {ledger,database}=openGuardCustody({directory:path.join(h.home,'state'),index,configuration:configurations[index],contributionPackageSha256:implementation.sha256,create:true});
+    ledger.close();const {dev,ino}=fs.lstatSync(database);return {file:database,configuration:configurations[index],identity:{dev,ino}};
+  });
   const watcherHomes=[0,1].map(i=>provision('watcher',i)),watcherFiles=watcherHomes.map((h,index)=>{
     const file=path.join(h.home,'participant.json');write(file,{version:1,index,roundtripConfig:h.roundtripConfig,
       dependencyRoot:config.rosenRoot,watcher:deployment.watchers[index],deployment:publicDeployment,
-      databasePath:path.join(h.home,'watcher.sqlite'),source:h.source,
+      databasePath:path.join(h.home,'watcher.sqlite'),source:h.source,creditEntries,
       fault:{pauseAt:index===0?'beforeRevealConfirmation':'beforeCommitmentBroadcast'}});return file;
   });
   let watchers,guards,verifier;const sources=[],faults=[],actions=[];let actionError;
@@ -77,7 +89,7 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     assert.equal(watchers.counts.uniqueCommitmentTransactions,2);assert.equal(watchers.counts.uniqueRevealTransactions,1);
     stage('watcher-recovery-passed',{commitments:2,reveals:1});
 
-    const guardHomes=[0,1,2,3].map(i=>provision('guard',i)),guardFiles=guardHomes.map((h,index)=>{
+    const guardFiles=guardHomes.map((h,index)=>{
       const file=path.join(h.home,'participant.json');write(file,{version:1,index,roundtripConfig:h.roundtripConfig,
         directory:path.join(h.home,'state'),secretKey:deployment.guardSecrets[index],deployment:publicDeployment,
         source:h.source,candidate,watcherReceipt:receipt});return file;
@@ -107,6 +119,14 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     await assert.rejects(()=>guards.sign(snapshot,{drop:[0,1,2,3],completionTimeoutMs:3000}),/transport timeout/);
     assert.equal(sum(guards.counts.guardPartialSigns),0);await guards.restartAll();
     const retained=checkpoints(await guards.stats());claimed(retained);await guards.assertAssigned(assignment);
+    const beforeNovelty={...watchers.counts};
+    await assert.rejects(()=>watchers.observe(candidate),/Watcher backing already claimed/);
+    await Promise.all([watchers.restart(0),watchers.restart(1)]);
+    await assert.rejects(()=>watchers.observe(candidate),/Watcher backing already claimed/);
+    assert.deepEqual(watchers.counts,beforeNovelty,'Claimed output produced new watcher transactions');
+    assert.deepEqual(checkpoints(await guards.stats()),retained,'Watcher novelty must be read-only');
+    assert.equal((await watchers.publish(candidate)).transaction.id,receipt.transaction.id,'Only exact confirmed-event recovery is allowed');
+    faults.push('watcher-claimed-output-before-event-and-after-restart');
     faults.push('all-signing-messages-dropped');stage('dropped-transport-refused');
 
     if(sourceFaults){

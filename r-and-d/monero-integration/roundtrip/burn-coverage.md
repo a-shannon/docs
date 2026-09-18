@@ -3,9 +3,10 @@
 A. Shannon · 18 September 2026
 
 The two reported incidents require three distinct mechanism checks. The current
-Rust scanner and V2 credit ledger pass the bounded regressions below. This
-increment adds tests and review documentation; it changes no bridge runtime or
-dependency. It does not replay either historical vulnerable wallet or establish
+Rust scanner and V2 credit ledger pass the bounded regressions below. The
+historical-mechanism increment added tests without changing the runtime or
+dependency. A subsequent watcher change adds credit-ledger novelty before event
+publication, as described below. These checks do not replay either historical vulnerable wallet or establish
 that every historical failure is covered in production.
 
 ## Mechanisms and source fixes
@@ -30,6 +31,7 @@ correct. Balance agreement alone is therefore an insufficient bridge check.
 | [Native block scan](source/native/src/deposit_block.rs) → [observer and certificate replay](source/native/src/deposit_observer_tests.rs) | Each of the three varied key layouts admits one owned output with exact identity and amount; all layouts refuse two owned outputs under this profile. The certificate is rebuilt against the varied transaction and block bytes. | Complete serialized transaction/block parsing and genuine local holder certificates. Transaction extra is changed after signing; these transactions are not consensus-validity evidence. |
 | [Fresh proof/receipt admission](source/consumer/freshDepositAdmission.test.mjs) → existing deposit policy | A payment report of 20,000 against the independently reported 10,000 output is refused. Restoring 10,000 admits exactly 9,880 after the fixture's 120 fees. | Real admission/policy functions with mocked native, daemon and proof ports; no cryptographic proof claim. |
 | [V2 durable assignment](source/guard-service/src/db/moneroCreditAssignmentV2.test.mjs) | Later occurrences with the same output/image and amounts 500, 1,000 or 1,500 conflict with the retained 1,000 deposit, including after restart and invalidation. Each later descriptor is accepted in an empty control ledger. Existing tests isolate output-key and image uniqueness independently. | Actual SQLite custody and immutable claims; ownership, image association and source freshness remain caller prerequisites. |
+| [Watcher novelty](source/ergo-node/watcher-novelty-runtime.test.mjs) → actual commitment/reveal jobs | Already claimed backing refuses observation; claims inserted after observation or during either broadcast pause stop publication. Queued restart repeats the check, while exact confirmed-event recovery returns the retained event. | Read-only local views of all four existing guard ledgers; atomic guard assignment still decides subsequent races. Production credit-state delivery remains an integration boundary. |
 
 The scanner's additional-only control contains no genuine primary key. It forces
 the indexed additional derivation; placing additional keys earlier in serialized
@@ -40,6 +42,14 @@ The bridge deliberately refuses a second obligation against claimed backing,
 including a larger subsequent reported amount. This is stricter than adopting
 wallet replacement-accounting behavior. An invalidated credit retains both its
 economic claims and the existing destination liability.
+
+The earlier admission helper alone did not consult credit custody: uniqueness
+was checked by guards. The multiprocess watcher now performs that check before
+event publication as well. Rust scanning, output/proof/intent association,
+daemon unspent state and confirmations remain source-admission checks; guards
+reconstruct the same committed output descriptor and repeat fresh verification.
+See [the qualification report](adapter-qualification.md#output-novelty-before-watcher-publication)
+for the implemented read-only view, retry behavior and validation limits.
 
 Two scratch dependency mutations demonstrate sensitivity. Removing the scanner's
 matched-output `break` causes three failures, with three controls passing.

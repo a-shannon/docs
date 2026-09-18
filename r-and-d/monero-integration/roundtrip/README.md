@@ -12,7 +12,11 @@ multiple-counting mechanisms from repeated economic backing. The
 [multisig review packet](multisig-review.md) prepares the remaining independent
 review of the optional contribution hook.
 
-**Latest increment: explicit output and intent agreement.** Read the
+**Latest increment: output novelty before watcher publication.** The V2
+watchers consult retained guard custody before proposing or publishing an event.
+See the [novelty and recovery checks](adapter-qualification.md#output-novelty-before-watcher-publication).
+
+**Explicit output and intent agreement.** Read the
 [output agreement report](output-agreement.md) for the watcher/guard binding,
 isolated negative tests and exact replay results.
 

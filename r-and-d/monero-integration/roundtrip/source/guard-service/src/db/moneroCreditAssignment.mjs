@@ -55,7 +55,7 @@ export function committeeConfigDigest(config) {
 /** Exact stable descriptor from fresh native/proof admission, not its mutable snapshot.
  * Monero's committee digest is retained separately from the Ergo binding digest.
  * Source verification remains the guard's responsibility before assignment. */
-function v2BackingNullifier(backing, outputs, binding) {
+function v2BackingIdentity(backing) {
   shape(backing, ['version','genesis','committeeDigest','vaultSpend','vaultAddress',
     'intentHash','txId','blockHash','blockHeight','outputIndex','globalIndex',
     'outputKey','keyImage','amountAtomic','destinationNetwork','destinationAsset',
@@ -72,10 +72,14 @@ function v2BackingNullifier(backing, outputs, binding) {
     if (typeof backing[name] !== 'string' || !/^[1-9][0-9]{0,19}$/.test(backing[name]) ||
         BigInt(backing[name]) > 18446744073709551615n) throw Error('backing:'+name+':uint64');
   }
-  if (outputs.length !== 1 || backing.outputKey !== outputs[0].publicKey ||
-      backing.intentHash !== binding.sourceIntentDigest) throw Error('backing:request-binding');
   // Neither committee epoch nor block occurrence may reset economic uniqueness.
   return `monero:key-image:${backing.genesis}:${backing.vaultSpend}:${backing.keyImage}`;
+}
+function v2BackingNullifier(backing, outputs, binding) {
+  const identity=v2BackingIdentity(backing);
+  if (outputs.length !== 1 || backing.outputKey !== outputs[0].publicKey ||
+      backing.intentHash !== binding.sourceIntentDigest) throw Error('backing:request-binding');
+  return identity;
 }
 function requestBytes(request, config, committeeDigest) {
   const backed=['single-deposit-v1','single-deposit-v2'].includes(config.backingPolicy);
@@ -122,22 +126,25 @@ function settlementBytes(value){
 /** Guard-owned durable anti-equivocation state. Caller owns source/payment verification.
  * No release, epoch migration, standalone signing authority, or rollback detection. */
 export class MoneroCreditAssignment {
-  #db; #config; #configBytes; #digest; #committeeDigest; #path; #identity; #closed = false;
+  #db; #config; #configBytes; #digest; #committeeDigest; #path; #identity; #readOnly; #closed = false;
   static create(file, config) { return new MoneroCreditAssignment(file, config, true); }
   static open(file, config) { return new MoneroCreditAssignment(file, config, false); }
-  constructor(file, config, create) {
+  static openReadOnly(file, config) { return new MoneroCreditAssignment(file, config, false, true); }
+  constructor(file, config, create, readOnly=false) {
     const bytes = configBytes(config);
+    if (typeof readOnly!=='boolean' || (readOnly && create)) throw Error('custody:read-only');
     if (typeof file !== 'string' || !isAbsolute(file)) throw Error('custody:absolute-path');
     // Exclusive creation is explicit; open never interprets missing state as fresh.
-    const fd = openSync(file, create ? 'wx' : 'r+'); closeSync(fd);
+    const fd = openSync(file, create ? 'wx' : readOnly ? 'r' : 'r+'); closeSync(fd);
     const stat = lstatSync(file);
     if (!stat.isFile() || stat.isSymbolicLink()) throw Error('custody:regular-file');
-    this.#path=file; this.#identity={dev:stat.dev,ino:stat.ino};
+    this.#path=file; this.#identity={dev:stat.dev,ino:stat.ino}; this.#readOnly=readOnly;
     this.#config=structuredClone(config); this.#configBytes=bytes; this.#digest=hash(bytes); this.#committeeDigest=committeeConfigDigest(config);
-    const db = new DatabaseSync(file); this.#db=db;
+    const db = new DatabaseSync(file,{readOnly}); this.#db=db;
     try {
-      db.exec('PRAGMA busy_timeout=1000; PRAGMA journal_mode=WAL; PRAGMA synchronous=EXTRA; PRAGMA foreign_keys=ON;');
-      if (db.prepare('PRAGMA synchronous').get().synchronous !== 3 ||
+      db.exec('PRAGMA busy_timeout=1000; PRAGMA foreign_keys=ON;');
+      if (!readOnly) db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=EXTRA;');
+      if ((!readOnly && db.prepare('PRAGMA synchronous').get().synchronous !== 3) ||
           db.prepare('PRAGMA journal_mode').get().journal_mode !== 'wal') throw Error('custody:durability');
       if (create) this.#transaction(() => {
         db.exec(`CREATE TABLE metadata(singleton INTEGER PRIMARY KEY CHECK(singleton=1),version INTEGER NOT NULL,config TEXT NOT NULL,revision INTEGER NOT NULL);
@@ -147,7 +154,7 @@ export class MoneroCreditAssignment {
           CREATE TABLE settlements(obligationId TEXT PRIMARY KEY REFERENCES claims(obligationId),settlementDigest TEXT NOT NULL,settlement TEXT NOT NULL);`);
         db.prepare('INSERT INTO metadata VALUES(1,2,?,0)').run(bytes);
       });
-      this.#verify();
+      this.#readTransaction(() => this.#verify());
     } catch (error) { db.close(); this.#closed=true; throw error; }
   }
   #live() {
@@ -187,14 +194,38 @@ export class MoneroCreditAssignment {
     }
   }
   #transaction(fn) {
-    this.#live(); this.#db.exec('BEGIN IMMEDIATE');
+    this.#writable(); this.#db.exec('BEGIN IMMEDIATE');
     try { const result=fn(); this.#db.exec('COMMIT'); return result; }
+    catch(error) { this.#db.exec('ROLLBACK'); throw error; }
+  }
+  #writable() {
+    this.#live();
+    if (this.#readOnly) throw Error('custody:read-only');
+  }
+  #readTransaction(fn) {
+    this.#live(); this.#db.exec('BEGIN');
+    try { const result=fn(); this.#live(); this.#db.exec('COMMIT'); return result; }
     catch(error) { this.#db.exec('ROLLBACK'); throw error; }
   }
   #bump() {
     if (this.#db.prepare('UPDATE metadata SET revision=revision+1 WHERE singleton=1 AND revision<9007199254740991').run().changes!==1) throw Error('custody:revision-exhausted');
   }
   get configDigest() { return this.#digest; }
+  /** Current economic membership only, never a reservation or signing authority. */
+  inspectNovelty(value) {
+    this.#live(); shape(value,['sourceNetwork','backing'],'novelty');
+    if (this.#config.backingPolicy!=='single-deposit-v2') throw Error('novelty:profile');
+    if (!['mainnet','testnet','stagenet'].includes(value.sourceNetwork)) throw Error('output:network');
+    const nullifierId=v2BackingIdentity(value.backing);
+    if (this.#config.custodyDomain!=='local-monero-genesis:'+value.backing.genesis) throw Error('novelty:custody-domain');
+    const economicId=`monero:output-key:${value.sourceNetwork}:${value.backing.outputKey}`;
+    return this.#readTransaction(() => {
+      this.#verify();
+      const output=this.#db.prepare('SELECT obligationId FROM outputs WHERE economicId=?').get(economicId);
+      const image=this.#db.prepare('SELECT obligationId FROM nullifiers WHERE nullifierId=?').get(nullifierId);
+      return {status:output || image?'claimed':'new',checkpoint:this.#checkpoint(),identity:{...this.#identity}};
+    });
+  }
   #observe(r){
     const claim=this.#db.prepare('SELECT * FROM claims WHERE obligationId=?').get(r.binding.obligationId);
     if(!claim){
@@ -222,7 +253,7 @@ export class MoneroCreditAssignment {
     return observation;
   }
   assign(request) {
-    this.#live(); const r=requestBytes(request,this.#config,this.#committeeDigest);
+    this.#writable(); const r=requestBytes(request,this.#config,this.#committeeDigest);
     return this.#transaction(() => {
       this.#verify();
       const previous=this.#db.prepare('SELECT * FROM claims WHERE obligationId=?').get(r.binding.obligationId);
@@ -242,7 +273,7 @@ export class MoneroCreditAssignment {
     });
   }
   #settlement(request,settlement,mode){
-    this.#live();
+    this.#writable();
     if(this.#config.backingPolicy==='single-deposit-v2')throw Error('settlement:profile');
     const r=requestBytes(request,this.#config,this.#committeeDigest),s=settlementBytes(settlement);
     if(!r.nullifierId)throw Error('settlement:backing-required');
@@ -268,6 +299,7 @@ export class MoneroCreditAssignment {
   /** Retained observation after invalidation never restores signing authority. */
   observeSettlement(request,settlement){return this.#settlement(request,settlement,'observe');}
   invalidate(obligationId, reason) {
+    this.#writable();
     text(obligationId,'obligationId'); text(reason,'reason');
     return this.#transaction(() => {
       this.#verify();
@@ -281,7 +313,11 @@ export class MoneroCreditAssignment {
   }
   /** Observation for caller continuity; a valid older snapshot cannot be detected locally. */
   checkpoint() {
-    return this.#transaction(() => {
+    return this.#readTransaction(() => {
+      this.#verify(); return this.#checkpoint();
+    });
+  }
+  #checkpoint() {
       const revision=this.#db.prepare('SELECT revision FROM metadata').get().revision;
       const claims=this.#db.prepare('SELECT * FROM claims ORDER BY obligationId').all().map(row=>({...row}));
       const outputs=this.#db.prepare('SELECT * FROM outputs ORDER BY economicId').all().map(row=>({...row}));
@@ -289,7 +325,6 @@ export class MoneroCreditAssignment {
       const settlements=this.#db.prepare('SELECT * FROM settlements ORDER BY obligationId').all().map(row=>({...row}));
       return {configDigest:this.#digest,revision,claims:claims.length,outputs:outputs.length,nullifiers:nullifiers.length,settlements:settlements.length,
         stateDigest:hash(canonicalAssignment({configDigest:this.#digest,revision,claims,outputs,nullifiers,settlements}))};
-    });
   }
   close() { if (!this.#closed) { this.#db.close(); this.#closed=true; } }
 }

@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 436,
-  "aggregateSha256": "3373ad21899c66034d1e0b19079fa85e08a9ce8995e276567a20a5db42aac678",
+  "fileCount": 442,
+  "aggregateSha256": "a6d7881c4adc4e7b6cef1e3f4cbd7fe0019d06f239c4330f5044ab79e0a58f67",
   "files": [
     {
       "path": "README.md",
-      "bytes": 19988,
-      "sha256": "7b88123ff85ff70449871d8ec24bd78d64eec0713c608c824e379836510ced48"
+      "bytes": 21000,
+      "sha256": "369a9745764d6165d9cf458f287051ea7701d992ace2ae9df2398c9f57975332"
     },
     {
       "path": "consumer/adapter.ts",
@@ -376,8 +376,8 @@
     },
     {
       "path": "consumer/processAdapterScenario.mjs",
-      "bytes": 18126,
-      "sha256": "c8bb6c0c55e3e6f997b5fb1862eb7acee7de70725b19b6252ed82d7c7250dc9a"
+      "bytes": 19872,
+      "sha256": "e69f5dc442a7c34aae8b3a8dd5052e53f6d7fa8fa50b43899fbd1aef4c760ca2"
     },
     {
       "path": "consumer/projectionFixture.ts",
@@ -541,8 +541,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 17013,
-      "sha256": "b83a57cca41cfee2752b8a206e4a4e1de1d6e1e64bde6d6f3c8bd49cbc8f6382"
+      "bytes": 16980,
+      "sha256": "a3542e5acce71030c702cd965dd2a9f19eca516be4981d801877982ae6e7d40c"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -605,6 +605,16 @@
       "sha256": "881970ea4007a72cef97d6f46800515b02daec156de2e7051555568bc692db4c"
     },
     {
+      "path": "ergo-node/credit-custody.mjs",
+      "bytes": 2917,
+      "sha256": "eb36db5a7b3ba3a3e957d735f53a4c773f0d725a3e386922df62a8c0b34d62e8"
+    },
+    {
+      "path": "ergo-node/credit-custody.test.mjs",
+      "bytes": 5293,
+      "sha256": "02f02cc9d64576dd043894b9bb289120da343112b9b1cbd92ce5a3c5479385b4"
+    },
+    {
       "path": "ergo-node/credit-event-policy.mjs",
       "bytes": 664,
       "sha256": "c365d3cc7abaf4d6264b31e0ce832eb07195171f8ed15ad5fa0e7bcd404af150"
@@ -661,8 +671,8 @@
     },
     {
       "path": "ergo-node/guard-participant.mjs",
-      "bytes": 10230,
-      "sha256": "28782fbef527308a0216f95b508c5fd2dc9c3cf5e576244abc9690ede71ad2ea"
+      "bytes": 9475,
+      "sha256": "f62290aa9192787a1bcbb7607270965d9b963508521f26e8a7a0acb3df861120"
     },
     {
       "path": "ergo-node/guard-process-committee.mjs",
@@ -705,14 +715,29 @@
       "sha256": "1df9ce004548fed8abb20fcb6c8b12d7b414893b1caa2b99c187c1d8dc4c72ec"
     },
     {
+      "path": "ergo-node/watcher-credit-view.mjs",
+      "bytes": 2163,
+      "sha256": "39035616f070ea779a9bc52acc6117bb93ac7ec32a09a4079121ca636cd28120"
+    },
+    {
+      "path": "ergo-node/watcher-credit-view.test.mjs",
+      "bytes": 3911,
+      "sha256": "9a15462f7e0a97786a042d6285cf0b656e46d306c4962c623adbefa122c1c925"
+    },
+    {
+      "path": "ergo-node/watcher-novelty-runtime.test.mjs",
+      "bytes": 14053,
+      "sha256": "9f9588c591765cf22369e81946394640cc9da25cd5bfdd810ec5014eac9ee258"
+    },
+    {
       "path": "ergo-node/watcher-participant.mjs",
-      "bytes": 2686,
-      "sha256": "09f436d5c1d70c3976603eb19c7126cbf0a4a9f9ca830ab6b212fa6102b5ba01"
+      "bytes": 2779,
+      "sha256": "f54ab680861b2303b06723ab3a500a9387cd9ea65ff775ec3f027669c72fb6e9"
     },
     {
       "path": "ergo-node/watcher-process-transport.mjs",
-      "bytes": 4022,
-      "sha256": "d267964abf97771aefdd423c679e6c072c48817dd9f6b84c089105d678b9ad8f"
+      "bytes": 4572,
+      "sha256": "745a52cc2b61ad58086b46e4802689d362a7480e1450cd44691bc7b077087b1f"
     },
     {
       "path": "ergo-node/watcher-producer.mjs",
@@ -721,8 +746,8 @@
     },
     {
       "path": "ergo-node/watcher-runtime.mjs",
-      "bytes": 21522,
-      "sha256": "bec0a7550619666b53e58d10f65287b849f24e2caec08f2146fb81f0cd6b7ca3"
+      "bytes": 28222,
+      "sha256": "2fbdc61a84f6b3eff3ae12b101d50e19adfaeb659d208af2b8a5f95c1f0fa669"
     },
     {
       "path": "ergo-node/watcher-runtime.test.mjs",
@@ -1271,18 +1296,23 @@
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.mjs",
-      "bytes": 19877,
-      "sha256": "657a645d91395d1c4922550cf5ed145994764b651654cb5f922098acd5ac7ac9"
+      "bytes": 21812,
+      "sha256": "7dc81cd4eae2623a937cfa175325c6c87fd9200376f5a04805182abd8d558784"
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.test.mjs",
-      "bytes": 19868,
-      "sha256": "a89db0f0cb4d4ced2f4de35927151c547b205d343b24e989fddd355506b8fc53"
+      "bytes": 20093,
+      "sha256": "1e3f17615f71990283c133a45b263489d6a3f1d73341de5c2f23906d6b327d97"
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignmentV2.test.mjs",
       "bytes": 12088,
       "sha256": "9228767c9b1685f9af6587487499878b2892dbeae5563edeb41c0f60d45675aa"
+    },
+    {
+      "path": "guard-service/src/db/moneroCreditNovelty.test.mjs",
+      "bytes": 8781,
+      "sha256": "adc3982ba1b1af279c085d1e3d7ac4b65eda402ae99c16251504181d1c6b906e"
     },
     {
       "path": "guard-service/src/db/moneroWithdrawalReservation.ts",

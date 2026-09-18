@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {createRequire,isBuiltin,registerHooks} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+import {canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
+import {openWatcherCreditView} from './watcher-credit-view.mjs';
 
 export const WATCHER_PIN='13b4c76ee7803bdf5f052e33cdc12b66acac2db0';
 const sourceRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
@@ -28,9 +30,13 @@ export function canonicalObservation(observation){
 export function openWatcherStore(filename){
   const db=new DatabaseSync(filename);db.exec('PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   db.exec(`CREATE TABLE IF NOT EXISTS observations(id TEXT PRIMARY KEY,rawHash TEXT NOT NULL,payload TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS sources(id TEXT PRIMARY KEY,raw TEXT NOT NULL,backing TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS creditContinuity(guardKey TEXT PRIMARY KEY,payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS queue(stage TEXT PRIMARY KEY,requestId TEXT NOT NULL,txId TEXT NOT NULL UNIQUE,signedHex TEXT NOT NULL,signedJson TEXT NOT NULL,confirmed TEXT);
     CREATE TABLE IF NOT EXISTS receipts(requestId TEXT PRIMARY KEY,payload TEXT NOT NULL);`);
   return {
+    creditContinuity(rows){db.exec('BEGIN IMMEDIATE');try{for(const row of rows){const previous=db.prepare('SELECT payload FROM creditContinuity WHERE guardKey=?').get(row.guardKey);if(previous){const old=JSON.parse(previous.payload);assert.deepEqual(row.identity,old.identity,'Watcher credit identity drift');assert.equal(row.checkpoint.configDigest,old.checkpoint.configDigest,'Watcher credit config drift');assert(row.checkpoint.revision>=old.checkpoint.revision,'Watcher credit revision regressed');if(row.checkpoint.revision===old.checkpoint.revision)assert.equal(row.checkpoint.stateDigest,old.checkpoint.stateDigest,'Watcher credit state drift');}db.prepare('INSERT OR REPLACE INTO creditContinuity VALUES(?,?)').run(row.guardKey,stringify(row));}db.exec('COMMIT');}catch(error){db.exec('ROLLBACK');throw error;}},
+    source(requestId,raw,backing){const previous=db.prepare('SELECT raw,backing FROM sources WHERE id=?').get(requestId);if(raw!==undefined){const next={raw:canonicalAssignment(raw),backing:canonicalAssignment(backing)};if(previous)assert.deepEqual({...previous},next,'Watcher retained source drift');else db.prepare('INSERT INTO sources VALUES(?,?,?)').run(requestId,next.raw,next.backing);}const row=previous??db.prepare('SELECT raw,backing FROM sources WHERE id=?').get(requestId);return row?{raw:JSON.parse(row.raw),backing:JSON.parse(row.backing)}:undefined;},
     observe(raw,observation){const canonical=canonicalObservation(observation),payload=stringify(canonical),rawHash=hash(raw),row=db.prepare('SELECT * FROM observations WHERE id=?').get(canonical.requestId);if(row){assert.equal(row.rawHash,rawHash,'Conflicting watcher request');assert.equal(row.payload,payload,'Conflicting watcher observation');}else db.prepare('INSERT INTO observations VALUES(?,?,?)').run(canonical.requestId,rawHash,payload);return canonical;},
     observation(requestId){const row=db.prepare('SELECT payload FROM observations WHERE id=?').get(requestId);return row?JSON.parse(row.payload):undefined;},
     queue(stage,requestId,tx){const row=this.readQueue(stage);const record={stage,requestId,txId:tx.id().to_str(),signedHex:Buffer.from(tx.sigma_serialize_bytes()).toString('hex'),signedJson:tx.to_json()};if(row){for(const field of ['requestId','txId','signedHex','signedJson'])assert.equal(row[field],record[field],'Queued transaction drift');}else db.prepare('INSERT INTO queue(stage,requestId,txId,signedHex,signedJson) VALUES(?,?,?,?,?)').run(...Object.values(record));return this.readQueue(stage);},
@@ -83,7 +89,7 @@ export async function createWatcherTransport({directory,deployment,nodePort,obse
     receipt=await nodePort.confirmed(queued.txId);assert.equal(receipt.id,queued.txId);assert(receipt.numConfirmations>0,'Unconfirmed watcher spend');store.confirm(stage,receipt);return receipt;
   }
   return {close(){stores.forEach(s=>s.close());},async publish(rawRequest){
-    const observations=[];for(let i=0;i<2;i++)observations.push(stores[i].observe(rawRequest,await observe(i,structuredClone(rawRequest))));assert.deepEqual(observations[0],observations[1],'Independent watcher observations disagree');const observation=observations[0],requestId=observation.requestId;
+    const observations=[];for(let i=0;i<2;i++){const proposal=await observe(i,structuredClone(rawRequest));assert(!proposal.fromAddress?.startsWith('rosen-monero-output:v2:'),'V2 deposits require watcher participants with credit custody');observations.push(stores[i].observe(rawRequest,proposal));}assert.deepEqual(observations[0],observations[1],'Independent watcher observations disagree');const observation=observations[0],requestId=observation.requestId;
     const prior=stores[0].receipt(requestId);if(prior)return prior;
     const commitments=[],commitmentTransactions=[];
     for(let i=0;i<2;i++){
@@ -111,16 +117,81 @@ export async function createWatcherTransport({directory,deployment,nodePort,obse
 }
 
 /** One watcher-owned pinned job runner. Its caller may be a separate process. */
-export async function createWatcherParticipant({databasePath,deployment,watcher,nodePort,inspect,dependencyRoot,pause=async()=>{}}){
+export async function createWatcherParticipant({databasePath,deployment,watcher,nodePort,inspect,dependencyRoot,creditEntries,pause=async()=>{}}){
   assert(path.isAbsolute(databasePath));assert.equal(typeof inspect,'function');
   const store=openWatcherStore(databasePath);let closure,live=true;const current=()=>assert(live,'Closed watcher participant');
+  let credit;
+  try{credit=openWatcherCreditView({entries:creditEntries,committeeKeys:deployment.guardPublicKeys,remember:rows=>store.creditContinuity(rows)});}
+  catch(error){store.close();throw error;}
+  function assertBacking(observation,backing){
+    const origin=crypto.createHash('sha256').update('rosen-monero/credit-origin/v2').update('\0').update(canonicalAssignment(backing)).digest('hex');
+    assert.equal(observation.fromAddress,'rosen-monero-output:v2:'+origin,'Watcher backing commitment drift');
+    assert.equal(observation.sourceTxId,backing.txId);assert.equal(observation.sourceBlockId,backing.blockHash);assert.equal(observation.height,backing.blockHeight);
+    assert.equal(observation.requestId,closure.requestId(backing.txId),'Watcher request binding');
+  }
+  function retained(requestId){const source=store.source(requestId),observation=store.observation(requestId);assert(source&&observation,'Missing retained watcher source');assertBacking(observation,source.backing);return {source,observation};}
+  function assertNew(requestId){current();credit.assertNew(retained(requestId).source.backing);}
   const serialized=json=>Buffer.from(closure.wasm.ErgoBox.from_json(stringify(json)).sigma_serialize_bytes()).toString('base64');
   async function knownUnspent(predicate){const known=[...watcher.permitBoxes,watcher.WIDBox,...(watcher.feeBoxes||[]),...store.confirmedOutputs()],unique=new Map(known.filter(predicate).map(b=>[b.boxId,b]));const live=[];for(const id of unique.keys()){try{live.push(await nodePort.rpc('/utxo/byId/'+id));}catch(e){if(!String(e).includes('404'))throw e;}}return live;}
   const database={getUnspentPermitBoxes:async WID=>{assert.equal(WID,watcher.WID);return (await knownUnspent(b=>b.ergoTree===deployment.contracts.Permit.tree)).filter(b=>Buffer.from(closure.wasm.ErgoBox.from_json(stringify(b)).register_value(4).to_byte_array()).toString('hex')===WID).map(b=>({boxSerialized:serialized(b)}));},getUnspentAddressBoxes:async()=>{const secret=typeof watcher.secretKey==='string'?closure.wasm.SecretKey.dlog_from_bytes(Buffer.from(watcher.secretKey,'hex')):watcher.secretKey;const addressTree=secret.get_address().to_ergo_tree().to_base16_bytes();return (await knownUnspent(b=>b.ergoTree===addressTree)).map(b=>({serialized:serialized(b)}));},trackTxQueue:async b=>b};
-  closure=await loadWatcherRuntime({dependencyRoot,deployment,watcher,nodePort,database});
-  async function reconcile(stage,checkpoint,confirmationCheckpoint=checkpoint+':before-confirmation'){current();const queued=store.readQueue(stage);assert(queued,'Missing signed transaction queue');if(queued.confirmed)return JSON.parse(queued.confirmed);let receipt;try{receipt=await nodePort.rpc('/blockchain/transaction/byId/'+queued.txId);}catch(e){if(!String(e).includes('404'))throw e;}if(!receipt){await pause(checkpoint);current();const id=await nodePort.rpc('/transactions',JSON.parse(queued.signedJson));assert.equal(id,queued.txId,'Node transaction ID mismatch');}await pause(confirmationCheckpoint);receipt=await nodePort.confirmed(queued.txId);assert.equal(receipt.id,queued.txId);assert(receipt.numConfirmations>0,'Unconfirmed watcher spend');current();store.confirm(stage,receipt);return receipt;}
-  async function observe(rawRequest){current();const admitted=await inspect(structuredClone(rawRequest));assert.equal(admitted.status,'accepted','Independent watcher source was not accepted');const observation=structuredClone(admitted.observation);assert.equal(observation.rawData,'');delete observation.rawData;observation.height=admitted.backing.blockHeight;current();return store.observe(rawRequest,observation);}
-  async function commitment(rawRequest){const observation=await observe(rawRequest),requestId=observation.requestId,stage='commitment:'+requestId;if(!store.readQueue(stage)){const txUtils={submitTransaction:async(tx,type)=>{assert.equal(type,'commitment');current();store.queue(stage,requestId,tx);await reconcile(stage,'beforeCommitmentBroadcast');}};const creator=new closure.CommitmentCreation({allReadyObservations:async()=>[observation]},txUtils,new closure.Boxes(database));await creator.job();assert(store.readQueue(stage),'Pinned commitment job failed before queue creation: '+closure.warnings.at(-1));}const receipt=await reconcile(stage,'beforeCommitmentBroadcast'),output=receipt.outputs.find(b=>b.ergoTree===deployment.contracts.Commitment.tree);assert(output,'No actual commitment output');const box=closure.wasm.ErgoBox.from_json(stringify(output));assert.equal(Buffer.from(box.register_value(4).to_byte_array()).toString('hex'),watcher.WID);assert.equal(Buffer.from(box.register_value(5).to_byte_array()).toString('hex'),requestId);return {observation,commitment:{WID:watcher.WID,boxId:output.boxId,commitment:Buffer.from(box.register_value(6).to_byte_array()).toString('hex'),rwtCount:box.tokens().get(0).amount().as_i64().to_str(),requestId},transaction:receipt};}
-  async function reveal(requestId,commitments){assert.match(requestId,/^[0-9a-f]{64}$/);assert.equal(commitments.length,2);const expected=deployment.watchers?.map(value=>value.WID)??[];assert.equal(expected.length,2,'Two public watcher identities required');assert.equal(new Set(expected).size,2);assert.deepEqual(new Set(commitments.map(value=>value.WID)),new Set(expected),'Unexpected watcher commitments');assert.equal(new Set(commitments.map(value=>value.boxId)).size,2,'Distinct commitment boxes required');assert(commitments.every(value=>value.requestId===requestId),'Commitment request mismatch');const observation=store.observation(requestId);assert(observation,'Missing durable watcher observation');const stage='trigger:'+requestId;if(!store.readQueue(stage)){const boxes=new closure.Boxes(database),revealJob=new closure.CommitmentReveal({allReadyCommitmentSets:async()=>[{observation,commitments}]},{submitTransaction:async(tx,type)=>{assert.equal(type,'trigger');current();store.queue(stage,requestId,tx);await reconcile(stage,'beforeRevealBroadcast','beforeRevealConfirmation');}},boxes);const live=async json=>closure.wasm.ErgoBox.from_json(stringify(await nodePort.rpc('/utxo/byId/'+json.boxId)));assert.equal(closure.ErgoUtils.requiredCommitmentCount(await live(deployment.RWTRepoBox),await live(deployment.repoConfigBox)),2n,'Exact two-watcher readiness threshold required');await revealJob.job();assert(store.readQueue(stage),'Pinned reveal job failed before queue creation: '+closure.warnings.at(-1));}const transaction=await reconcile(stage,'beforeRevealBroadcast','beforeRevealConfirmation'),trigger=transaction.outputs.find(b=>b.ergoTree===deployment.contracts.EventTrigger.tree);assert(trigger,'No confirmed event trigger');assert(commitments.every(c=>transaction.inputs.some(b=>b.boxId===c.boxId)),'Trigger did not spend both commitments');const receipt={watcherPin:WATCHER_PIN,observation,commitments,trigger,transaction};store.receipt(requestId,receipt);return receipt;}
-  return {observe,commitment,reveal,receipt(requestId,value){current();return store.receipt(requestId,value);},close(){if(live){live=false;store.close();}}};
+  try{closure=await loadWatcherRuntime({dependencyRoot,deployment,watcher,nodePort,database});}
+  catch(error){credit.close();store.close();throw error;}
+  async function reconcile(stage,checkpoint,confirmationCheckpoint=checkpoint+':before-confirmation'){current();const queued=store.readQueue(stage);assert(queued,'Missing signed transaction queue');if(queued.confirmed)return JSON.parse(queued.confirmed);let receipt;try{receipt=await nodePort.rpc('/blockchain/transaction/byId/'+queued.txId);}catch(e){if(!String(e).includes('404'))throw e;}if(!receipt){await pause(checkpoint);assertNew(queued.requestId);const id=await nodePort.rpc('/transactions',JSON.parse(queued.signedJson));assert.equal(id,queued.txId,'Node transaction ID mismatch');}await pause(confirmationCheckpoint);receipt=await nodePort.confirmed(queued.txId);assert.equal(receipt.id,queued.txId);assert(receipt.numConfirmations>0,'Unconfirmed watcher spend');current();store.confirm(stage,receipt);return receipt;}
+  async function observe(rawRequest){current();const admitted=await inspect(structuredClone(rawRequest));assert.equal(admitted.status,'accepted','Independent watcher source was not accepted');const observation=structuredClone(admitted.observation);assert.equal(observation.rawData,'');delete observation.rawData;observation.height=admitted.backing.blockHeight;assertBacking(observation,admitted.backing);credit.assertNew(admitted.backing);current();const result=store.observe(rawRequest,observation);store.source(result.requestId,rawRequest,admitted.backing);return result;}
+  async function commitment(rawRequest){
+    const observation=await observe(rawRequest),requestId=observation.requestId,stage='commitment:'+requestId;
+    if(!store.readQueue(stage)){
+      const txUtils={submitTransaction:async(tx,type)=>{assert.equal(type,'commitment');assertNew(requestId);store.queue(stage,requestId,tx);await reconcile(stage,'beforeCommitmentBroadcast');}};
+      const creator=new closure.CommitmentCreation({allReadyObservations:async()=>[observation]},txUtils,new closure.Boxes(database));
+      await creator.job();assert(store.readQueue(stage),'Pinned commitment job failed before queue creation: '+closure.warnings.at(-1));
+    }
+    const receipt=await reconcile(stage,'beforeCommitmentBroadcast'),output=receipt.outputs.find(b=>b.ergoTree===deployment.contracts.Commitment.tree);assert(output,'No actual commitment output');
+    const box=closure.wasm.ErgoBox.from_json(stringify(output));assert.equal(Buffer.from(box.register_value(4).to_byte_array()).toString('hex'),watcher.WID);assert.equal(Buffer.from(box.register_value(5).to_byte_array()).toString('hex'),requestId);
+    return {observation,commitment:{WID:watcher.WID,boxId:output.boxId,commitment:Buffer.from(box.register_value(6).to_byte_array()).toString('hex'),rwtCount:box.tokens().get(0).amount().as_i64().to_str(),requestId},transaction:receipt};
+  }
+  async function receipt(requestId,value){
+    current();const saved=store.receipt(requestId);if(value===undefined&&!saved)return undefined;
+    value=structuredClone(value??saved);const {observation}=retained(requestId);
+    assert.deepEqual(value.observation,observation,'Watcher recovered observation drift');assert.equal(value.watcherPin,WATCHER_PIN);
+    assert.equal(value.commitments.length,2);assert.deepEqual(value.commitments.map(c=>c.WID),deployment.watchers.map(w=>w.WID));
+    assert.equal(new Set(value.commitments.map(c=>c.boxId)).size,2);assert(value.commitments.every(c=>c.requestId===requestId));
+    const own=store.readQueue('commitment:'+requestId);assert(own?.confirmed,'Missing confirmed own commitment');
+    const selected=value.commitments.find(c=>c.WID===watcher.WID);assert(JSON.parse(own.confirmed).outputs.some(b=>b.boxId===selected.boxId),'Recovered commitment drift');
+    const chainReceipt=await nodePort.confirmed(value.transaction.id);current();assert.equal(chainReceipt.id,value.transaction.id);assert(chainReceipt.numConfirmations>0);
+    assert.deepEqual(value.transaction.inputs,chainReceipt.inputs,'Recovered transaction inputs drift');
+    // The indexer adds spend metadata after credit consumes the trigger. Compare
+    // consensus box bytes and IDs, not the mutable JSON presentation of a box.
+    const boxBytes=json=>{const box=closure.wasm.ErgoBox.from_json(stringify(json));assert.equal(box.box_id().to_str(),json.boxId,'Recovered transaction outputs drift');return Buffer.from(box.sigma_serialize_bytes()).toString('hex');};
+    assert.deepEqual(value.transaction.outputs.map(boxBytes),chainReceipt.outputs.map(boxBytes),'Recovered transaction outputs drift');
+    assert(chainReceipt.inputs.some(b=>b.boxId===selected.boxId),'Recovered trigger did not spend own commitment');
+    const trigger=chainReceipt.outputs.find(b=>b.ergoTree===deployment.contracts.EventTrigger.tree);assert(trigger,'Missing confirmed recovered trigger');
+    assert.equal(boxBytes(trigger),boxBytes(value.trigger),'Recovered trigger drift');assert(value.transaction.outputs.some(b=>b.boxId===trigger.boxId));
+    // The decoded event must still match the complete independently retained source.
+    const box=closure.wasm.ErgoBox.from_json(stringify(trigger));
+    const candidate=new closure.Boxes(database).createTriggerEvent(1000000n,observation.height,deployment.watchers.map(w=>w.WID),observation,10n);
+    const expectedBox=closure.wasm.ErgoBox.from_box_candidate(candidate,closure.wasm.TxId.from_str('00'.repeat(32)),0);
+    for(const register of [4,5,6,7])assert.equal(box.register_value(register).encode_to_base16(),expectedBox.register_value(register).encode_to_base16(),'Recovered event drift');
+    if(saved)assert.deepEqual(value,saved,'Receipt drift');return store.receipt(requestId,value);
+  }
+  async function recover(rawRequest){
+    current();const requestId=closure.requestId(rawRequest.txId);const saved=store.receipt(requestId);if(!saved)return null;
+    assert.equal(canonicalAssignment(rawRequest),canonicalAssignment(retained(requestId).source.raw),'Watcher recovery request drift');
+    return {receipt:await receipt(requestId),commitmentTransaction:JSON.parse(store.readQueue('commitment:'+requestId).confirmed)};
+  }
+  async function reveal(requestId,commitments){
+    assert.match(requestId,/^[0-9a-f]{64}$/);assert.equal(commitments.length,2);
+    const expected=deployment.watchers?.map(value=>value.WID)??[];assert.equal(expected.length,2,'Two public watcher identities required');assert.equal(new Set(expected).size,2);
+    assert.deepEqual(commitments.map(value=>value.WID),expected,'Unexpected watcher commitments');assert.equal(new Set(commitments.map(value=>value.boxId)).size,2,'Distinct commitment boxes required');assert(commitments.every(value=>value.requestId===requestId),'Commitment request mismatch');
+    const prior=store.receipt(requestId);if(prior){assert.deepEqual(commitments,prior.commitments,'Recovered commitments drift');return receipt(requestId);}
+    const {observation}=retained(requestId),stage='trigger:'+requestId;
+    if(!store.readQueue(stage)){
+      assertNew(requestId);
+      const boxes=new closure.Boxes(database),revealJob=new closure.CommitmentReveal({allReadyCommitmentSets:async()=>[{observation,commitments}]},{submitTransaction:async(tx,type)=>{assert.equal(type,'trigger');assertNew(requestId);store.queue(stage,requestId,tx);await reconcile(stage,'beforeRevealBroadcast','beforeRevealConfirmation');}},boxes);
+      const live=async json=>closure.wasm.ErgoBox.from_json(stringify(await nodePort.rpc('/utxo/byId/'+json.boxId)));assert.equal(closure.ErgoUtils.requiredCommitmentCount(await live(deployment.RWTRepoBox),await live(deployment.repoConfigBox)),2n,'Exact two-watcher readiness threshold required');
+      await revealJob.job();assert(store.readQueue(stage),'Pinned reveal job failed before queue creation: '+closure.warnings.at(-1));
+    }
+    const transaction=await reconcile(stage,'beforeRevealBroadcast','beforeRevealConfirmation'),trigger=transaction.outputs.find(b=>b.ergoTree===deployment.contracts.EventTrigger.tree);assert(trigger,'No confirmed event trigger');assert(commitments.every(c=>transaction.inputs.some(b=>b.boxId===c.boxId)),'Trigger did not spend both commitments');
+    return receipt(requestId,{watcherPin:WATCHER_PIN,observation,commitments,trigger,transaction});
+  }
+  return {observe,commitment,reveal,receipt,recover,close(){if(live){live=false;credit.close();store.close();}}};
 }

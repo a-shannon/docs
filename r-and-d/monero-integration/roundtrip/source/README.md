@@ -42,7 +42,7 @@ This direct qualification command is separate from the older roundtrip launcher
 profiles. It preserves private node, holder and proof material outside the source
 package. Its V2 deposit ledger explicitly refuses the older V1 withdrawal join.
 
-Set `processSimulation: true` in that external configuration to run the
+Set `processSimulation: true` in that external configuration for the V2
 [multiprocess campaign](consumer/processAdapterScenario.mjs). It starts two
 watcher Node processes and four guard Node processes with separate SQLite stores,
 proof inboxes and fixture keys. The parent relays the existing authenticated
@@ -52,6 +52,22 @@ three-of-four signing with a non-coordinator offline, delayed duplicate messages
 and recovery of the same confirmed credit. The three-of-four trial uses the node's
 transaction check endpoint without broadcasting; the final trial confirms one
 credit. The external `adapter-*/process-result.json` records the result and PIDs.
+
+The controller provisions the same four guard custody databases before starting
+watchers. Each watcher reads all four through a read-only view before retaining a
+new observation, queueing a commitment/reveal and submitting pending transactions.
+An output key or associated key image already retained by any guard refuses a new
+proposal, including after invalidation and restart. Missing, corrupt or rebound
+custody fails closed. The guard's atomic assignment remains necessary for races
+after a watcher read. Confirmed-event recovery returns the exact retained event;
+it does not grant new eligibility. The older in-process transport refuses V2
+observations and remains available only to older experiment profiles.
+
+For focused replay, set `WATCHER_DEPENDENCY_ROOT` to the prepared Rosen root:
+
+```text
+node --experimental-vm-modules --test ergo-node/credit-custody.test.mjs ergo-node/watcher-credit-view.test.mjs ergo-node/watcher-novelty-runtime.test.mjs guard-service/src/db/moneroCreditNovelty.test.mjs
+```
 
 Also set `sourceResilience: true` to add the bounded source-fault campaign; this
 option requires process simulation. It retries missing proof delivery for at least

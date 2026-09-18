@@ -18,6 +18,7 @@ import {captureAuthenticatedDepositSource,moneroCreditOrigin} from '../consumer/
 import {issueBackingClaim} from '../consumer/backingClaim.mjs';
 import {verifyDeliveryMode} from '../consumer/depositDelivery.mjs';
 import {captureFreshCreditSource} from './fresh-credit-source.mjs';
+import {freshCreditConfigurations} from './credit-custody.mjs';
 
 const require=createRequire(path.join(config.rosenRoot,'package.json'));
 const load=relative=>import(pathToFileURL(path.join(config.rosenRoot,relative)).href);
@@ -68,13 +69,15 @@ async function prepareAuthorizedCredit({directory,source,rawRequest,watcherRecei
   const {DataSource}=await load('node_modules/@rosen-bridge/extended-typeorm/dist/index.js');
   const {default:EventTriggerExtractor}=await load('node_modules/@rosen-bridge/watcher-data-extractor/dist/extractor/eventTriggerExtractor.js');
   const extractor=new EventTriggerExtractor('local-authority',new DataSource({type:'sqlite',database:':memory:'}),'node','',d.contracts.EventTrigger.address,d.tokens.RWT,d.contracts.Permit.address,d.contracts.Fraud.address,undefined,false);
-  const policyDigest=hash(canonicalAssignment(freshMode?{profile:'local-four-guard-backed-credit-v2',scope:freshSource.scope,genesis:freshSource.genesis,
-    guardBoxId:d.guard.boxId,tokens:d.tokens,contracts:Object.fromEntries(Object.entries(d.contracts).map(([name,c])=>[name,c.tree]))}:
-    {profile:'local-four-guard-backed-credit-v1',configuration:source.context.configuration,feePolicy:source.context.feePolicy,
+  let configs;
+  if(freshMode)configs=freshCreditConfigurations({deployment:d,scope:freshSource.scope,genesis:freshSource.genesis});
+  else {
+    const policyDigest=hash(canonicalAssignment({profile:'local-four-guard-backed-credit-v1',configuration:source.context.configuration,feePolicy:source.context.feePolicy,
       guardBoxId:d.guard.boxId,tokens:d.tokens,contracts:Object.fromEntries(Object.entries(d.contracts).map(([name,c])=>[name,c.tree]))}));
-  const custodyDomain='local-monero-genesis:'+(freshMode?freshSource.genesis:source.publicScan.genesis),activationId='ergo-guard:'+d.guard.boxId;
-  const backingPolicy=freshMode?'single-deposit-v2':'single-deposit-v1';
-  const configs=d.guardPublicKeys.map(guardKey=>({custodyDomain,guardKey,committeeKeys:d.guardPublicKeys,quorum:3,maxFaults:1,activationId,policyEpoch:'1',policyDigest,backingPolicy}));
+    const custodyDomain='local-monero-genesis:'+source.publicScan.genesis,activationId='ergo-guard:'+d.guard.boxId,backingPolicy='single-deposit-v1';
+    configs=d.guardPublicKeys.map(guardKey=>({custodyDomain,guardKey,committeeKeys:d.guardPublicKeys,quorum:3,maxFaults:1,activationId,policyEpoch:'1',policyDigest,backingPolicy}));
+  }
+  const {policyDigest,custodyDomain,activationId,backingPolicy}=configs[0];
   const assignmentRequest=(candidate,snapshot,backing)=>({binding:{obligationId:candidate.depositId,creditTransactionDigest:snapshot.digest,sourceIntentDigest:candidate.intentHash,
     triggerBoxId:receipt.trigger.boxId,policyDigest,committeeDigest:committeeConfigDigest(configs[0])},outputs:candidate.outputs.map(o=>({sourceNetwork:candidate.sourceNetwork,publicKey:o.publicKey})),
     backing:freshMode?structuredClone(backing):captureAuthenticatedDepositSource(source).backing});

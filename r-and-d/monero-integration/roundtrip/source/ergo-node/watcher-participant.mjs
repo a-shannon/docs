@@ -17,9 +17,10 @@ async function pause(checkpoint){
   emitProcessEvent('checkpoint',{index:config.index,checkpoint});
   if(config.fault?.pauseAt===checkpoint)await new Promise(resolve=>gates.set(checkpoint,resolve));
 }
-const actor=await createWatcherParticipant({databasePath:config.databasePath,deployment:config.deployment,watcher:config.watcher,nodePort:{rpc,confirmed,getStateContext:stateContext},inspect:(candidate,signal)=>source.inspect(candidate,signal),dependencyRoot:config.dependencyRoot,pause});
+const actor=await createWatcherParticipant({databasePath:config.databasePath,deployment:config.deployment,watcher:config.watcher,nodePort:{rpc,confirmed,getStateContext:stateContext},inspect:(candidate,signal)=>source.inspect(candidate,signal),dependencyRoot:config.dependencyRoot,creditEntries:config.creditEntries,pause});
 await serveProcessRpc({
   handlers:{
+    recover(candidate){return actor.recover(candidate);},
     async observe(candidate){const observation=await actor.observe(candidate);emitProcessEvent('observation',{index:config.index,requestId:observation.requestId});return observation;},
     async commitment(candidate){const result=await actor.commitment(candidate);emitProcessEvent('commitment',{index:config.index,requestId:result.observation.requestId,boxId:result.commitment.boxId});return result;},
     async reveal({requestId,commitments}){const receipt=await actor.reveal(requestId,commitments);emitProcessEvent('reveal',{index:config.index,requestId,txId:receipt.transaction.id});return receipt;},

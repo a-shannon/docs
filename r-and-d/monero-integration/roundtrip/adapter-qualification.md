@@ -50,6 +50,54 @@ evidence does not qualify a V2 payout path.
 
 ## Validation and current limits
 
+### Output novelty before watcher publication
+
+The [watcher credit view](source/ergo-node/watcher-credit-view.mjs) reads the same
+four guard custody databases that later authorize credit. They are provisioned
+before watchers start; neither watchers nor restarting guards initialize missing
+custody. Each read validates the complete retained ledger and tests the selected
+output key and associated key image. Assigned and invalidated claims both refuse
+a new observation. The roster, configuration and file identities are bound to
+operator configuration, independently of deposit data.
+
+The [watcher participant](source/ergo-node/watcher-runtime.mjs) checks novelty
+before retaining an observation, queueing commitment/reveal transactions, and
+submitting a pending transaction after an awaited pause. Retained backing is
+bound to the exact observation. Queue recovery repeats the check; confirmed-event
+recovery instead verifies the exact retained request and backing, confirmed
+transaction inputs, immutable output bytes and event registers, returning that
+event without a new submission. Node-added spend metadata may change after credit;
+the serialized boxes and their computed IDs must remain identical.
+The legacy in-process transport refuses V2 proposals.
+
+Watchers retain per-guard revision and state-digest watermarks. An observed
+revision decrease, a changed state at the same revision, changed configuration,
+missing/corrupt custody or file replacement refuses progress. This is local
+continuity evidence, not protection against coordinated rollback of all guard
+and watcher stores. Reads do not reserve backing. The existing atomic guard
+assignment still decides races between competing proposals.
+
+The focused custody/view/ledger suites pass **53 tests**. The actual pinned
+watcher runtime passes **14 tests** with real SQLite and mocked source/node ports,
+including claims inserted after observation or during each broadcast pause,
+queued restart, exact recovery and altered recovery data. The other affected
+watcher/source/recovery/audit/signer suites pass **52 tests**. Independent review
+of the integrated novelty delta and legacy V2 refusal found no blocking findings.
+Three isolated removals of the observation, pre-broadcast and pre-trigger gates
+are detected by the corresponding runtime regressions.
+
+The updated real-node campaign passed in **496.6 seconds** with two watchers,
+four guards and two isolated Monero daemons. Its **16 fault cases** include
+refusing already-claimed backing before a new watcher event, again after watcher
+restart. It confirmed one credit, retained exactly two commitment transactions
+and one reveal, and recovered the same credit after all participants restarted.
+Three of four guards also produced a transaction accepted by the node's check
+endpoint without broadcast. Post-credit proof loss and source disagreement held
+progress; an agreed source reorganization quarantined all four assignments while
+retaining their claims across restart. The source suffix was restored exactly.
+
+### Earlier qualification runs
+
 The scanner package passes 69 tests, build, type checking and lint. The multisig
 package passes 72 tests, build, type checking and lint; 15 targeted mutations of
 the checks are detected. The earlier in-process path passed in 103.6 seconds using
@@ -204,5 +252,6 @@ operational handling of an already issued credit remain separate work.
 Production qualification additionally needs persistent holder identities,
 certificate delivery and independently administered source endpoints; the selected
 services must replay these credit/refusal/recovery criteria.
-Valid old database snapshots remain outside local rollback detection, and a
+Coordinated rollback of every guard and watcher store remains outside local
+rollback detection, and a
 crash during first-time custody initialization may require operator recovery.
