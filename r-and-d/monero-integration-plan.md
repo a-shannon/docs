@@ -4,15 +4,15 @@ A. Shannon · 18 September 2026 · Draft integration document — RCS-003
 
 The proposed first adapter connects native XMR to Ergo using output-specific
 deposit verification and the Rust wallet's threshold CLSAG signing path. A
-runnable local experiment exercises the deposit, Rosen credit, redemption and
-Monero payment on isolated nodes. Adopting it as a production Rosen network
+runnable local experiment exercises the deposit, Rosen credit, redemption,
+Monero payment and Ergo reward distribution on isolated nodes. Adopting it as a production Rosen network
 requires decisions on deposit-proof delivery and output agreement, followed by
 adapter and operational qualification.
 
 This is the single integration document for the RCS requirements review.
 [CLSAG signing and transaction construction](monero-signing.md) is its detailed
-mechanism reference. The [published implementation and reproduction instructions](https://github.com/a-shannon/docs/tree/f5b41ca7b65caec0d0afd8ef916d86d23a617970/r-and-d/monero-integration/roundtrip)
-and [V2 qualification report](https://github.com/a-shannon/docs/blob/f5b41ca7b65caec0d0afd8ef916d86d23a617970/r-and-d/monero-integration/roundtrip/adapter-qualification.md)
+mechanism reference. The [published implementation and reproduction instructions](https://github.com/a-shannon/docs/tree/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip)
+and [V2 qualification report](https://github.com/a-shannon/docs/blob/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip/adapter-qualification.md)
 provide the evidence for the local results below. The signing walkthrough retains
 its own exact source pin; later adapter results do not replace that review scope.
 
@@ -36,7 +36,7 @@ It identifies both implemented experimental behavior and integration gaps.
 | Wallet/dApp connector | A depositor must create the exact intent and supply the matching payment proof. The experiment provides that path through its harness; a supported user-wallet connector and delivery interface remain open. |
 | Transaction chaining | The initial adapter can wait for confirmed source state. Chained transactions and parallel spending from a shared vault are outside the tested profile. |
 | Event distinguishability | One qualifying unlocked vault output is accepted per deposit transaction. Keep the raw txid and existing request ID; additionally commit the selected output and full intent in the event's origin descriptor. Separate ledger uniqueness checks cover output keys and associated key images across txids. |
-| Fee handling | Use Rosen's effective bridge/network charges, including configured minima and proportional bridge fees, and bind the resulting recipient amount and miner-fee ceiling before signing. An uncertain signed payment retains its inputs and liability; a changed fee estimate must not silently authorize another payment. The published V2 run uses fixed fixture charges and subsidized reserves; authoritative fee-box integration, completed return rewards and sustainable pricing are not established by that run. |
+| Fee handling | Read the configured minimum-fee NFT and historical policy, apply Rosen's effective bridge/network charges including minima and proportional bridge fees, and bind the resulting recipient amount and miner-fee ceiling before signing. An uncertain signed payment retains its inputs and liability; a changed fee estimate must not silently authorize another payment. The local V2 run exercises the proportional branch and completes return rewards. Its reserves subsidize miner fees; sustainable pricing and reserve-wide accounting remain unqualified. |
 
 One deposit-policy decision remains: the current intent authenticates exact fees
 and credited amount. If its quote is below the applicable Rosen minimum, this
@@ -70,7 +70,7 @@ to the same intent that watchers and guards are accepting.
    credit ledger. Each guard must atomically reserve that backing before release
    and recheck source facts at its pre-signing boundary.
 
-The [local watcher credit view](https://github.com/a-shannon/docs/blob/f5b41ca7b65caec0d0afd8ef916d86d23a617970/r-and-d/monero-integration/roundtrip/source/ergo-node/watcher-credit-view.mjs)
+The [local watcher credit view](https://github.com/a-shannon/docs/blob/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip/source/ergo-node/watcher-credit-view.mjs)
 reads all four configured custody stores and refuses an existing claim or an
 unavailable store. Guards retain the atomic assignment that closes concurrent
 admission races. Independent operators need an authenticated ledger-view delivery
@@ -142,7 +142,7 @@ Copied output keys are not resolved by globally blacklisting every repeated
 key: that could let an unrelated copied output disable an authenticated deposit.
 The selected backing policy verifies the intended receipt and tracks one
 economic claim. The lab tests both raw and decodable copies, including the copy
-appearing first. The [historical-failure coverage map](https://github.com/a-shannon/docs/blob/f5b41ca7b65caec0d0afd8ef916d86d23a617970/r-and-d/monero-integration/roundtrip/burn-coverage.md)
+appearing first. The [historical-failure coverage map](https://github.com/a-shannon/docs/blob/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip/burn-coverage.md)
 separately records repeated-primary-key, additional-key and duplicated-backing
 regressions. These bounded cases do not establish that every historical Monero
 burn scenario, wallet behavior or future protocol is covered.
@@ -244,12 +244,15 @@ key derivation, address coverage and full-node resource sizing remain deployment
 qualification inputs.
 
 The published V2 evidence covers deposit, Ergo credit, recipient redemption,
-Monero payout and retained recovery with two watcher processes in each direction
-and four guard processes. Its return event remains `pending-reward`; it is not a
-completed reward-distribution or reserve-wide accounting result. The selected
-reserve subsidizes miner fees. The [multisig review packet](https://github.com/a-shannon/docs/blob/f5b41ca7b65caec0d0afd8ef916d86d23a617970/r-and-d/monero-integration/roundtrip/multisig-review.md)
-states its exact review scope and remaining gate. Later unpublished fee/reward
-changes are not evidence for this document.
+Monero payout and confirmed Ergo reward distribution with two watcher processes
+in each direction and four guard processes. The actual Rosen processor records
+the reward transaction and return event as `completed`. Lost replies and four-guard
+restart recover the retained signed bytes without signing another payout or
+reward. The selected reserve subsidizes miner fees; one-operation
+reconciliation does not establish reserve-wide solvency. The [multisig review packet](https://github.com/a-shannon/docs/blob/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip/multisig-review.md)
+records the completed independent local implementation review, exact code and
+replay scope. It does not constitute a commissioned cryptographic audit or Rosen
+acceptance of the integration.
 
 The present experiment fixes one qualifying output per deposit transaction,
 local fakechain/devnet nodes, fixture assets, a local ceremony, a selected signer
