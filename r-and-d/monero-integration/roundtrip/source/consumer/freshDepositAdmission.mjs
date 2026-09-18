@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {openSync,closeSync,fstatSync,readSync} from 'node:fs';
 import {isAbsolute,join} from 'node:path';
 import {blake2b} from 'blakejs';
-import {decodeIntent} from '../packages/monero-deposit/lib/intentCodec.ts';
+import {decodeIntent,intentHash} from '../packages/monero-deposit/lib/intentCodec.ts';
 import {verifyDeposit} from '../packages/monero-deposit/lib/depositPolicy.ts';
 import {NATIVE_SOURCE_PIN} from '../packages/monero-deposit/lib/evidence.ts';
 import {decodeDepositData,decodeDepositEnvelope} from './depositDelivery.mjs';
@@ -48,7 +48,7 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
   const scope=digest('rosen-monero/deposit-admission-scope/v1',cfg);
   const identity=id=>({kind:'independent',id,sourcePin:NATIVE_SOURCE_PIN});
 
-  async function inspect(input,signal){
+  async function reconstruct(input,signal,retained){
     const candidate=structuredClone(input);
     hash(candidate.txId);hash(candidate.sourceBlockId);integer(candidate.sourceHeight);
     assert.equal(candidate.scope,scope,'Admission scope');signal.throwIfAborted();
@@ -95,11 +95,11 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
       assert.equal(retainedTip.hash,tip.hash,'Admission snapshot rollback');
       const now=await network.getCurrentHeight();
       assert(now>=tipHeight,'Admission chain regression');
-      assert(now-candidate.sourceHeight<=cfg.maxObservationAge&&BigInt(now+1)<=intent.expiry_height,'Admission expired during verification');
+      if(!retained)assert(now-candidate.sourceHeight<=cfg.maxObservationAge&&BigInt(now+1)<=intent.expiry_height,'Admission expired during verification');
       signal.throwIfAborted();
     }
     // Validate the source anchor before returning terminal policy expiry.
-    if(expired){assert.equal((await network.getBlockAtHeight(candidate.sourceHeight)).hash,candidate.sourceBlockId);signal.throwIfAborted();return {status:'expired'};}
+    if(!retained&&expired){assert.equal((await network.getBlockAtHeight(candidate.sourceHeight)).hash,candidate.sourceBlockId);signal.throwIfAborted();return {status:'expired'};}
     await current();
     const snapshot={id:digest('rosen-monero/deposit-snapshot/v1',{genesis:cfg.genesis,height:tipHeight,hash:tip.hash}),
       network:'mainnet',txid:candidate.txId,blockHash:candidate.sourceBlockId,blockHeight:BigInt(candidate.sourceHeight),
@@ -125,12 +125,30 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
             maturity:'unlocked',spent:'unspent',keyOccurrences:1n}]}};
       }},
     };
-    const decision=await verifyDeposit(request.intentBytes,request.proof,request.receiptEvidence,{
-      version:2,domain:'rosen-monero-deposit',sourceNetwork:'mainnet',vaultEpoch:cfg.vaultEpoch,vaultAddress:cfg.vaultAddress,
-      destinationNetwork:'ergo-testnet',destinationAsset:cfg.destinationAsset,nativeSourcePin:NATIVE_SOURCE_PIN,
-      outputHistoryPolicy:'authenticated-backing-v1',snapshot,creditedDepositIds:new Set(),creditedOutputIds:new Set(),
-    },{bridgeFee:cfg.bridgeFee,networkFee:cfg.networkFee,sourceDecimals:12,destinationDecimals:12,remainder:'reject'},providers);
-    assert.equal(decision.status,'accepted','Admission policy refused');await current();
+    let decision;
+    if(retained){
+      // Revalidate an existing liability against today's real chain snapshot.
+      // Only initial delivery expiry/novelty is outside this source-only check.
+      for(const [name,expected] of Object.entries({version:2,domain:'rosen-monero-deposit',source_network:'mainnet',
+        vault_epoch:cfg.vaultEpoch,vault_address:cfg.vaultAddress,destination_network:'ergo-testnet',
+        destination_asset:cfg.destinationAsset,bridge_fee:cfg.bridgeFee,network_fee:cfg.networkFee,txid:candidate.txId}))
+        assert.equal(intent[name],expected,'Retained backing configuration '+name);
+      const amount=BigInt(intent.amount),fees=BigInt(cfg.bridgeFee)+BigInt(cfg.networkFee);
+      assert(amount>fees,'Retained backing positive amount');
+      await providers.addresses.verify({sourceNetwork:'mainnet',vaultAddress:intent.vault_address,
+        destinationNetwork:intent.destination_network,destinationAsset:intent.destination_asset,recipient:intent.to_address});
+      const proof=await providers.proof.verify({messageBytes:request.intentBytes,proof:request.proof});
+      assert(proof.value.good===true&&proof.value.received===amount,'Retained backing proof');
+      decision={intentHash:intentHash(request.intentBytes),recipient:intent.to_address,destinationAmount:amount-fees};
+    }else{
+      decision=await verifyDeposit(request.intentBytes,request.proof,request.receiptEvidence,{
+        version:2,domain:'rosen-monero-deposit',sourceNetwork:'mainnet',vaultEpoch:cfg.vaultEpoch,vaultAddress:cfg.vaultAddress,
+        destinationNetwork:'ergo-testnet',destinationAsset:cfg.destinationAsset,nativeSourcePin:NATIVE_SOURCE_PIN,
+        outputHistoryPolicy:'authenticated-backing-v1',snapshot,creditedDepositIds:new Set(),creditedOutputIds:new Set(),
+      },{bridgeFee:cfg.bridgeFee,networkFee:cfg.networkFee,sourceDecimals:12,destinationDecimals:12,remainder:'reject'},providers);
+      assert.equal(decision.status,'accepted','Admission policy refused');
+    }
+    await current();
     // Stable across chain growth and across readers; source re-inclusion changes
     // the descriptor. Snapshot/reader identities are deliberately not preimages.
     const backing=Object.freeze({version:2,genesis:cfg.genesis,committeeDigest:cfg.committeeDigest,vaultSpend:cfg.vaultSpend,
@@ -138,14 +156,23 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
       blockHeight:candidate.sourceHeight,outputIndex,globalIndex:output.globalIndex,outputKey:output.outputKey,
       keyImage:output.keyImage,amountAtomic:output.amountAtomic,destinationNetwork:'ergo-testnet',destinationAsset:cfg.destinationAsset,
       recipient:decision.recipient,creditedAtomic:decision.destinationAmount.toString()});
+    if(retained)return Object.freeze({backing});
     const observation=Object.freeze({fromChain:'monero',toChain:'ergo',fromAddress:'rosen-monero-output:v2:'+digest('rosen-monero/credit-origin/v2',backing),
       toAddress:decision.recipient,amount:decision.amount.toString(),bridgeFee:cfg.bridgeFee,networkFee:cfg.networkFee,
       sourceChainTokenId:'XMR',targetChainTokenId:cfg.destinationAsset,sourceTxId:candidate.txId,sourceBlockId:candidate.sourceBlockId,
       requestId:Buffer.from(blake2b(candidate.txId,undefined,32)).toString('hex'),rawData:''});
     return Object.freeze({status:'accepted',observation,backing,decision});
   }
+  const inspect=(candidate,signal)=>reconstruct(candidate,signal,false);
+  /** Caller must first establish the exact assigned ledger claim. This is only
+   * fresh unspent backing currentness, never admission or after-spend recovery. */
+  async function readRetainedBacking(candidate,expectedBacking,signal){
+    const expected=structuredClone(expectedBacking);
+    const result=await reconstruct(candidate,signal,true);
+    assert.deepEqual(result.backing,expected,'Retained backing descriptor');return result;
+  }
   async function verify(candidate,signal){try{
     const result=await inspect(candidate,signal);return result.status==='accepted'?{status:'accepted',observation:result.observation}:result;
   }catch{return {status:'pending'};}}
-  return Object.freeze({scope,inspect,verify});
+  return Object.freeze({scope,inspect,verify,readRetainedBacking});
 }

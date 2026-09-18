@@ -31,11 +31,11 @@ export function createRoundtripPayment({node,binary,sha256,vault,owner,database,
   {node:LocalMonero,binary:string,sha256:string,vault:any,owner:any,database:string,dataSource:DataSource,lostSubmissionReply?:boolean}){
   const d=owner.disposition,proposalId=owner.transaction.txId,reservationId=owner.reservationId;
   const backingClaim=owner.backingClaim,anchor=owner.anchor;
-  const settlementCurrent=()=>{
+  const settlementCurrent=async(fresh=false)=>{
     if((anchor.backingDigest!==undefined)!==(backingClaim!==undefined))throw Error('Payment backing custody required');
-    if(backingClaim!==undefined)assertBackingSettlement(backingClaim,anchor);
+    if(backingClaim!==undefined)await assertBackingSettlement(backingClaim,anchor,{fresh});
   };
-  settlementCurrent();
+  if((anchor.backingDigest!==undefined)!==(backingClaim!==undefined))throw Error('Payment backing custody required');
   const binding:MoneroPaymentBinding={reservationId,proposalId,obligationId:owner.transaction.eventId,eventId:owner.transaction.eventId,
     originalTxJson:owner.transaction.toJson(),inputReferences:[...d.inputReferences],changeIdentity:d.changeIdentity,
     requiredConfirmations:2,recipientAtomic:d.recipientAtomic,changeAtomic:d.changeAtomic};
@@ -45,7 +45,7 @@ export function createRoundtripPayment({node,binary,sha256,vault,owner,database,
     if(genesis.block_header.hash!==vault.genesis)throw Error('Payment network changed');return info;
   }
   async function recover():Promise<MoneroFinal>{
-    settlementCurrent();counters.recoveries++;const final=await recoverDistributedWithdrawal(database,reservationId,binary,sha256,backingClaim);settlementCurrent();
+    await settlementCurrent();counters.recoveries++;const final=await recoverDistributedWithdrawal(database,reservationId,binary,sha256,backingClaim);await settlementCurrent();
     if(final.reservationId!==reservationId)throw Error('Payment reservation changed');
     return {reservationId,proposalId,finalTxId:final.txId,byteDigest:final.byteDigest,txBytes:final.txBytes,
       spentInputs:[...d.inputReferences],changeIdentity:d.changeIdentity};
@@ -71,8 +71,8 @@ export function createRoundtripPayment({node,binary,sha256,vault,owner,database,
       canonicalBlockHash:header.block_header.hash,recipientMatches:true,recipientAtomic:scanned.recipientAtomic,changeAtomic:scanned.changeAtomic,inPool:false};
   }
   const ports={dataSource,requiredConfirmations:2,recoverFinal:async(id:string)=>{if(id!==reservationId)throw Error('Payment recovery identity');return recover();},observe,
-    submit:async(final:MoneroFinal)=>{settlementCurrent();await network();settlementCurrent();const response=await node.submit(final.txBytes);if(response.status!=='OK')throw Error('Payment submission rejected');
+    submit:async(final:MoneroFinal)=>{await settlementCurrent(true);await network();await settlementCurrent(true);const response=await node.submit(final.txBytes);if(response.status!=='OK')throw Error('Payment submission rejected');
       counters.submissions++;submitted.push(final.byteDigest);if(lostSubmissionReply&&counters.submissions===1)throw Error('fixture-lost-submission-reply');}};
-  return {binding,create:()=>new MoneroPaymentLifecycle(ports),sign:async()=>{settlementCurrent();counters.signCalls++;return owner.sign();},recover,
+  return {binding,create:()=>new MoneroPaymentLifecycle(ports),sign:async()=>{await settlementCurrent(true);counters.signCalls++;return owner.sign();},recover,
     counts:()=>({...counters}),submitted:()=>[...submitted],observations:()=>[...observations]};
 }

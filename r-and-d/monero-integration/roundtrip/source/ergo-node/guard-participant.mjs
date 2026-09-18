@@ -6,7 +6,8 @@ import {createRequire} from 'node:module';
 import {serveProcessRpc,emitProcessEvent} from '../tools/process-rpc.mjs';
 import {readParticipantConfig} from '../tools/participant-config.mjs';
 import {auditCreditBacking} from './credit-backing-audit.mjs';
-import {openGuardCustody} from './credit-custody.mjs';
+import {openGuardCustody,freshCreditConfigurations} from './credit-custody.mjs';
+import {canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
 
 const file=process.env.PARTICIPANT_CONFIG;
 assert(path.isAbsolute(file??''),'Absolute participant configuration required');
@@ -27,14 +28,18 @@ const [{config},{openProcessSource},{openCreditVerifier},{stateContext},{capture
   import('../guard-service/src/deposit/moneroCreditSigner.mjs')]);
 const {createMoneroCreditSigner,snapshotCreditSigning}=signerModule;
 const sources=await Promise.all(Array.from({length:4},()=>openProcessSource(selected.source)));
-const verifier=await openCreditVerifier({directory:path.join(selected.directory,'verification'),deployment:selected.deployment,
-  watcherReceipt:selected.watcherReceipt,freshAdmission:{readers:sources,candidate:selected.candidate}});
+// Opening retained custody must work after its own payout spent the deposit.
+// Only new credit verification opens the fresh, unspent admission authority.
+let verifierPromise;
+const creditVerifier=()=>verifierPromise??=(openCreditVerifier({directory:path.join(selected.directory,'verification'),deployment:selected.deployment,
+  watcherReceipt:selected.watcherReceipt,freshAdmission:{readers:sources,candidate:selected.candidate}}).catch(error=>{verifierPromise=undefined;throw error;}));
 const implementation=captureContributionPackage(config.contributionPackage);
 const {MultiSigHandler,MultiSigUtils}=await import(implementation.entry);implementation.verify();
 const require=createRequire(path.join(config.rosenRoot,'package.json')),wasm=require('ergo-lib-wasm-nodejs');
-const {ECDSA}=await import('@rosen-bridge/encryption'),{DummyLogger}=await import('@rosen-bridge/abstract-logger');
+const {ECDSA}=await import('@rosen-bridge/encryption'),{DefaultLogger,DummyLogger}=await import('@rosen-bridge/abstract-logger');
+DefaultLogger.init(new DummyLogger());
 const index=selected.index,keys=[...selected.deployment.guardPublicKeys],peerIds=keys.map((_,i)=>'process-credit-guard-'+i);
-const configuration=verifier.configurations()[index];
+const configuration=freshCreditConfigurations({deployment:selected.deployment,scope:sources[0].scope,genesis:selected.source.genesis})[index];
 const {ledger,bootstrap,custody}=openGuardCustody({directory:selected.directory,index,configuration,contributionPackageSha256:implementation.sha256});
 let active,closed=false,auditing=false,facade;const gates=new Map(),counts={commitments:0,partialSigns:0,completed:0,messagesSent:0,messagesReceived:0};
 const current=()=>{assert(!closed,'Closed guard process');return active;};
@@ -64,7 +69,7 @@ participant.getProver=()=>counted??=(new Proxy(prover(),{get(target,name){const 
 const turn=participant.handleMyTurnForTx.bind(participant);
 participant.handleMyTurnForTx=async txId=>{const run=current();assert(run&&run.txId===txId,'Unbound queued transaction');
   if(!run.queued){run.queued=true;emitProcessEvent('queued',{index,session:run.session,txId});}};
-facade=createMoneroCreditSigner({participant,assignment:ledger,verify:snapshot=>verifier.verifyForGuard(index,snapshot),requireFreshContribution:true});
+facade=createMoneroCreditSigner({participant,assignment:ledger,verify:async snapshot=>(await creditVerifier()).verifyForGuard(index,snapshot),requireFreshContribution:true});
 const nativeBox=hex=>wasm.ErgoBox.sigma_parse_bytes(Buffer.from(hex,'hex'));
 function snapshotFrom(row){
   assert(row&&Object.keys(row).sort().join(',')==='dataHex,digest,inputHex,reducedHex,requiredSign,txId');
@@ -72,7 +77,38 @@ function snapshotFrom(row){
     row.inputHex.map(nativeBox),row.dataHex.map(nativeBox));
   assert.equal(snapshot.digest,row.digest);assert.equal(snapshot.txId,row.txId);assert.equal(snapshot.requiredSign,3);return snapshot;
 }
-await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configuration,policyDigest:verifier.policyDigest,
+function settlement(anchor){return {reservationId:anchor.reservation.reservationId,reservationHash:anchor.reservation.reservationHash,
+  requestDigest:anchor.requestDigest,selectionDigest:createHash('sha256').update(anchor.reservation.selectionBytes).digest('hex'),
+  bindingDigest:anchor.bindingDigest,expectationDigest:anchor.expectationDigest};}
+let withdrawalPorts;
+function prepareWithdrawalPorts(){return withdrawalPorts??=(async()=>{
+  const [{terms},{configureFixtureTokens},{MoneroChain},{setFixtureChain}]=await Promise.all([
+    import('../consumer/projectionFixture.ts'),import('../consumer/fixturePorts.ts'),import('../consumer/adapter.ts'),import('../consumer/resolver.ts')]);
+  const data=terms();data.profile.tokens[0].ergo.tokenId=selected.deployment.tokens.Asset;data.profile.tokens[0].ergo.name='Local rsXMR';
+  await configureFixtureTokens(data.profile.tokens);setFixtureChain(await MoneroChain.create(data.profile.tokens));
+})();}
+async function withdrawal({request,anchor,context,fresh=false},reserve=false){
+  current();assert(!auditing&&(!active||active.settled),'Active signing or withdrawal audit');auditing=true;
+  try{
+    const r=structuredClone(request),a=structuredClone(anchor),c=structuredClone(context),tuple=settlement(a);
+    assert.equal(canonicalAssignment(c.assignment),canonicalAssignment(r),'Withdrawal assigned liability');
+    assert.equal(canonicalAssignment(c.deployment),canonicalAssignment(selected.deployment),'Withdrawal deployment');
+    assert.deepEqual(c.sourceContext,{genesis:selected.source.genesis,vaultSpend:selected.source.configuration.vaultSpend,
+      vaultAddress:selected.source.configuration.vaultAddress,nativeNetwork:'testnet',sourceNetwork:'testnet',maxMinerFeeAtomic:'1000000000000'},'Withdrawal source policy');
+    const captured=snapshotFrom(c.snapshot);assert.equal(captured.digest,r.binding.creditTransactionDigest);
+    ledger.assertAssigned(r);if(!reserve)ledger.assertSettlement(r,tuple);
+    const {verifyV2Withdrawal,verifyV2RetainedCredit}=await import('./v2-withdrawal-authority.mjs');
+    if(reserve||fresh){
+      await prepareWithdrawalPorts();
+      await sources[index].readRetainedBacking(selected.candidate,r.backing);current();ledger.assertAssigned(r);
+      const checked=await verifyV2Withdrawal({...c,selection:a.reservation.selectionBytes,request:JSON.parse(a.reservation.requestJson)});
+      assert.equal(checked.requestDigest,tuple.requestDigest);assert.equal(checked.selectionDigest,tuple.selectionDigest);
+      await sources[index].readRetainedBacking(selected.candidate,r.backing);current();ledger.assertAssigned(r);
+    }else{await verifyV2RetainedCredit(c);current();ledger.assertAssigned(r);}
+    return reserve?ledger.reserveSettlement(r,tuple):ledger.assertSettlement(r,tuple);
+  }finally{auditing=false;}
+}
+await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configuration,policyDigest:configuration.policyDigest,
   configSha256,custodyPath:fs.realpathSync(custody),
   bootstrapSha256:createHash('sha256').update(bootstrap).digest('hex'),coordinatorIndex:participant.getCurrentTurnInd()},handlers:{
   async sign({session,snapshot,indices,pausePartials=false}){
@@ -92,13 +128,18 @@ await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configu
     assert(run.seen.size<1000,'Guard message budget');run.seen.add(packetHash);
     await facade.handleMessage(message,peerIds[sender]);counts.messagesReceived++;return null;},
   resume({checkpoint}){const gate=gates.get(checkpoint);assert(gate,'Guard is not paused');gates.delete(checkpoint);gate();return null;},
-  async verify(snapshot){current();const result=await verifier.verifyForGuard(index,snapshotFrom(snapshot));result.assertCurrent();return result.assignment;},
-  async audit(snapshot){current();assert(!auditing&&(!active||active.settled),'Active signing session or backing audit');auditing=true;
-    try{return await auditCreditBacking({assignment:verifier.expectedAssignment(snapshotFrom(snapshot)),ledger,
-      readAnchor:height=>sources[index].anchor(height),readBacking:()=>verifier.readBacking(index),assertCurrent:current});}finally{auditing=false;}},
+  async verify(snapshot){current();const result=await (await creditVerifier()).verifyForGuard(index,snapshotFrom(snapshot));result.assertCurrent();return result.assignment;},
+  async audit({snapshot,assignment}){current();assert(!auditing&&(!active||active.settled),'Active signing session or backing audit');auditing=true;
+    try{const expected=structuredClone(assignment),captured=snapshotFrom(snapshot);
+      assert.equal(expected.binding.creditTransactionDigest,captured.digest);assert.equal(expected.binding.triggerBoxId,selected.watcherReceipt.trigger.boxId);
+      ledger.observeAssignment(expected); // Exact retained bytes, including invalidated claims.
+      return await auditCreditBacking({assignment:expected,ledger,readAnchor:height=>sources[index].anchor(height),
+        readBacking:()=>sources[index].readRetainedBacking(selected.candidate,expected.backing),assertCurrent:current});}finally{auditing=false;}},
   observe(request){current();return ledger.observeAssignment(request);},
   assertAssigned(request){current();return ledger.assertAssigned(request);},
+  reserveWithdrawal(input){return withdrawal(input,true);},
+  assertWithdrawal(input){return withdrawal(input);},
   invalidate({obligationId,reason}){current();return ledger.invalidate(obligationId,reason);},
   stats(){current();return stats();}
-},async close(){closed=true;facade.close();for(const gate of gates.values())gate();gates.clear();verifier.close();
+},async close(){closed=true;facade.close();for(const gate of gates.values())gate();gates.clear();if(verifierPromise)(await verifierPromise.catch(()=>undefined))?.close();
   for(const source of sources)source.close();ledger.close();}});

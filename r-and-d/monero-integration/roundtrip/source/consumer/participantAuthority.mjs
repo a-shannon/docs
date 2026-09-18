@@ -2,7 +2,7 @@
 export function guardParticipantIO(actors,current){
   if(typeof current!=='function')throw Error('Participant current authority required');
   return actors.map(actor=>Object.freeze({child:actor.child,
-    send:async(...args)=>{current();const value=await actor.send(...args);current();return value;},
-    next:async(...args)=>{current();const value=await actor.next(...args);current();return value;},
+    send:async(...args)=>{await current();const value=await actor.send(...args);await current();return value;},
+    next:async(...args)=>{await current();const value=await actor.next(...args);await current();return value;},
   }));
 }

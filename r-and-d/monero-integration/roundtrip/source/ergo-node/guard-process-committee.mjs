@@ -4,8 +4,12 @@ import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {launchProcessRpc} from '../tools/process-rpc.mjs';
 import {pinParticipantConfig} from '../tools/participant-config.mjs';
+import {committeeConfigDigest,canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
 
 const entry=fileURLToPath(new URL('./guard-participant.mjs',import.meta.url));
+const custodyHandles=new WeakMap();
+export function captureGuardProcessCustody(handle){const custody=custodyHandles.get(handle);
+  if(!custody)throw Error('backing:process-committee-unissued');custody.current();return custody;}
 /** Local message relay. Original authenticated multisig envelopes remain opaque. */
 export async function createGuardProcessCommittee({configFiles,guardKeys,timeoutMs=120000,onEvent=()=>{}}){
   assert(Array.isArray(configFiles)&&configFiles.length===4&&new Set(configFiles).size===4&&configFiles.every(path.isAbsolute));
@@ -88,8 +92,8 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
     async observeAssignment(request){return Promise.all(actors.map(a=>a.request('observe',request,{timeoutMs})));},
     async assertAssigned(request){return Promise.all(actors.map(a=>a.request('assertAssigned',request,{timeoutMs})));},
     async verifyFresh(snapshot){return Promise.all(actors.map(a=>a.request('verify',snapshot,{timeoutMs})));},
-    async auditBacking(snapshot){assert(!closed&&!run&&!auditing,'Committee unavailable');auditing=true;
-      try{const results=await Promise.allSettled(actors.map(a=>a.request('audit',snapshot,{timeoutMs})));
+    async auditBacking(snapshot,assignment){assert(!closed&&!run&&!auditing,'Committee unavailable');auditing=true;
+      try{const results=await Promise.allSettled(actors.map(a=>a.request('audit',{snapshot,assignment},{timeoutMs})));
         const failure=results.find(row=>row.status==='rejected');if(failure)throw failure.reason;
         return results.map(row=>row.value);}finally{auditing=false;}},
     async invalidate(obligationId,reason){return Promise.all(actors.map(a=>a.request('invalidate',{obligationId,reason},{timeoutMs})));},
@@ -102,5 +106,21 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
       if(failure){await Promise.allSettled(actors.map(a=>a.close()));throw failure.reason;}return results.map(r=>r.value);},
     get pids(){return actors.map(a=>a?.pid);},get counts(){return structuredClone(counts);},
     async close(){closed=true;fail(Error('Process committee closed'));await Promise.allSettled(actors.filter(Boolean).map(a=>a.close()));}
-  };return Object.freeze(handle);
+  };
+  const current=()=>{assert(!closed&&actors.every(a=>a&&!a.closed),'backing:process-committee-unavailable');};
+  const configs=handle.configurations(),committeeDigest=committeeConfigDigest(configs[0]);
+  assert(configs.every(c=>c.backingPolicy==='single-deposit-v2'&&committeeConfigDigest(c)===committeeDigest));
+  const matching=rows=>{assert.equal(new Set(rows.map(({status,...row})=>canonicalAssignment(row))).size,1,'Guard custody disagreement');return rows[0];};
+  let custodyQueue=Promise.resolve();
+  const serialized=action=>{const result=custodyQueue.then(action);custodyQueue=result.catch(()=>{});return result;};
+  custodyHandles.set(handle,Object.freeze({current,backingPolicy:'single-deposit-v2',committeeDigest,
+    async assertAssigned(request){current();const rows=await handle.assertAssigned(request);current();return matching(rows);},
+    reserveSettlement(request,anchor,context){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+      try{const rows=[];for(const actor of actors)rows.push(await actor.request('reserveWithdrawal',{request,anchor,context},{timeoutMs}));
+        current();return matching(rows);}finally{auditing=false;}});},
+    assertSettlement(request,anchor,context,{fresh=false}={}){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+      try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('assertWithdrawal',{request,anchor,context,fresh},{timeoutMs})));
+        const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
+        current();return matching(rows.map(row=>row.value));}finally{auditing=false;}});}
+  }));return Object.freeze(handle);
 }

@@ -22,7 +22,8 @@ const stage=(name,values={})=>console.log(JSON.stringify({stage:'process-'+name,
 const write=(file,value)=>fs.writeFileSync(file,JSON.stringify(value,null,2),{flag:'wx',mode:0o600});
 
 /** Controlled local fault campaign. Every actor owns a process and durable store. */
-export async function runProcessScenario({directory,deployment,candidate,sourceDescriptor,proofFile,certificateFile,sourceFaults}){
+export async function runProcessScenario({directory,deployment,candidate,sourceDescriptor,proofFile,certificateFile,sourceFaults,returnRuntime}){
+  assert(!returnRuntime||!sourceFaults,'Quarantined credit cannot enter the return campaign');
   const publicDeployment=structuredClone(deployment);delete publicDeployment.guardSecrets;
   for(const watcher of publicDeployment.watchers)delete watcher.secretKey;
   const proofBytes=fs.readFileSync(proofFile),certificateBytes=fs.readFileSync(certificateFile);
@@ -97,7 +98,7 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     guards=await createGuardProcessCommittee({configFiles:guardFiles,guardKeys:deployment.guardPublicKeys,onEvent(type,payload){
       if(type==='checkpoint'&&payload.checkpoint==='beforePartial'&&killPartial&&!killedPartial){
         killedPartial=true;schedule(async()=>{
-          if(sourceFaults){await assert.rejects(()=>guards.auditBacking(snapshot),/Committee unavailable/);auditDuringSigningRefused=true;}
+          if(sourceFaults){await assert.rejects(()=>guards.auditBacking(snapshot,assignment),/Committee unavailable/);auditDuringSigningRefused=true;}
           await guards.kill(payload.index);});}
     }});
     assert.equal(new Set([...watchers.pids,...guards.pids,process.pid]).size,7,'Six distinct child processes required');
@@ -202,22 +203,22 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     let sourceAudit;
     if(sourceFaults){
       const before=await guards.stats(),counts=before.map(s=>s.counts);
-      const pendingAudit=guards.auditBacking(snapshot);
+      const pendingAudit=guards.auditBacking(snapshot,assignment);
       await assert.rejects(()=>guards.sign(snapshot),/Committee unavailable/);
-      await assert.rejects(()=>guards.auditBacking(snapshot),/Committee unavailable/);
+      await assert.rejects(()=>guards.auditBacking(snapshot,assignment),/Committee unavailable/);
       const checked=await pendingAudit;assert(checked.every(row=>row.status==='checked'));
       assert.deepEqual(checkpoints(await guards.stats()),retained);
       fs.unlinkSync(guardHomes[2].proof);
-      try{const held=await guards.auditBacking(snapshot);assert.equal(held[2].status,'held');
+      try{const held=await guards.auditBacking(snapshot,assignment);assert.equal(held[2].status,'held');
         assert.equal(held[2].reason,'backing-unavailable');assert(held.filter((_,i)=>i!==2).every(row=>row.status==='checked'));
         assert.deepEqual(checkpoints(await guards.stats()),retained);}
       finally{fs.writeFileSync(guardHomes[2].proof,proofBytes);}
       await sourceFaults.diverge();
-      try{const held=await guards.auditBacking(snapshot);assert(held.every(row=>row.status==='held'&&row.reason==='source-unavailable'));
+      try{const held=await guards.auditBacking(snapshot,assignment);assert(held.every(row=>row.status==='held'&&row.reason==='source-unavailable'));
         assert.deepEqual(checkpoints(await guards.stats()),retained);}
       finally{await sourceFaults.restore();}
       await sourceFaults.remove();let invalidated;
-      try{const quarantined=await guards.auditBacking(snapshot);
+      try{const quarantined=await guards.auditBacking(snapshot,assignment);
         assert(quarantined.every(row=>row.status==='quarantined'&&row.claim.status==='invalidated'&&row.claim.reason==='source-block-changed'));
         await assert.rejects(()=>guards.assertAssigned(assignment),/assignment:invalidated/);
         invalidated=checkpoints(await guards.stats());claimed(invalidated);
@@ -226,7 +227,7 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
         assert.equal((await confirmed(credit.id)).id,credit.id,'Source reorg cannot undo confirmed Ergo credit');
       }finally{await sourceFaults.restore();}
       await guards.restartAll();assert.deepEqual(checkpoints(await guards.stats()),invalidated);
-      const restarted=await guards.stats(),terminal=await guards.auditBacking(snapshot);
+      const restarted=await guards.stats(),terminal=await guards.auditBacking(snapshot,assignment);
       assert(terminal.every(row=>row.status==='quarantined'&&row.claim.status==='invalidated'));
       assert.deepEqual((await guards.stats()).map(s=>s.proofCalls),restarted.map(s=>s.proofCalls),'Terminal audit must not reread proof');
       assert.deepEqual(checkpoints(await guards.stats()),invalidated);
@@ -243,6 +244,12 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
       guardFreshProofCalls:finalStats.map(s=>s.proofCalls),durableClaimsRetained:true,
       confirmedCreditCount:1,creditTxId:credit.id,creditRestartStable:true};
     if(sourceFaults){result.sourceResilience=sourceFaults.result();result.sourceAudit=sourceAudit;}
+    if(returnRuntime){
+      const {runV2ReturnScenario}=await import('./v2ReturnScenario.mjs');
+      result.return=await runV2ReturnScenario({...returnRuntime,directory,deployment,publicDeployment,guards,
+        snapshot,assignment,record,credit,guardHomes,proofBytes});
+      result.stage='multiprocess-local-v2-roundtrip-qualified';
+    }
     return result;
   }finally{await guards?.close();await watchers?.close();verifier?.close();for(const source of sources)source.close();}
 }

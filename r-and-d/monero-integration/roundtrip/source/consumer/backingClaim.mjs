@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
 import {captureCreditCommittee} from '../ergo-node/credit-committee.mjs';
+import {captureGuardProcessCustody} from '../ergo-node/guard-process-committee.mjs';
 
 const claims=new WeakMap();
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -18,13 +19,33 @@ export function issueBackingClaim(committee,request){
 }
 
 export function captureBackingClaim(handle){
-  const claim=lookup(handle);claim.custody.assertAssigned(claim.request);
+  const claim=lookup(handle);
+  if(claim.context)claim.custody.current();else claim.custody.assertAssigned(claim.request);
   return {request:structuredClone(claim.request),digest:claim.digest};
+}
+
+/** V2 issuance is asynchronous and requires the actual four process-owned ledgers.
+ * Synchronous capture checks local handle identity only; consumers must await
+ * revalidation at every deciding asynchronous boundary. */
+export async function issueProcessBackingClaim(committee,request,context){
+  const custody=captureGuardProcessCustody(committee),captured=structuredClone(request),retained=structuredClone(context);
+  if(captured.backing?.version!==2||captured.binding?.committeeDigest!==custody.committeeDigest||
+    canonicalAssignment(retained.assignment)!==canonicalAssignment(captured))throw Error('backing:profile');
+  await custody.assertAssigned(captured);custody.current();
+  const digest=hash('rosen-monero/backing-claim/v2\0'+canonicalAssignment(captured)),handle=Object.freeze({});
+  claims.set(handle,{custody,request:captured,digest,context:retained});return handle;
+}
+
+export async function revalidateBackingClaim(handle){
+  const claim=lookup(handle);await claim.custody.assertAssigned(claim.request);
+  return captureBackingClaim(handle);
 }
 
 /** The native decoder owns ring/commitment validation; this closes admitted identity. */
 export function assertBackingOccurrence(handle,{selection,genesis,vaultSpend,vaultAddress}){
-  const {request}=captureBackingClaim(handle),backing=request.backing;
+  const {request}=captureBackingClaim(handle),original=request.backing;
+  const backing=original.version===2?{...original,txid:original.txId,publicKey:original.outputKey,
+    outputIndex:String(original.outputIndex),globalIndex:String(original.globalIndex)}:original;
   if(genesis!==backing.genesis || vaultSpend!==backing.vaultSpend || vaultAddress!==backing.vaultAddress ||
     selection?.network!=='testnet' || selection.vaultSpend!==backing.vaultSpend || !Array.isArray(selection.inputs) || selection.inputs.length!==2)
     throw Error('backing:selection-context');
@@ -52,11 +73,13 @@ export function backingSettlement(anchor){
 export function reserveBackingSettlement(handle,anchor){
   const claim=lookup(handle);
   if(anchor.backingDigest!==claim.digest)throw Error('backing:anchor');
-  return claim.custody.reserveSettlement(claim.request,backingSettlement(anchor));
+  return claim.context?claim.custody.reserveSettlement(claim.request,anchor,claim.context)
+    :claim.custody.reserveSettlement(claim.request,backingSettlement(anchor));
 }
 
-export function assertBackingSettlement(handle,anchor){
+export function assertBackingSettlement(handle,anchor,options={}){
   const claim=lookup(handle);
   if(anchor.backingDigest!==claim.digest)throw Error('backing:anchor');
-  return claim.custody.assertSettlement(claim.request,backingSettlement(anchor));
+  return claim.context?claim.custody.assertSettlement(claim.request,anchor,claim.context,options)
+    :claim.custody.assertSettlement(claim.request,backingSettlement(anchor));
 }

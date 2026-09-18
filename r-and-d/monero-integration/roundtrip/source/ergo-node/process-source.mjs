@@ -26,5 +26,7 @@ export async function openProcessSource(descriptor){
       if(closed)throw Error('Process source closed');return {height:block.height,hash:block.hash};},
     inspect(candidate,signal=abort.signal){if(closed)throw Error('Process source closed');return admission.inspect(candidate,AbortSignal.any([abort.signal,signal]));},
     verify(candidate,signal=abort.signal){if(closed)throw Error('Process source closed');return admission.verify(candidate,AbortSignal.any([abort.signal,signal]));},
+    readRetainedBacking(candidate,expectedBacking,signal=abort.signal){if(closed)throw Error('Process source closed');
+      return admission.readRetainedBacking(candidate,expectedBacking,AbortSignal.any([abort.signal,signal]));},
     close(){closed=true;abort.abort();network.close();}});
 }

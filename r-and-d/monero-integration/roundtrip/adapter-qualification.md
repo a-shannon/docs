@@ -1,12 +1,13 @@
-# Monero deposit adapter: qualification evidence
+# Monero V2 adapter: local roundtrip qualification
 
 A. Shannon · 18 September 2026
 
-The deposit path now connects real isolated Monero transactions to Rosen scanner
-observations, actual watcher commitment/reveal transactions, and four fresh guard
-verifiers signing an Ergo credit. The local multiprocess campaign runs two
-watcher processes and four guard processes with individual persistent stores.
-The source is public and executable.
+The V2 path connects a real isolated Monero deposit to Rosen scanner observations,
+watcher commitment/reveal transactions, a four-guard Ergo credit, redemption of
+that exact credit and a confirmed native Monero payout. Two watcher processes
+run in each direction; four guard processes retain individual custody stores.
+The complete local roundtrip, lost-reply recovery and post-payout guard restart
+pass. The source is public and executable.
 **Production qualification remains open.** The test hosts, custody bootstrap and
 deployment profile are controlled fixtures.
 
@@ -23,7 +24,8 @@ deployment profile are controlled fixtures.
 
 The RCS documentation proposal remains separate from these implementation branches.
 The existing CLSAG and Monero transaction-building source remains in the roundtrip
-package; this increment changes deposit admission and the Ergo credit boundary.
+package. The V2 return composes that payment engine with the output-focused
+deposit and persistent four-guard custody.
 
 ## What the path checks
 
@@ -44,9 +46,73 @@ The native call consumes one permit for the same retained transaction, then
 checks the durable assignment synchronously. Timeout, refusal or invalidation
 does not release the economic output or key-image claim.
 
-The fresh ledger profile is `single-deposit-v2`. It has no implicit V1 migration
-and refuses withdrawal settlement methods. The older roundtrip's withdrawal
-evidence does not qualify a V2 payout path.
+The retained ledger profile is `single-deposit-v2`, with no implicit V1 migration.
+Its V2 return capability binds the four retained guard assignments to one exact
+withdrawal reservation. New native authorization requires fresh source and
+assignment checks; recovery after source spend can only verify the retained
+settlement and existing payment. Older V1 evidence does not establish this join.
+
+## Complete local V2 roundtrip
+
+The [executable return](source/consumer/v2ReturnScenario.mjs) passed in 286.0
+seconds including the deposit/credit process campaign. The frozen run verified
+449 source files before and after execution: aggregate
+`001ed9afe1c82dd7752853c5218246f0c4c48159943eb20c86e03358eaa6491f`,
+manifest SHA-256
+`36dc2e46000e55a9cc79808e70044e6a034fa7ed486090a5fd4cf966d4acff61`.
+It exited zero with unchanged inputs. These are the execution snapshot pins;
+the final package also includes the separately checked audit/launcher updates.
+
+| Transition | Isolated-chain transaction ID |
+| --- | --- |
+| Monero deposit | `f938d77d66a031569cd017ad76d5dd43f7f3f4c64bc42db81818a6bb76a9e5e2` |
+| Confirmed Ergo credit | `5dd57432e4fa576dfb6235e31464f4ad5b527a9df763cf67e71697918074d443` |
+| Recipient redemption | `73a69ee5fc81ddf024338a553b3045f441873ca9c939ce4b924f63920666e09e` |
+| Return watcher trigger | `d875e744e317201b80ccd271917a23af9b9509154420565328d5c4d4b1d250e4` |
+| Confirmed Monero payout | `2c045d71f66881fb16c99b75e00fe83a68fecd5b26b63b12a7b43d95b69d31e4` |
+
+Both directions retained two commitment transactions and one reveal. The return
+watchers recovered the same event after restart. All four guards checked the
+original credited occurrence, actual recipient redemption, return event, complete
+withdrawal request and native selection. Two of four Rust holders produced the
+native signature. Exactly one signing call and one submission occurred; a lost
+submission reply and restart of all four guards recovered the same payment.
+The selected deposit output was spent, settlement reached `settled`, and a fresh
+authorization after spend was refused. Competing reservations and missing proof
+before native approval were also refused. The preceding deposit campaign retained
+its eight fault cases and the node-checked, unbroadcast three-of-four trial.
+
+The [withdrawal verifier](source/ergo-node/v2-withdrawal-authority.mjs) checks
+canonical signed and unsigned credit bytes against the original assignment,
+the unique recipient box, the independently verified return and every request
+source field. Its 72 focused tests include separately changed output locators,
+destinations, amounts, fees, source fields and rehashed alternative requests.
+[Settlement tests](source/guard-service/src/db/moneroCreditSettlementV2.test.mjs)
+cover all six immutable reservation fields, exact retries, competing handles,
+missing assignments, invalidation, corruption and restart (26 tests).
+Fresh and retained source suites pass 80 tests; return/deposit watcher runtime
+suites pass 33. The two [async custody regressions](source/consumer/v2AsyncCustody.test.mjs)
+execute actual source and detect both delayed one-use reservation and premature
+queue release after one guard rejects. Independent reviews of the V2 source,
+authority, process, watcher and consumer joins found no unresolved findings.
+This does not close the separate final multisig-package review.
+
+Accounting reconciles one operation's selected inputs at redemption, reservation
+and settlement. The payout inputs total `35183630595823` atomic units, split
+into recipient `500000000`, miner fee `2599200000` and change `35180531395823`.
+Outstanding user credit and pending payout are zero. Issued deposit-fee tokens
+and retained return fees are `120` each; return rewards remain `pending-reward`.
+The network-fee coverage variance is **-2599199960 atomic units**: fixture reserve
+inputs subsidize the miner fee. This is not sustainable-fee, global-reserve,
+pooled-vault or production-solvency evidence.
+
+The external `v2-return-result.json` has SHA-256
+`3ed29d85299834e773495de7ab5275fab007068b6ebc9445bd858b05e1d3edff`;
+`process-result.json` has SHA-256
+`07fbdca3dca8d63822782515fb0f964363eb7fe0c66dc0ee0a9cd2ac05731559`.
+The hashes identify retained local reports, not a public chain explorer or an
+independent execution attestation. The [reproduction recipe](source/README.md#complete-the-v2-return)
+uses the frozen `v2-roundtrip` launcher profile.
 
 ## Validation and current limits
 
@@ -158,6 +224,10 @@ The pinned multisig runtime aggregate and reproduction command are in the
 | Fresh native contribution permission | Native signer; [fresh signer tests](source/guard-service/src/deposit/moneroCreditSignerFresh.test.mjs) cover missing/reused permits, removed proof, changed assignment and local invalidation. The live case exercises both proof-removal timings with the real multisig package. | Queueing or an earlier successful check can authorize a later contribution without current evidence. |
 | Process/config identity and retained custody | [Config pins](source/tools/participant-config.mjs), child handshake and live changed-directory regression bind exact config bytes and resolved store path. | Restart can silently select an empty ledger. |
 | Bounded IPC lifecycle | [Process RPC tests](source/tools/process-rpc.test.mjs) exercise deadlines, crashes, disconnect, duplicate identifiers and message bounds; the live campaign drops and duplicates real envelopes. | Failed sessions can leave active children or unbounded requests. |
+| Exact V2 credit, return and native occurrence | [Withdrawal authority tests](source/ergo-node/v2-withdrawal-authority.test.mjs) mutate the credit, every event/request field and selected output independently, including coherent alternative digests. | Another credit, recipient or output can authorize the payout. |
+| Permanent single settlement | [V2 settlement tests](source/guard-service/src/db/moneroCreditSettlementV2.test.mjs) isolate every tuple field and reopen/failure branch; the real campaign rejects a competing reservation. | Retry or restart can create another withdrawal against the same claim. |
+| Asynchronous authority lifetime | [Actual-source race tests](source/consumer/v2AsyncCustody.test.mjs) detect both ordering mutants; native I/O consumers await fresh authority. | Two attempts enter one-use state, or a retry overlaps unfinished guard checks. |
+| Retained recovery after payout | The real V2 campaign restarts four guards, recovers the existing payment and refuses fresh authorization after spend. Journal and authority tests cover immutable identity and retained-only observation. | A recovery exception can become authority for a new payment or block recovery of an already submitted one. |
 
 | Evidence dimension | Status |
 | --- | --- |
@@ -231,10 +301,24 @@ that does not replace its pending independent re-review.
 
 The source check is explicitly invoked. It is not an autonomous monitoring
 service, an atomic action across four ledgers, an on-chain revocation, or a
-global vault halt. Startup still requires valid source evidence before opening
-the retained guard service; starting during divergence is not qualified.
+global vault halt. Guard startup now opens the exact retained custody without
+creating a fresh admission verifier. Terminal invalidation can be reported without
+proof reads; new signing and withdrawal authorization still require fresh source
+verification. Opening a service does not establish source health or eligibility.
 The experiment uses equal-height replacement branches under one operator and
 does not establish general reorg handling, finality or independent administration.
+
+The post-V2 regression passed in 468.3 seconds of test execution with all 16
+process/source fault cases, ten replacement/restoration cycles and unchanged
+frozen inputs. All four quarantined assignments survived restart; terminal audit
+performed no additional proof reads. Source aggregate:
+`2e16f27f3db02b7b42954be22f5e14cc5f976fac22632d11d26a42d9a771784d`;
+manifest SHA-256:
+`8a6222e76d3be8d1bbd2d6d452e5e8960ea6d18b3f96b736c1dabd0bdb29898e`.
+Its external `process-result.json` hashes to
+`73385637c7d79b6488c7dd8a9ae9769400dec052222bfe95142d851bb1153704`.
+The final source manifest additionally includes the reproduction-document update;
+the runtime files match this regression snapshot.
 
 ## Remaining production gates
 
@@ -245,6 +329,7 @@ does not establish general reorg handling, finality or independent administratio
 | Deployment integration | Full watcher and guard service processes using a chosen production network/asset profile and independently administered Monero sources. |
 | Recovery and operations | Deep source reorg handling after credit, old-backup recovery, delayed/expired or malformed deposits, monitored candidate retention and an operator recovery procedure. |
 | Capacity and delivery | Representative historical catch-up and sustained-load tests, evidence availability and retention, certificate-size policy, OS-level custody isolation and protected executable custody. |
+| Payout economics and rewards | A funded fee policy and reusable vault lifecycle, reserve-wide reconciliation, fee-token redemption and return reward distribution. The local V2 payment uses subsidized fixture reserves. |
 
 The six-process campaign now covers these bounded source replacements and
 delivery retries. Longer outages, retention under load, old-backup recovery and

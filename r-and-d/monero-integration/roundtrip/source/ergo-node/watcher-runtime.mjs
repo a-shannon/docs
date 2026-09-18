@@ -117,11 +117,14 @@ export async function createWatcherTransport({directory,deployment,nodePort,obse
 }
 
 /** One watcher-owned pinned job runner. Its caller may be a separate process. */
-export async function createWatcherParticipant({databasePath,deployment,watcher,nodePort,inspect,dependencyRoot,creditEntries,pause=async()=>{}}){
-  assert(path.isAbsolute(databasePath));assert.equal(typeof inspect,'function');
+export async function createWatcherParticipant({databasePath,deployment,watcher,nodePort,inspect,observeReturn,dependencyRoot,creditEntries,pause=async()=>{}}){
+  assert(path.isAbsolute(databasePath));
+  const returnMode=observeReturn!==undefined;
+  assert(returnMode?typeof observeReturn==='function'&&inspect===undefined&&creditEntries===undefined
+    :typeof inspect==='function'&&creditEntries!==undefined,'Watcher source mode');
   const store=openWatcherStore(databasePath);let closure,live=true;const current=()=>assert(live,'Closed watcher participant');
   let credit;
-  try{credit=openWatcherCreditView({entries:creditEntries,committeeKeys:deployment.guardPublicKeys,remember:rows=>store.creditContinuity(rows)});}
+  try{if(!returnMode)credit=openWatcherCreditView({entries:creditEntries,committeeKeys:deployment.guardPublicKeys,remember:rows=>store.creditContinuity(rows)});}
   catch(error){store.close();throw error;}
   function assertBacking(observation,backing){
     const origin=crypto.createHash('sha256').update('rosen-monero/credit-origin/v2').update('\0').update(canonicalAssignment(backing)).digest('hex');
@@ -129,19 +132,35 @@ export async function createWatcherParticipant({databasePath,deployment,watcher,
     assert.equal(observation.sourceTxId,backing.txId);assert.equal(observation.sourceBlockId,backing.blockHash);assert.equal(observation.height,backing.blockHeight);
     assert.equal(observation.requestId,closure.requestId(backing.txId),'Watcher request binding');
   }
-  function retained(requestId){const source=store.source(requestId),observation=store.observation(requestId);assert(source&&observation,'Missing retained watcher source');assertBacking(observation,source.backing);return {source,observation};}
-  function assertNew(requestId){current();credit.assertNew(retained(requestId).source.backing);}
+  function assertReturn(observation,raw){
+    assert.equal(observation.fromChain,'ergo','Watcher return source chain');assert.equal(observation.toChain,'monero','Watcher return destination chain');
+    assert(typeof observation.fromAddress==='string'&&!observation.fromAddress.startsWith('rosen-monero-output:v2:'),'Watcher return origin');
+    assert.equal(observation.sourceTxId,raw.txId,'Watcher return source transaction');
+    assert.equal(observation.requestId,closure.requestId(raw.txId),'Watcher return request binding');
+  }
+  function retained(requestId){const source=store.source(requestId),observation=store.observation(requestId);assert(source&&observation,'Missing retained watcher source');
+    if(returnMode){assertReturn(observation,source.raw);assert.deepEqual(source.backing,{kind:'ergo-return-v1',observation},'Watcher retained return drift');}
+    else assertBacking(observation,source.backing);return {source,observation};}
+  async function currentReturn(requestId){const {source,observation}=retained(requestId);
+    const fresh=canonicalObservation(await observeReturn(structuredClone(source.raw)));current();assertReturn(fresh,source.raw);
+    assert.deepEqual(fresh,observation,'Watcher return observation drift');
+    assert.deepEqual(retained(requestId),{source,observation},'Watcher retained return drift');}
+  // Keep deposit novelty checks synchronous and adjacent to queue/submission.
+  function assertNew(requestId){current();if(returnMode)return currentReturn(requestId);credit.assertNew(retained(requestId).source.backing);}
   const serialized=json=>Buffer.from(closure.wasm.ErgoBox.from_json(stringify(json)).sigma_serialize_bytes()).toString('base64');
   async function knownUnspent(predicate){const known=[...watcher.permitBoxes,watcher.WIDBox,...(watcher.feeBoxes||[]),...store.confirmedOutputs()],unique=new Map(known.filter(predicate).map(b=>[b.boxId,b]));const live=[];for(const id of unique.keys()){try{live.push(await nodePort.rpc('/utxo/byId/'+id));}catch(e){if(!String(e).includes('404'))throw e;}}return live;}
   const database={getUnspentPermitBoxes:async WID=>{assert.equal(WID,watcher.WID);return (await knownUnspent(b=>b.ergoTree===deployment.contracts.Permit.tree)).filter(b=>Buffer.from(closure.wasm.ErgoBox.from_json(stringify(b)).register_value(4).to_byte_array()).toString('hex')===WID).map(b=>({boxSerialized:serialized(b)}));},getUnspentAddressBoxes:async()=>{const secret=typeof watcher.secretKey==='string'?closure.wasm.SecretKey.dlog_from_bytes(Buffer.from(watcher.secretKey,'hex')):watcher.secretKey;const addressTree=secret.get_address().to_ergo_tree().to_base16_bytes();return (await knownUnspent(b=>b.ergoTree===addressTree)).map(b=>({serialized:serialized(b)}));},trackTxQueue:async b=>b};
   try{closure=await loadWatcherRuntime({dependencyRoot,deployment,watcher,nodePort,database});}
-  catch(error){credit.close();store.close();throw error;}
-  async function reconcile(stage,checkpoint,confirmationCheckpoint=checkpoint+':before-confirmation'){current();const queued=store.readQueue(stage);assert(queued,'Missing signed transaction queue');if(queued.confirmed)return JSON.parse(queued.confirmed);let receipt;try{receipt=await nodePort.rpc('/blockchain/transaction/byId/'+queued.txId);}catch(e){if(!String(e).includes('404'))throw e;}if(!receipt){await pause(checkpoint);assertNew(queued.requestId);const id=await nodePort.rpc('/transactions',JSON.parse(queued.signedJson));assert.equal(id,queued.txId,'Node transaction ID mismatch');}await pause(confirmationCheckpoint);receipt=await nodePort.confirmed(queued.txId);assert.equal(receipt.id,queued.txId);assert(receipt.numConfirmations>0,'Unconfirmed watcher spend');current();store.confirm(stage,receipt);return receipt;}
-  async function observe(rawRequest){current();const admitted=await inspect(structuredClone(rawRequest));assert.equal(admitted.status,'accepted','Independent watcher source was not accepted');const observation=structuredClone(admitted.observation);assert.equal(observation.rawData,'');delete observation.rawData;observation.height=admitted.backing.blockHeight;assertBacking(observation,admitted.backing);credit.assertNew(admitted.backing);current();const result=store.observe(rawRequest,observation);store.source(result.requestId,rawRequest,admitted.backing);return result;}
+  catch(error){credit?.close();store.close();throw error;}
+  async function reconcile(stage,checkpoint,confirmationCheckpoint=checkpoint+':before-confirmation'){current();const queued=store.readQueue(stage);assert(queued,'Missing signed transaction queue');if(queued.confirmed)return JSON.parse(queued.confirmed);let receipt;try{receipt=await nodePort.rpc('/blockchain/transaction/byId/'+queued.txId);}catch(e){if(!String(e).includes('404'))throw e;}if(!receipt){await pause(checkpoint);if(returnMode)await assertNew(queued.requestId);else assertNew(queued.requestId);const id=await nodePort.rpc('/transactions',JSON.parse(queued.signedJson));assert.equal(id,queued.txId,'Node transaction ID mismatch');}await pause(confirmationCheckpoint);receipt=await nodePort.confirmed(queued.txId);assert.equal(receipt.id,queued.txId);assert(receipt.numConfirmations>0,'Unconfirmed watcher spend');current();store.confirm(stage,receipt);return receipt;}
+  async function observe(rawRequest){current();
+    if(returnMode){const raw=structuredClone(rawRequest),observation=canonicalObservation(await observeReturn(structuredClone(raw)));current();assertReturn(observation,raw);
+      const result=store.observe(raw,observation);store.source(result.requestId,raw,{kind:'ergo-return-v1',observation:result});return result;}
+    const admitted=await inspect(structuredClone(rawRequest));assert.equal(admitted.status,'accepted','Independent watcher source was not accepted');const observation=structuredClone(admitted.observation);assert.equal(observation.rawData,'');delete observation.rawData;observation.height=admitted.backing.blockHeight;assertBacking(observation,admitted.backing);credit.assertNew(admitted.backing);current();const result=store.observe(rawRequest,observation);store.source(result.requestId,rawRequest,admitted.backing);return result;}
   async function commitment(rawRequest){
     const observation=await observe(rawRequest),requestId=observation.requestId,stage='commitment:'+requestId;
     if(!store.readQueue(stage)){
-      const txUtils={submitTransaction:async(tx,type)=>{assert.equal(type,'commitment');assertNew(requestId);store.queue(stage,requestId,tx);await reconcile(stage,'beforeCommitmentBroadcast');}};
+      const txUtils={submitTransaction:async(tx,type)=>{assert.equal(type,'commitment');if(returnMode)await assertNew(requestId);else assertNew(requestId);store.queue(stage,requestId,tx);await reconcile(stage,'beforeCommitmentBroadcast');}};
       const creator=new closure.CommitmentCreation({allReadyObservations:async()=>[observation]},txUtils,new closure.Boxes(database));
       await creator.job();assert(store.readQueue(stage),'Pinned commitment job failed before queue creation: '+closure.warnings.at(-1));
     }
@@ -185,13 +204,13 @@ export async function createWatcherParticipant({databasePath,deployment,watcher,
     const prior=store.receipt(requestId);if(prior){assert.deepEqual(commitments,prior.commitments,'Recovered commitments drift');return receipt(requestId);}
     const {observation}=retained(requestId),stage='trigger:'+requestId;
     if(!store.readQueue(stage)){
-      assertNew(requestId);
-      const boxes=new closure.Boxes(database),revealJob=new closure.CommitmentReveal({allReadyCommitmentSets:async()=>[{observation,commitments}]},{submitTransaction:async(tx,type)=>{assert.equal(type,'trigger');assertNew(requestId);store.queue(stage,requestId,tx);await reconcile(stage,'beforeRevealBroadcast','beforeRevealConfirmation');}},boxes);
+      if(returnMode)await assertNew(requestId);else assertNew(requestId);
+      const boxes=new closure.Boxes(database),revealJob=new closure.CommitmentReveal({allReadyCommitmentSets:async()=>[{observation,commitments}]},{submitTransaction:async(tx,type)=>{assert.equal(type,'trigger');if(returnMode)await assertNew(requestId);else assertNew(requestId);store.queue(stage,requestId,tx);await reconcile(stage,'beforeRevealBroadcast','beforeRevealConfirmation');}},boxes);
       const live=async json=>closure.wasm.ErgoBox.from_json(stringify(await nodePort.rpc('/utxo/byId/'+json.boxId)));assert.equal(closure.ErgoUtils.requiredCommitmentCount(await live(deployment.RWTRepoBox),await live(deployment.repoConfigBox)),2n,'Exact two-watcher readiness threshold required');
       await revealJob.job();assert(store.readQueue(stage),'Pinned reveal job failed before queue creation: '+closure.warnings.at(-1));
     }
     const transaction=await reconcile(stage,'beforeRevealBroadcast','beforeRevealConfirmation'),trigger=transaction.outputs.find(b=>b.ergoTree===deployment.contracts.EventTrigger.tree);assert(trigger,'No confirmed event trigger');assert(commitments.every(c=>transaction.inputs.some(b=>b.boxId===c.boxId)),'Trigger did not spend both commitments');
     return receipt(requestId,{watcherPin:WATCHER_PIN,observation,commitments,trigger,transaction});
   }
-  return {observe,commitment,reveal,receipt,recover,close(){if(live){live=false;credit.close();store.close();}}};
+  return {observe,commitment,reveal,receipt,recover,close(){if(live){live=false;credit?.close();store.close();}}};
 }

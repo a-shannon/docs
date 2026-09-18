@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 442,
-  "aggregateSha256": "a6d7881c4adc4e7b6cef1e3f4cbd7fe0019d06f239c4330f5044ab79e0a58f67",
+  "fileCount": 449,
+  "aggregateSha256": "9dbb8f714f65f275153b4fdf2e338f80710e0fa3e42cba3bb31aa3538e38cbfb",
   "files": [
     {
       "path": "README.md",
-      "bytes": 21000,
-      "sha256": "369a9745764d6165d9cf458f287051ea7701d992ace2ae9df2398c9f57975332"
+      "bytes": 24024,
+      "sha256": "e620f3cb144a2269cbc792c9f7c78284e04b9711edd9fb6e8b0ec8d19102d002"
     },
     {
       "path": "consumer/adapter.ts",
@@ -76,8 +76,8 @@
     },
     {
       "path": "consumer/authorityRoundtrip.ts",
-      "bytes": 7909,
-      "sha256": "989d1cd3fa5145d4821dbc26771a26e9d3a620dbb1683f7090015cb0de3af53e"
+      "bytes": 8253,
+      "sha256": "83df1b3bbe9dba31e586d47e16b9a1417a405c9a5ffb57b3e83d2b8776f4321b"
     },
     {
       "path": "consumer/authorizedAgreement.spec.ts",
@@ -96,8 +96,8 @@
     },
     {
       "path": "consumer/backingClaim.mjs",
-      "bytes": 3512,
-      "sha256": "c121f90ae7b4389631f276c6c71acf8035a405457dd44848b40af8f459f261ad"
+      "bytes": 5099,
+      "sha256": "9404a922e144c692ca0207839dd6ae692def70032a18f2b0d6ada37532849c38"
     },
     {
       "path": "consumer/backingClaim.test.mjs",
@@ -136,8 +136,8 @@
     },
     {
       "path": "consumer/depositAdapter.live.mjs",
-      "bytes": 29980,
-      "sha256": "d3c9435c0f69cf4ba237f834a4007fc82fc81e7893146ae11d1f1f11bcb3455d"
+      "bytes": 30243,
+      "sha256": "d1b40688452a91fc91c5f8c21096e59cf73e2424372b876c99ac29221d2319f1"
     },
     {
       "path": "consumer/depositDelivery.config.ts",
@@ -166,8 +166,8 @@
     },
     {
       "path": "consumer/distributedIssuer.ts",
-      "bytes": 10728,
-      "sha256": "ff323602ac379d94ae5b1b4448f577bce7fca93f224a6aa149197c988ede8790"
+      "bytes": 10916,
+      "sha256": "9f662158662ba0c81575603fd17b2ae8482b1dc774b24e37b38a80072803dd20"
     },
     {
       "path": "consumer/distributedWithdrawal.spec.ts",
@@ -201,8 +201,8 @@
     },
     {
       "path": "consumer/freshDepositAdmission.mjs",
-      "bytes": 11993,
-      "sha256": "e148a5545f7a7fb2c138bd0e3b5889087310834085a51a9979b66b4b2874c777"
+      "bytes": 13973,
+      "sha256": "17584e74a76f35498f6a82fb502ce06dbf71febea8efbaaa83a8e11904a084cd"
     },
     {
       "path": "consumer/freshDepositAdmission.test.mjs",
@@ -326,13 +326,13 @@
     },
     {
       "path": "consumer/participantAuthority.mjs",
-      "bytes": 501,
-      "sha256": "24c6a547109db798f1f5d80c86ac24411499f703245d5301d8a904966940f446"
+      "bytes": 525,
+      "sha256": "1330763aae9efdf77c5a2e6fc6a7b611b89b8e4747612573a0d07e3a25d25961"
     },
     {
       "path": "consumer/participantAuthority.test.mjs",
-      "bytes": 1569,
-      "sha256": "9257b3222caab37eadc9a3f06d0dd321c9d03b02c944451ab1b7582323f8a9b8"
+      "bytes": 3001,
+      "sha256": "ca7c192aac4dd9a7dec50022d1806385e771a865c91b67f0a85533a52310da5e"
     },
     {
       "path": "consumer/participantDeposit.config.ts",
@@ -366,8 +366,8 @@
     },
     {
       "path": "consumer/participantSigning.mjs",
-      "bytes": 17854,
-      "sha256": "74f6332b2cd63b818c7e50e763886b9de5459db7164ca8828dab9a587c3d043f"
+      "bytes": 18336,
+      "sha256": "1a362d80a649752566f86d4f1be93f6cb7f2ba0e781cbb740daee9b79f3a9ac1"
     },
     {
       "path": "consumer/participantSigningFaults.spec.ts",
@@ -376,8 +376,8 @@
     },
     {
       "path": "consumer/processAdapterScenario.mjs",
-      "bytes": 19872,
-      "sha256": "e69f5dc442a7c34aae8b3a8dd5052e53f6d7fa8fa50b43899fbd1aef4c760ca2"
+      "bytes": 20402,
+      "sha256": "f9bd99d36f64dc05114db31228226f04b8b68c769328dc6755a1cca98df62829"
     },
     {
       "path": "consumer/projectionFixture.ts",
@@ -398,6 +398,11 @@
       "path": "consumer/retained.config.ts",
       "bytes": 2655,
       "sha256": "cf356324789245eb41fe5f634e3882324f8845d71d4632ecc9447190753c62f7"
+    },
+    {
+      "path": "consumer/retainedBackingSource.test.mjs",
+      "bytes": 10223,
+      "sha256": "203c3795750b7bfe391032d48b04db9afbb3549280c1acf4bafec558d5a4cb80"
     },
     {
       "path": "consumer/retainedCodec.ts",
@@ -436,8 +441,8 @@
     },
     {
       "path": "consumer/roundtripPayment.ts",
-      "bytes": 6971,
-      "sha256": "e9318dda7c8ecc08197652bd52f2c6a9a4bca205c8fb03327c0a9651850f635d"
+      "bytes": 7138,
+      "sha256": "f2959d71da8a59f12eecf28473ee6af6074d6e74179fa6292576ded64f204615"
     },
     {
       "path": "consumer/rpcTiming.mjs",
@@ -488,6 +493,16 @@
       "path": "consumer/tsconfig.json",
       "bytes": 329,
       "sha256": "4272e7169bcfcc6c8d2b6e0a6533acf54abcfcf01a4efcb5c608ba90971dfa34"
+    },
+    {
+      "path": "consumer/v2AsyncCustody.test.mjs",
+      "bytes": 8216,
+      "sha256": "0a1bb370a261fc9fb75e52b3f2fc4f7433cda4ba7732c024938d8ccdaf223507"
+    },
+    {
+      "path": "consumer/v2ReturnScenario.mjs",
+      "bytes": 7254,
+      "sha256": "fd99884593892693ee8914770793b1e8b52718983321f9cf9313013bc3b36340"
     },
     {
       "path": "consumer/vitest.config.ts",
@@ -651,8 +666,8 @@
     },
     {
       "path": "ergo-node/deposit-loader.mjs",
-      "bytes": 1875,
-      "sha256": "9ffd7d39c3a44a2c22c34a3f3f62df0875233eebff35945f0f860512ecb40991"
+      "bytes": 4253,
+      "sha256": "9e29e756557f7b9d5fbf49141a7da6705e2140d329ff6b95b9f2fd2637325f14"
     },
     {
       "path": "ergo-node/deposit-register.mjs",
@@ -671,13 +686,13 @@
     },
     {
       "path": "ergo-node/guard-participant.mjs",
-      "bytes": 9475,
-      "sha256": "f62290aa9192787a1bcbb7607270965d9b963508521f26e8a7a0acb3df861120"
+      "bytes": 13367,
+      "sha256": "3d98b98dde093fd21e7f10456c4b7bc84ea3f95e3bed5f0ab71bbb2c6008efad"
     },
     {
       "path": "ergo-node/guard-process-committee.mjs",
-      "bytes": 8685,
-      "sha256": "5661e9e77936b638a61d4add1702586cdf35c9e0b7e0185c8e82bee0a420f700"
+      "bytes": 10754,
+      "sha256": "ac25ec3229900031568a540aed908addde6398267e833d0d206d4809cc66ea3f"
     },
     {
       "path": "ergo-node/loader.mjs",
@@ -686,8 +701,8 @@
     },
     {
       "path": "ergo-node/process-source.mjs",
-      "bytes": 2363,
-      "sha256": "fbc1c5517e8eae8513bb5b7151834bf493bd512f2edfeec38b50d54efca5f611"
+      "bytes": 2594,
+      "sha256": "2c7e202a31251f766d3afc19a6564fb27a7ab52f8f456b9cb76ebd1983c34167"
     },
     {
       "path": "ergo-node/register.mjs",
@@ -715,6 +730,16 @@
       "sha256": "1df9ce004548fed8abb20fcb6c8b12d7b414893b1caa2b99c187c1d8dc4c72ec"
     },
     {
+      "path": "ergo-node/v2-withdrawal-authority.mjs",
+      "bytes": 11785,
+      "sha256": "eb0be1896294514a513143ad7bb1b1062be8726497b5ee41511aaec3e0dd290a"
+    },
+    {
+      "path": "ergo-node/v2-withdrawal-authority.test.mjs",
+      "bytes": 17954,
+      "sha256": "ce552c3e34cdecaf4a2a02a22f07795c2f3436a9efc56a0eba5f807264b6f329"
+    },
+    {
       "path": "ergo-node/watcher-credit-view.mjs",
       "bytes": 2163,
       "sha256": "39035616f070ea779a9bc52acc6117bb93ac7ec32a09a4079121ca636cd28120"
@@ -731,8 +756,8 @@
     },
     {
       "path": "ergo-node/watcher-participant.mjs",
-      "bytes": 2779,
-      "sha256": "f54ab680861b2303b06723ab3a500a9387cd9ea65ff775ec3f027669c72fb6e9"
+      "bytes": 3411,
+      "sha256": "724f16dd163e635896f3c53d27c3e72137357e6c0a10c44c1774b9ac212ee09e"
     },
     {
       "path": "ergo-node/watcher-process-transport.mjs",
@@ -745,9 +770,14 @@
       "sha256": "2432a6b616efc0952a6da675b680128eda7caf0f4468c2acab002a1008bf219b"
     },
     {
+      "path": "ergo-node/watcher-return-runtime.test.mjs",
+      "bytes": 9779,
+      "sha256": "3d6014b02cbbc172f49033e11d04060b0cfa7468237ba7caa59bcc4fd48d8542"
+    },
+    {
       "path": "ergo-node/watcher-runtime.mjs",
-      "bytes": 28222,
-      "sha256": "2fbdc61a84f6b3eff3ae12b101d50e19adfaeb659d208af2b8a5f95c1f0fa669"
+      "bytes": 30179,
+      "sha256": "4e81a6b7ea290e4a42b1f567f6fadcdcae712e5066ad042407bf7e1ec74b3da2"
     },
     {
       "path": "ergo-node/watcher-runtime.test.mjs",
@@ -1296,8 +1326,8 @@
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.mjs",
-      "bytes": 21812,
-      "sha256": "7dc81cd4eae2623a937cfa175325c6c87fd9200376f5a04805182abd8d558784"
+      "bytes": 21626,
+      "sha256": "18d8196e37384842c619d7221b2751687a86713121abf455fdb09d257a701144"
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.test.mjs",
@@ -1306,13 +1336,18 @@
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignmentV2.test.mjs",
-      "bytes": 12088,
-      "sha256": "9228767c9b1685f9af6587487499878b2892dbeae5563edeb41c0f60d45675aa"
+      "bytes": 11684,
+      "sha256": "37d555982622d932983441befefacbab191cc193ac5636bf25b24bde922d0f97"
     },
     {
       "path": "guard-service/src/db/moneroCreditNovelty.test.mjs",
       "bytes": 8781,
       "sha256": "adc3982ba1b1af279c085d1e3d7ac4b65eda402ae99c16251504181d1c6b906e"
+    },
+    {
+      "path": "guard-service/src/db/moneroCreditSettlementV2.test.mjs",
+      "bytes": 15807,
+      "sha256": "b424a3dbb6d0a6b44b817e4c0f0fe8c0741f3175f534e40e6fdc487e1e258b76"
     },
     {
       "path": "guard-service/src/db/moneroWithdrawalReservation.ts",
@@ -2121,8 +2156,8 @@
     },
     {
       "path": "tools/launch-roundtrip.mjs",
-      "bytes": 11520,
-      "sha256": "c0b4ec24de217eb7f6c0a817adcf58abee46996647ef364186d67bbd95d4530f"
+      "bytes": 12337,
+      "sha256": "f6dbfef5f8a713ab0d093e0c3d24a0130dd9eb1be415fa4a29c25fcd4746c081"
     },
     {
       "path": "tools/launcher-guards.mjs",

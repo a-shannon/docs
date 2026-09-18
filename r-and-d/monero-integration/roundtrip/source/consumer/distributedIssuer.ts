@@ -8,7 +8,7 @@ import {MoneroWithdrawalReservation} from '../guard-service/src/db/moneroWithdra
 import {retainedRequest,retainedReceipt} from './retainedCodec';
 import {frame,canonical,decimal,U64} from './codec';
 import {captureAuthority,decodeApprovalDescriptor,bindVerifiedAgreement,ownData} from './approvalAuthority';
-import {captureBackingClaim,assertBackingOccurrence,assertBackingSelection,reserveBackingSettlement,assertBackingSettlement} from './backingClaim.mjs';
+import {revalidateBackingClaim,assertBackingOccurrence,assertBackingSelection,reserveBackingSettlement,assertBackingSettlement} from './backingClaim.mjs';
 import {WithdrawalJournal,type WithdrawalJournalAnchor} from './withdrawalJournal';
 import type {AuthorizedWithdrawalSetup} from './retainedIssuer';
 
@@ -21,7 +21,7 @@ function boundedExpectation(path:string){
 
 export async function openDistributedWithdrawal(vault:any,requestValue:unknown,setup:AuthorizedWithdrawalSetup,timestamp:number){
   const backingClaim=ownData(setup).backingClaim;
-  if(backingClaim!==undefined)captureBackingClaim(backingClaim);
+  if(backingClaim!==undefined)await revalidateBackingClaim(backingClaim);
   const authority=captureAuthority(setup.authority),authorityJson=JSON.stringify(authority);
   const currentAuthority=()=>{if(ownData(setup).backingClaim!==backingClaim||JSON.stringify(captureAuthority(setup.authority))!==authorityJson)throw Error('distributed:authority-changed');};
   const projection=await captureUnapprovedMoneroPayoutRequest(requestValue);
@@ -65,14 +65,14 @@ export async function openDistributedWithdrawal(vault:any,requestValue:unknown,s
     const anchor:WithdrawalJournalAnchor=Object.freeze({reservation,requestDigest:projection.requestDigest,nativeDirectory:held.directories[0],
       descriptorDigest:descriptor.digest,bindingDigest:c.binding,expectationDigest:c.expectationDigest,hostGeneration:'1',reservationGeneration:reservation.generation,
       ...(backingDigest===undefined?{}:{backingDigest})});
-    if(backingClaim!==undefined)reserveBackingSettlement(backingClaim,anchor);
-    const settlementCurrent=()=>{if(backingClaim!==undefined)assertBackingSettlement(backingClaim,anchor);};
-    settlementCurrent();
-    let approvalStarted=false,signStarted=false,approval:undefined|{certificate:unknown;current:()=>void};
+    if(backingClaim!==undefined)await reserveBackingSettlement(backingClaim,anchor);
+    const settlementCurrent=async()=>{if(backingClaim!==undefined)await assertBackingSettlement(backingClaim,anchor,{fresh:true});};
+    await settlementCurrent();
+    let approvalStarted=false,signStarted=false,approval:undefined|{certificate:unknown;current:()=>Promise<void>};
     const approve=async(receiptValue:unknown)=>{
       if(approvalStarted)throw Error('distributed:approval-used');approvalStarted=true;
-      try{live();settlementCurrent();const {consumeVerifiedAgreement,assertVerifiedAgreementCurrent}=await import('../guard-service/src/agreement/txAgreement');live();settlementCurrent();
-        const verified=consumeVerifiedAgreement(receiptValue),current=()=>{live();settlementCurrent();assertVerifiedAgreementCurrent(verified);};current();
+      try{live();await settlementCurrent();const {consumeVerifiedAgreement,assertVerifiedAgreementCurrent}=await import('../guard-service/src/agreement/txAgreement');live();await settlementCurrent();
+        const verified=consumeVerifiedAgreement(receiptValue),current=async()=>{live();await settlementCurrent();live();assertVerifiedAgreementCurrent(verified);};await current();
         const txDataHash=bindVerifiedAgreement(verified,projection.request.canonicalRequest,snapshot.json,snapshot.id,authority);
         if(txDataHash!==c.txDataHash||verified.certificate.timestamp!==timestamp)throw Error('distributed:agreement-binding');
         approval={certificate:verified.certificate,current};
@@ -83,12 +83,12 @@ export async function openDistributedWithdrawal(vault:any,requestValue:unknown,s
       if(signStarted)throw Error('distributed:sign-used');signStarted=true;const owned=approval;approval=undefined;
       if(!owned){await close();throw Error('distributed:unapproved');}
       let journal:WithdrawalJournal|undefined;
-      try{owned.current();journal=await WithdrawalJournal.open(setup.database,setup.journalFault);owned.current();
-        await journal.prepare(anchor);owned.current();await journal.markSigning(reservation.reservationId);owned.current();
-        const final=await held.sign(owned.certificate,owned.current);owned.current();
+      try{await owned.current();journal=await WithdrawalJournal.open(setup.database,setup.journalFault);await owned.current();
+        await journal.prepare(anchor);await owned.current();await journal.markSigning(reservation.reservationId);await owned.current();
+        const final=await held.sign(owned.certificate,owned.current);await owned.current();
         const completed=await journal.complete(reservation.reservationId,{expectationDigest:final.expectationDigest,bindingDigest:final.binding,
-          txId:final.txId,byteHash:final.byteDigest,bytesHex:final.bytesHex});owned.current();return completed;
-      }finally{await journal?.close();await close();settlementCurrent();}
+          txId:final.txId,byteHash:final.byteDigest,bytesHex:final.bytesHex});await owned.current();return completed;
+      }finally{await journal?.close();await close();await settlementCurrent();}
     };
     const disposition=Object.freeze({inputReferences:Object.freeze(selection.inputs.map(i=>i.publicKey)),changeIdentity:c.changeOutputKey,
       changeOutputIndex:c.changeOutputIndex,recipientAtomic:payment.toString(),changeAtomic:change.toString()});
@@ -99,23 +99,23 @@ export async function openDistributedWithdrawal(vault:any,requestValue:unknown,s
 
 export async function recoverDistributedWithdrawal(database:string,reservationId:string,binary:string,sha256:string,backingClaim?:object){
   const journal=await WithdrawalJournal.open(database);
-  let beforeDelivery:(()=>void)|undefined;
+  let beforeDelivery:(()=>Promise<void>)|undefined;
   try{const entry=await journal.read(reservationId);
     if(entry.state!=='signing'&&entry.state!=='completed')throw Error('distributed:not-recoverable');
     if((entry.anchor.backingDigest!==undefined)!==(backingClaim!==undefined))throw Error('distributed:recovery-backing-required');
-    const settlementCurrent=()=>{
+    const settlementCurrent=async()=>{
       if(backingClaim===undefined)return;
-      const {request}=captureBackingClaim(backingClaim),backing=request.backing;
+      const {request}=await revalidateBackingClaim(backingClaim),backing=request.backing;
       // Retained claim context is custody, not a fresh observation of the node.
       assertBackingOccurrence(backingClaim,{selection:decodeNativeSelection(entry.anchor.reservation.selectionBytes),
         genesis:backing.genesis,vaultSpend:entry.anchor.reservation.vaultSpend,vaultAddress:backing.vaultAddress});
-      assertBackingSettlement(backingClaim,entry.anchor);
+      await assertBackingSettlement(backingClaim,entry.anchor);
     };
-    settlementCurrent();
+    await settlementCurrent();
     const final:any=await recoverParticipantFinal({binary,sha256,directory:entry.anchor.nativeDirectory,expectationDigest:entry.anchor.expectationDigest});
-    settlementCurrent();
+    await settlementCurrent();
     const completed=await journal.complete(reservationId,{expectationDigest:final.expectationDigest,bindingDigest:final.binding,
       txId:final.txId,byteHash:final.byteDigest,bytesHex:final.bytesHex});
-    settlementCurrent();beforeDelivery=settlementCurrent;return completed;
-  }finally{await journal.close();beforeDelivery?.();}
+    await settlementCurrent();beforeDelivery=settlementCurrent;return completed;
+  }finally{await journal.close();await beforeDelivery?.();}
 }

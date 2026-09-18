@@ -185,7 +185,6 @@ export class MoneroCreditAssignment {
       const rows=settlements.filter(s=>s.obligationId===c.obligationId);
       if(c.settlementDigest===null){if(rows.length)throw Error('custody:settlement-integrity');}
       else{
-        if(this.#config.backingPolicy==='single-deposit-v2')throw Error('settlement:profile');
         hex(c.settlementDigest,32,'custody:settlement-digest');
         if(!request.nullifierId || rows.length!==1)throw Error('custody:settlement-integrity');
         const stored=settlementBytes(JSON.parse(rows[0].settlement));
@@ -274,7 +273,6 @@ export class MoneroCreditAssignment {
   }
   #settlement(request,settlement,mode){
     this.#writable();
-    if(this.#config.backingPolicy==='single-deposit-v2')throw Error('settlement:profile');
     const r=requestBytes(request,this.#config,this.#committeeDigest),s=settlementBytes(settlement);
     if(!r.nullifierId)throw Error('settlement:backing-required');
     return this.#transaction(()=>{

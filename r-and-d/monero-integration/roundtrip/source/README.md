@@ -29,18 +29,16 @@ Ergo devnet. Existing deployments have consumed fixture funds and are not fresh
 test inputs. The test manages its own two isolated Monero daemons; the operator
 retains responsibility for the separately started Ergo node.
 
-With `ROUNDTRIP_CONFIG` set to the absolute configuration filename, set
-`MONERO_ADAPTER_LOCAL_TEST=1`. Export the proof fields through
-`ROUNDTRIP_PROOF_CONFIG` and include that variable in `WSLENV`, as the existing
-launcher does. Then run:
+Set `processSimulation: true` in that external configuration, then use the frozen
+launcher. It supplies the proof-helper environment and the adapter's module loader:
 
 ```text
-node --experimental-vm-modules --import ./ergo-node/deposit-register.mjs ./consumer/depositAdapter.live.mjs
+node tools/launch-roundtrip.mjs --config <absolute-config-file> --manifest-sha256 <reviewed-manifest-sha256> --profile deposit-adapter
 ```
 
-This direct qualification command is separate from the older roundtrip launcher
-profiles. It preserves private node, holder and proof material outside the source
-package. Its V2 deposit ledger explicitly refuses the older V1 withdrawal join.
+The launcher verifies original and copied inputs before and after execution and
+keeps node, holder and proof material outside the source package. Both adapter
+profiles support `--check-only true` and refuse `--collect-only true`.
 
 Set `processSimulation: true` in that external configuration for the V2
 [multiprocess campaign](consumer/processAdapterScenario.mjs). It starts two
@@ -113,6 +111,52 @@ independent source administration or rollback-resistant backups. A crash between
 initial bootstrap-manifest creation and initial SQLite creation fails closed;
 that initialization window is not a qualified automatic recovery path.
 
+### Complete the V2 return
+
+Set `v2Return: true`, `processSimulation: true`, and `sourceResilience: false`,
+with a fresh external runtime directory, then run:
+
+```text
+node tools/launch-roundtrip.mjs --config <absolute-config-file> --manifest-sha256 <reviewed-manifest-sha256> --profile v2-roundtrip
+```
+
+The [return scenario](consumer/v2ReturnScenario.mjs) redeems the exact confirmed
+recipient credit, starts two return watcher processes, confirms the return event,
+and reopens those watchers without creating another event. All four guards bind
+the original V2 assignment, confirmed credit, recipient redemption, return event,
+native request and selected output before retaining one permanent withdrawal
+reservation. Each fresh authorization reconstructs the same unspent Monero
+backing; expiry of the initial deposit-delivery window does not erase an existing
+credit liability. New deposit admission retains its expiry rules.
+
+The existing Rust threshold CLSAG engine pays the recipient with two of four
+holders. The campaign checks competing reservations, proof loss before approval,
+lost submission replies and restart of all four guards after payout. Recovery
+checks the retained settlement and existing native transaction; it cannot grant
+a fresh withdrawal authorization for spent backing. Signing and submission must
+each occur once. The external `adapter-*/v2-return-result.json` records the payout
+and accounting at redemption, reservation and settlement. Return watcher counters
+in that report are sampled after restart, not during initial observation.
+
+Keep the source-reorganization campaign separate: `deposit-adapter` with
+`sourceResilience: true` and `v2Return: false` tests permanent quarantine of a
+credited liability. Quarantined backing cannot fund the successful payout case.
+
+Focused V2 checks, from this source directory with prepared dependencies:
+
+```text
+node --import tsx --test consumer/freshDepositAdmission.test.mjs consumer/retainedBackingSource.test.mjs guard-service/src/db/moneroCreditSettlementV2.test.mjs
+node --experimental-vm-modules --import ./ergo-node/deposit-register.mjs --test ergo-node/v2-withdrawal-authority.test.mjs consumer/v2AsyncCustody.test.mjs
+node --experimental-vm-modules --import tsx --test ergo-node/watcher-return-runtime.test.mjs
+```
+
+Set `ROUNDTRIP_CONFIG` to the external configuration for the loader-dependent
+checks and `WATCHER_DEPENDENCY_ROOT` to the prepared Rosen root for watcher tests.
+The [qualification report](../adapter-qualification.md#complete-local-v2-roundtrip)
+records exact transaction evidence and limitations. Fee subsidy from fixture
+reserve inputs, pending reward distribution, shared administration and the
+separately pending multisig review remain explicit boundaries.
+
 This experimental source package joins an actual isolated Monero deposit and native transaction proof to a real local Ergo credit, redemption of that exact credited box, and a separate-holder Monero payout. The `baseline` profile retains the original local operator trigger fixture. The `watcher-authority` profile uses two independently checked observations and actual Rosen commitment/reveal transactions in both directions, plus four guard instances with separate permanent output-assignment ledgers and actual three-of-four Ergo signatures. Both profiles use isolated chains and fixture tokens.
 
 The original signing and proof algorithms are retained. A public fixed-view native reader and the watcher/guard composition extend the baseline. `relocation-only-changes.json` records the historical baseline relocation; it does not describe these subsequent changes. `source-manifest.json` binds the current exact file set, sizes, and ordinal aggregate. Its SHA-256 must be obtained independently from the reviewed package.
@@ -136,7 +180,7 @@ Create a caller-owned JSON configuration outside the package with these fields:
 | `rosenRoot` | Absolute prepared Rosen workspace path |
 | `runtimeDirectory` | New, absent absolute output directory outside the package and prepared inputs |
 | `nativeBinary`, `nativeSha256` | Participant executable and independent SHA-256 |
-| `observerBinary`, `observerSha256` | Additional public-source reader executable and independent SHA-256, required for `watcher-authority` |
+| `observerBinary`, `observerSha256` | Public-source reader executable and independent SHA-256, required for every non-baseline profile |
 | `moneroDaemon`, `moneroDaemonSha256` | Daemon executable and independent SHA-256 |
 | `ergoRuntime` | Existing external prepared Ergo runtime directory |
 | `ergoRecipient` | Public address controlled by that runtime's recipient capability |
@@ -144,6 +188,8 @@ Create a caller-owned JSON configuration outside the package with these fields:
 | `proofBinary`, `proofBinarySha256` | Absolute WSL helper path and independent SHA-256 |
 | `proofLibrary`, `proofLibrarySha256` | Absolute WSL wallet library path and independent SHA-256 |
 | `proofSharedLibraries` | Complete absolute-path/hash list of non-system shared libraries emitted by the proof build |
+| `scannerAdapterRoot`, `contributionPackage` | Adapter package root and pinned multisig package configuration described above; required for the adapter profiles |
+| `processSimulation`, `v2Return`, `sourceResilience` | Explicit adapter modes described above; the successful V2 return and quarantine campaign are separate runs |
 
 Run from this source directory, replacing the placeholders:
 

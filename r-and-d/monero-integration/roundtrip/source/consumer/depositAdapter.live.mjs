@@ -25,6 +25,7 @@ import {captureSuffix,rewind,restoreSuffix,OFFICIAL_MONERO_RPC_EXAMPLE_ADDRESS} 
 
 assert.equal(process.env.MONERO_ADAPTER_LOCAL_TEST,'1','Explicit isolated adapter test required');
 if(config.sourceResilience===true)assert.equal(config.processSimulation,true,'Source resilience requires process simulation');
+if(config.v2Return===true){assert.equal(config.processSimulation,true);assert.notEqual(config.sourceResilience,true,'Quarantine campaign is separate from a successful return');}
 const moduleAt=relative=>import(pathToFileURL(join(config.scannerAdapterRoot,relative)).href);
 const {MoneroNetworkConnector}=await moduleAt('lib/moneroNetworkConnector.ts');
 const {NativeDepositObserver}=await moduleAt('lib/nativeDepositObserver.ts');
@@ -231,7 +232,7 @@ test('actual source reaches watcher commitments and four fresh guards on the iso
       const {runProcessScenario}=await import('./processAdapterScenario.mjs');
       const processResult=await runProcessScenario({directory,deployment,candidate,sourceFaults,
         sourceDescriptor:{endpoints,genesis,nativeOptions,configuration,deliveryDirectory:inbox,certificateDirectory:inbox},
-        proofFile,certificateFile});
+        proofFile,certificateFile,...(config.v2Return===true?{returnRuntime:{node:primary,vault,source:inspected}}:{})});
       writeFileSync(join(directory,'process-result.json'),JSON.stringify(processResult,null,2),{flag:'wx'});
       console.log(JSON.stringify(processResult));return;
     }

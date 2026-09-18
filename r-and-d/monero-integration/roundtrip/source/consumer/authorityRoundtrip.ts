@@ -18,8 +18,9 @@ import {verifyReturnAuthority} from '../ergo-node/return-authority.mjs';
 import {decodeNativeSelection} from '../guard-service/src/withdrawal/moneroWithdrawalSelection';
 
 /** Same reviewed withdrawal owner/lifecycle; its input is the actual two-watcher return. */
-export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment,backingClaim,onAccounting}:any){
+export async function settleAuthorityReturn({node,vault,source,returnReceipt,redemption,returnTerms,directory,deployment,backingClaim,onAccounting,onReserved,afterSubmission}:any){
   assert(onAccounting===undefined || typeof onAccounting==='function');
+  assert(onReserved===undefined || typeof onReserved==='function');assert(afterSubmission===undefined || typeof afterSubmission==='function');
   const verifySource=()=>verifyReturnAuthority({returnReceipt,redemption,deployment,terms:returnTerms});
   const trusted=await verifySource(),returnTx=trusted.transaction,returnBox=trusted.trigger,event=trusted.event;
   assert.equal(event.WIDsCount,2);
@@ -37,6 +38,7 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
     const authority={epoch:'1',publicKeys:state.keys,requiredSign:3,nativeParticipants:[1,2,3,4],nativeThreshold:2,nativeSelected:[1,2]};
     const beforeConstruction=await verifySource();assert.deepEqual(beforeConstruction.event,event);assert.equal(beforeConstruction.trigger.boxId,returnBox.boxId);
     const owner=await launchDistributedNative(vault,request,{database,clock:()=>1000n,leaseDuration:1000000n,authority,backingClaim},timestamp);
+    if(onReserved)await onReserved(structuredClone(owner.anchor),owner.counts());
     assert(owner.disposition.inputReferences.includes(source.deposit.outputKey));assert.equal(owner.disposition.recipientAtomic,'500000000');assert(await verify(owner.transaction));
     const selection=decodeNativeSelection(owner.anchor.reservation.selectionBytes);
     const accounting={reservationId:owner.reservationId,proposalId:owner.transaction.txId,redemptionTxId:redemption.txId,
@@ -53,6 +55,7 @@ export async function settleAuthorityReturn({node,vault,source,returnReceipt,red
     const processor=payment.create();await processor.initialize();ChainHandler.initializeScoped(new Map([['monero',chain]]),processor);
     await processor.attachApproved(payment.binding,{sign:payment.sign});await TransactionProcessor.processTransactions();
     assert.equal(payment.counts().signCalls,1);assert.equal(owner.counts().shares,2);assert.equal(payment.counts().submissions,1);
+    if(afterSubmission)await afterSubmission(structuredClone(owner.anchor),owner.counts());
     const final=await payment.recover();assert((await node.transaction(final.finalTxId)).txs[0].in_pool);
     assert.equal((await state.database!.getTxById(owner.transaction.txId))!.status,'signed');
     const restarted=payment.create();await restarted.initialize();ChainHandler.initializeScoped(new Map([['monero',chain]]),restarted);

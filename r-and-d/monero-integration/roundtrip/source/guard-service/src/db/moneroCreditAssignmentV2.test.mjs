@@ -215,7 +215,7 @@ test('v2 configuration is explicit and never migrates existing v1 or unbacked cu
   }
 });
 
-test('v2 nullifier failure is atomic and v2 does not enable settlement', t => {
+test('v2 nullifier failure is atomic and does not reserve backing', t => {
   const f = fixture(t), ledger = f.create(), r = request(), db = new DatabaseSync(f.file);
   try {
     db.exec("CREATE TRIGGER reject_image BEFORE INSERT ON nullifiers BEGIN SELECT RAISE(ABORT,'v2-nullifier-fault'); END");
@@ -225,11 +225,5 @@ test('v2 nullifier failure is atomic and v2 does not enable settlement', t => {
     db.exec('DROP TRIGGER reject_image');
   } finally { db.close(); }
   assert.equal(ledger.assign(r).status, 'assigned');
-  const settlement = Object.fromEntries(['reservationId', 'reservationHash', 'requestDigest',
-    'selectionDigest', 'bindingDigest', 'expectationDigest'].map((name, i) => [name, h(50 + i)]));
-  const before = ledger.checkpoint();
-  for (const method of ['reserveSettlement', 'assertSettlement', 'observeSettlement']) {
-    assert.throws(() => ledger[method](r, settlement), /settlement:profile/);
-  }
-  assert.deepEqual(ledger.checkpoint(), before);
+  assert.equal(ledger.checkpoint().settlements, 0);
 });

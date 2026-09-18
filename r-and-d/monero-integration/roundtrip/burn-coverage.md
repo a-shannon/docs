@@ -92,8 +92,9 @@ qualification remain unperformed here. Final independent review of the Ergo
 multisig hook is still pending; its [review packet](multisig-review.md) identifies
 the exact candidate and replayable tests.
 
-The V2 deposit ledger still refuses withdrawal settlement. A local V2 return
-test can be a separate next increment: exact V2 backing capability, persistent
-single-withdrawal reservation, fresh source checks by all four guards, then the
-existing recoverable Monero payment path. Production contracts, service
+The [complete local V2 return](adapter-qualification.md#complete-local-v2-roundtrip)
+now exercises exact V2 backing, a persistent single-withdrawal reservation,
+fresh source checks by all four guards, and the recoverable native Monero payout.
+This closes the local deposit-to-return composition; it does not expand the
+historical vulnerability coverage claimed above. Production contracts, service
 deployment and testnet rollout remain integration work for Rosen.

@@ -11,12 +11,17 @@ const args=Object.create(null),allowed=new Set(['config','manifest-sha256','chec
 for(let i=2;i<process.argv.length;i+=2){const key=process.argv[i]?.slice(2),value=process.argv[i+1];if(!process.argv[i]?.startsWith('--')||!allowed.has(key)||!value||Object.hasOwn(args,key))throw Error('Arguments');args[key]=value;}
 if(!args.config||!isAbsolute(args.config)||!/^[0-9a-f]{64}$/.test(args['manifest-sha256']))throw Error('Explicit config and manifest pin required');
 for(const key of ['check-only','collect-only'])if(args[key]&&args[key]!=='true')throw Error('Boolean option');
-const profile=args.profile??'baseline';if(!['baseline','watcher-authority','economic-reconciliation','deposit-delivery'].includes(profile))throw Error('Unsupported profile');
+const profile=args.profile??'baseline';if(!['baseline','watcher-authority','economic-reconciliation','deposit-delivery','v2-roundtrip','deposit-adapter'].includes(profile))throw Error('Unsupported profile');
+const nodeProfile=profile==='v2-roundtrip'||profile==='deposit-adapter';if(nodeProfile&&args['collect-only'])throw Error(profile+' does not support collect-only');
 const profiles={baseline:['roundtrip.spec.ts','roundtrip.config.ts'],'watcher-authority':['watcherAuthority.spec.ts','watcherAuthority.config.ts'],
   'economic-reconciliation':['economicRoundtrip.spec.ts','economicRoundtrip.config.ts'],
-  'deposit-delivery':['depositDelivery.spec.ts','depositDelivery.config.ts']};
+  'deposit-delivery':['depositDelivery.spec.ts','depositDelivery.config.ts'],
+  'v2-roundtrip':['depositAdapter.live.mjs',undefined],
+  'deposit-adapter':['depositAdapter.live.mjs',undefined]};
 const [spec,testConfig]=profiles[profile];
 const configBytes=readFileSync(args.config),config=JSON.parse(configBytes);
+if(profile==='v2-roundtrip'&&(config.v2Return!==true||config.processSimulation!==true||config.sourceResilience===true))throw Error('V2 roundtrip requires v2Return and processSimulation without sourceResilience');
+if(profile==='deposit-adapter'&&(config.v2Return===true||config.processSimulation!==true))throw Error('Deposit adapter requires processSimulation without v2Return');
 for(const key of ['rosenRoot','runtimeDirectory','nativeBinary','moneroDaemon','ergoRuntime'])if(typeof config[key]!=='string'||!isAbsolute(config[key]))throw Error('Absolute configuration: '+key);
 const work=resolve(config.runtimeDirectory),rosen=resolve(config.rosenRoot);
 const observerFiles=profile!=='baseline'?[[config.observerBinary,config.observerSha256]]:[];
@@ -69,8 +74,9 @@ const closure=freezeInputs({...frozenOptions,files:[...declaredFiles,...manifest
   paths:[...frozenOptions.paths,...[...skippedLinks].map(p=>join(fixture,p))],validateSets:()=>{verifySourceSet();if(JSON.stringify(list(fixture,'',skippedLinks).sort(ordinal))!==JSON.stringify([...names,'source-manifest.json'].sort(ordinal)))throw Error('Exact copied source set changed');}});
 const proofConfig=JSON.stringify(capturedProof);
 const runId=randomUUID(),cwd=join(fixture,'consumer');
-const env={...process.env,ROUNDTRIP_CONFIG:runtimeConfig,ROUNDTRIP_PROOF_CONFIG:proofConfig,WSLENV:[process.env.WSLENV,'ROUNDTRIP_PROOF_CONFIG'].filter(Boolean).join(':'),PARTICIPANT_SHA256:config.nativeSha256,MONERO_NODE_NATIVE_SHA256:config.nativeSha256,PARTICIPANT_BIN:config.nativeBinary,W1HB_RUN_ID:runId,W1HB_TRACE_DIR:trace,W1HC_SPEC:spec,NODE_OPTIONS:'--experimental-vm-modules --import ./observe.mjs --import tsx --import '+pathToFileURL(join(fixture,'ergo-node/deposit-register.mjs')).href};
-const command=[join(rosen,'node_modules/vitest/vitest.mjs'),args['collect-only']?'list':'run','--config',testConfig,...(args['collect-only']?[]:['--reporter','verbose'])];
+const env={...process.env,ROUNDTRIP_CONFIG:runtimeConfig,ROUNDTRIP_PROOF_CONFIG:proofConfig,WSLENV:[process.env.WSLENV,'ROUNDTRIP_PROOF_CONFIG'].filter(Boolean).join(':'),PARTICIPANT_SHA256:config.nativeSha256,MONERO_NODE_NATIVE_SHA256:config.nativeSha256,PARTICIPANT_BIN:config.nativeBinary,W1HB_RUN_ID:runId,W1HB_TRACE_DIR:trace,W1HC_SPEC:spec,NODE_OPTIONS:'--experimental-vm-modules --import ./observe.mjs '+(nodeProfile?'':'--import tsx ')+'--import '+pathToFileURL(join(fixture,'ergo-node/deposit-register.mjs')).href};
+if(nodeProfile)env.MONERO_ADAPTER_LOCAL_TEST='1';
+const command=nodeProfile?['--test',join(fixture,'consumer',spec)]:[join(rosen,'node_modules/vitest/vitest.mjs'),args['collect-only']?'list':'run','--config',testConfig,...(args['collect-only']?[]:['--reporter','verbose'])];
 writeFileSync(join(work,'execution-before.json'),JSON.stringify({runId,profile,manifestSha256:args['manifest-sha256'],aggregateSha256:manifest.aggregateSha256,nodeSha256:sha(readFileSync(process.execPath)),nativeSha256:config.nativeSha256,moneroDaemonSha256:config.moneroDaemonSha256,...(observerFiles.length?{observerSha256:config.observerSha256}:{}),...(config.collisionExperiment?{collisionExperiment:config.collisionExperiment,collisionSha256:config.collisionSha256}:{}),command},null,2),{flag:'wx'});
 const child=spawn(process.execPath,command,{cwd,env,windowsHide:true,shell:false,stdio:['ignore','pipe','pipe']}),stdout=[],stderr=[];
 child.stdout.on('data',x=>stdout.push(Buffer.from(x)));child.stderr.on('data',x=>stderr.push(Buffer.from(x)));

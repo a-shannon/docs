@@ -3,7 +3,7 @@ import {createHash,randomBytes} from 'node:crypto';
 import {mkdtempSync,mkdirSync,readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {spawn} from 'node:child_process';
-import {captureBackingClaim} from './backingClaim.mjs';
+import {captureBackingClaim,revalidateBackingClaim} from './backingClaim.mjs';
 import {guardParticipantIO} from './participantAuthority.mjs';
 import {fundPreparedDeposit} from './participantDepositFunding.mjs';
 
@@ -159,14 +159,20 @@ export async function prepareParticipantSigning(vault,{request,rosenKeys,timesta
   const state=liveVaults.get(vault);if(!state||state.used)throw Error('Participant vault unavailable');
   if(state.inspectionPolicy==='authenticated-backing-v1'){
     const {request:claimRequest}=captureBackingClaim(backingClaim),backing=claimRequest.backing,deposit=state.funded.source.deposit;
-    if(backing.genesis!==vault.genesis||backing.vaultSpend!==vault.groupKey||backing.txid!==deposit.txId||
-      backing.outputIndex!==String(deposit.outputIndex)||backing.globalIndex!==String(deposit.chainIndex)||
-      backing.publicKey!==deposit.outputKey||backing.amountAtomic!==deposit.amountAtomic)throw Error('Participant backing claim mismatch');
+    const matchesDeposit=backing.version===2?
+      backing.genesis===vault.genesis&&backing.vaultSpend===vault.groupKey&&backing.txId===deposit.txId&&
+        backing.outputIndex===deposit.outputIndex&&backing.globalIndex===deposit.chainIndex&&
+        backing.outputKey===deposit.outputKey&&backing.amountAtomic===deposit.amountAtomic:
+      backing.genesis===vault.genesis&&backing.vaultSpend===vault.groupKey&&backing.txid===deposit.txId&&
+        backing.outputIndex===String(deposit.outputIndex)&&backing.globalIndex===String(deposit.chainIndex)&&
+        backing.publicKey===deposit.outputKey&&backing.amountAtomic===deposit.amountAtomic;
+    if(!matchesDeposit)throw Error('Participant backing claim mismatch');
   }
   state.used=true;
+  if(backingClaim!==undefined)await revalidateBackingClaim(backingClaim);
   const {ceremony,funded,runtime}=state;
   let approvalCurrent=()=>{};
-  const current=()=>{if(backingClaim!==undefined)captureBackingClaim(backingClaim);approvalCurrent();};
+  const current=async()=>{if(backingClaim!==undefined)await revalidateBackingClaim(backingClaim);await approvalCurrent();};
   const actors=guardParticipantIO(ceremony.actors.slice(0,2),current);
   const attempt=hex32(),seed=hex32(),directory=mkdtempSync(join(runtime,'participant-attempt-'));
   const directories=[1,2].map(id=>{const path=join(directory,String(id));mkdirSync(path);return path;});
