@@ -53,6 +53,38 @@ and recovery of the same confirmed credit. The three-of-four trial uses the node
 transaction check endpoint without broadcasting; the final trial confirms one
 credit. The external `adapter-*/process-result.json` records the result and PIDs.
 
+Also set `sourceResilience: true` to add the bounded source-fault campaign; this
+option requires process simulation. It retries missing proof delivery for at least
+10 seconds over five attempts, reopening the scanner/admission database once.
+The controller first replaces equal-height suffixes on the two owned fakechain
+daemons, checks disagreement refusal, and rolls back pending and accepted
+candidates, deleting the accepted observation. It restores the exact original
+blocks and transactions and checks readmission. The six-process campaign then
+tests disagreement and agreed replacement before watcher and guard commitments,
+and disagreement after signing before submission.
+
+After the credit is confirmed, each guard can audit the retained backing using
+its own source connection. Missing evidence or daemon disagreement returns
+`held` without changing the claim. An agreed replacement of the selected block
+permanently invalidates that claim while retaining its output/key-image
+reservations. Restoring the original chain does not reactivate it. The audit and
+signing session exclude each other in both directions. This explicit audit is
+neither an autonomous monitor nor a global vault halt, and cannot undo an Ergo
+credit. A production response to the outstanding liability remains a separate
+integration decision. Both sources remain under one operator; this experiment
+does not establish general reorg handling, finality or independent administration.
+
+Focused source-audit checks:
+
+```text
+node --test ergo-node/credit-backing-audit.test.mjs consumer/moneroForkFixture.test.mjs
+```
+
+For the opt-in real fork-helper smoke, also set
+`MONERO_FORK_FIXTURE_LOCAL_TEST=1`, an absolute fresh
+`MONERO_FORK_FIXTURE_RUNTIME`, and the prepared `ROUNDTRIP_CONFIG`; run the helper
+test with `node --import tsx --test consumer/moneroForkFixture.test.mjs`.
+
 Focused process checks need no running chain:
 
 ```text

@@ -5,6 +5,7 @@ import {createECDH,createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import {serveProcessRpc,emitProcessEvent} from '../tools/process-rpc.mjs';
 import {readParticipantConfig} from '../tools/participant-config.mjs';
+import {auditCreditBacking} from './credit-backing-audit.mjs';
 
 const file=process.env.PARTICIPANT_CONFIG;
 assert(path.isAbsolute(file??''),'Absolute participant configuration required');
@@ -45,7 +46,7 @@ if(fs.existsSync(manifest)){
   const fd=fs.openSync(manifest,'wx');try{fs.writeFileSync(fd,bootstrap);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
   ledger=MoneroCreditAssignment.create(database,configuration);
 }
-let active,closed=false,facade;const gates=new Map(),counts={commitments:0,partialSigns:0,completed:0,messagesSent:0,messagesReceived:0};
+let active,closed=false,auditing=false,facade;const gates=new Map(),counts={commitments:0,partialSigns:0,completed:0,messagesSent:0,messagesReceived:0};
 const current=()=>{assert(!closed,'Closed guard process');return active;};
 const stats=()=>({index,pid:process.pid,counts:{...counts},checkpoint:ledger.checkpoint(),proofCalls:sources.reduce((n,s)=>n+s.proofCalls,0),
   coordinatorIndex:participant.getCurrentTurnInd(),session:active?.session??null});
@@ -85,7 +86,7 @@ await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configu
   configSha256,custodyPath:fs.realpathSync(custody),
   bootstrapSha256:createHash('sha256').update(bootstrap).digest('hex'),coordinatorIndex:participant.getCurrentTurnInd()},handlers:{
   async sign({session,snapshot,indices,pausePartials=false}){
-    current();assert(!active,'A process hosts one signing attempt; restart before retry');assert.match(session,/^[0-9a-f-]{36}$/);
+    current();assert(!auditing,'Active backing audit');assert(!active,'A process hosts one signing attempt; restart before retry');assert.match(session,/^[0-9a-f-]{36}$/);
     assert(Array.isArray(indices)&&indices.length>=3&&indices.length<=4&&new Set(indices).size===indices.length);
     assert(indices.every(i=>Number.isInteger(i)&&i>=0&&i<4)&&indices.includes(index));assert.equal(typeof pausePartials,'boolean');
     const captured=snapshotFrom(snapshot);active={session,txId:captured.txId,indices:[...indices],pausePartials,queued:false,settled:false,seen:new Set()};
@@ -102,6 +103,9 @@ await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configu
     await facade.handleMessage(message,peerIds[sender]);counts.messagesReceived++;return null;},
   resume({checkpoint}){const gate=gates.get(checkpoint);assert(gate,'Guard is not paused');gates.delete(checkpoint);gate();return null;},
   async verify(snapshot){current();const result=await verifier.verifyForGuard(index,snapshotFrom(snapshot));result.assertCurrent();return result.assignment;},
+  async audit(snapshot){current();assert(!auditing&&(!active||active.settled),'Active signing session or backing audit');auditing=true;
+    try{return await auditCreditBacking({assignment:verifier.expectedAssignment(snapshotFrom(snapshot)),ledger,
+      readAnchor:height=>sources[index].anchor(height),readBacking:()=>verifier.readBacking(index),assertCurrent:current});}finally{auditing=false;}},
   observe(request){current();return ledger.observeAssignment(request);},
   assertAssigned(request){current();return ledger.assertAssigned(request);},
   invalidate({obligationId,reason}){current();return ledger.invalidate(obligationId,reason);},

@@ -14,7 +14,7 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
   const pins=configFiles.map(pinParticipantConfig),identities=new Array(4);
   const actors=new Array(4),counts={starts:[0,0,0,0],messagesSubmitted:0,messagesDelivered:0,
     guardCommitments:[0,0,0,0],guardPartialSigns:[0,0,0,0],completedGuards:0};
-  let closed=false,run,draining=false;const pending=[];
+  let closed=false,run,draining=false,auditing=false;const pending=[];
   function fail(error){if(run&&!run.failed){run.failed=true;run.reject(error);}}
   async function drain(){
     if(draining||!run?.started||run.failed)return;draining=true;
@@ -65,7 +65,7 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
   catch(error){await Promise.allSettled(actors.filter(Boolean).map(a=>a.close()));throw error;}
   const handle={
     async sign(snapshot,{indices=[0,1,2,3],pausePartials=false,delayMs=0,duplicate=false,drop=[],completionTimeoutMs=60000}={}){
-      assert(!closed&&!run,'Committee unavailable');assert(Array.isArray(indices)&&indices.length>=3&&indices.length<=4&&new Set(indices).size===indices.length);
+      assert(!closed&&!run&&!auditing,'Committee unavailable');assert(Array.isArray(indices)&&indices.length>=3&&indices.length<=4&&new Set(indices).size===indices.length);
       assert(indices.every(i=>Number.isInteger(i)&&i>=0&&i<4&&!actors[i].closed));
       assert(Number.isSafeInteger(delayMs)&&delayMs>=0&&delayMs<=1000);assert.equal(typeof duplicate,'boolean');
       assert(Array.isArray(drop)&&drop.every(i=>indices.includes(i)));
@@ -88,6 +88,10 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
     async observeAssignment(request){return Promise.all(actors.map(a=>a.request('observe',request,{timeoutMs})));},
     async assertAssigned(request){return Promise.all(actors.map(a=>a.request('assertAssigned',request,{timeoutMs})));},
     async verifyFresh(snapshot){return Promise.all(actors.map(a=>a.request('verify',snapshot,{timeoutMs})));},
+    async auditBacking(snapshot){assert(!closed&&!run&&!auditing,'Committee unavailable');auditing=true;
+      try{const results=await Promise.allSettled(actors.map(a=>a.request('audit',snapshot,{timeoutMs})));
+        const failure=results.find(row=>row.status==='rejected');if(failure)throw failure.reason;
+        return results.map(row=>row.value);}finally{auditing=false;}},
     async invalidate(obligationId,reason){return Promise.all(actors.map(a=>a.request('invalidate',{obligationId,reason},{timeoutMs})));},
     async resume(index,checkpoint){return actors[index].request('resume',{checkpoint},{timeoutMs});},
     async kill(index){assert(Number.isInteger(index)&&index>=0&&index<4);await actors[index].kill();},

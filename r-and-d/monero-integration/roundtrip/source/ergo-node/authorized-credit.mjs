@@ -134,6 +134,7 @@ async function prepareAuthorizedCredit({directory,source,rawRequest,watcherRecei
   if(verifierOnly){
     assert(freshMode,'Process verifier requires fresh admission');
     return Object.freeze({verifyForGuard,readers,chain,policyDigest,activationId,custodyDomain,backingPolicy,
+      async readBacking(index){assert(live,'Closed source authority');const result=await freshSource.read(index);assert(live,'Closed source authority');return result;},
       configurations:()=>structuredClone(configs),initial:Object.freeze({decision:runCandidate,observation:runObservation,backing:runBacking}),
       expectedAssignment:snapshot=>assignmentRequest(runCandidate,snapshot,runBacking),close(){live=false;}});
   }

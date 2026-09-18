@@ -22,6 +22,8 @@ export async function openProcessSource(descriptor){
       return nativeProof('verify',request,config.runtimeDirectory);},
     validateRecipient:address=>assert.equal(wasm.Address.from_base58(address).to_base58(wasm.NetworkPrefix.Testnet),address)});
   return Object.freeze({scope:admission.scope,get proofCalls(){return proofCalls;},
+    async anchor(height){if(closed)throw Error('Process source closed');const block=await network.getBlockAtHeight(height);
+      if(closed)throw Error('Process source closed');return {height:block.height,hash:block.hash};},
     inspect(candidate,signal=abort.signal){if(closed)throw Error('Process source closed');return admission.inspect(candidate,AbortSignal.any([abort.signal,signal]));},
     verify(candidate,signal=abort.signal){if(closed)throw Error('Process source closed');return admission.verify(candidate,AbortSignal.any([abort.signal,signal]));},
     close(){closed=true;abort.abort();network.close();}});

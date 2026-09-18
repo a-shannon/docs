@@ -20,7 +20,7 @@ const stage=(name,values={})=>console.log(JSON.stringify({stage:'process-'+name,
 const write=(file,value)=>fs.writeFileSync(file,JSON.stringify(value,null,2),{flag:'wx',mode:0o600});
 
 /** Controlled local fault campaign. Every actor owns a process and durable store. */
-export async function runProcessScenario({directory,deployment,candidate,sourceDescriptor,proofFile,certificateFile}){
+export async function runProcessScenario({directory,deployment,candidate,sourceDescriptor,proofFile,certificateFile,sourceFaults}){
   const publicDeployment=structuredClone(deployment);delete publicDeployment.guardSecrets;
   for(const watcher of publicDeployment.watchers)delete watcher.secretKey;
   const proofBytes=fs.readFileSync(proofFile),certificateBytes=fs.readFileSync(certificateFile);
@@ -42,7 +42,7 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
   let watchers,guards,verifier;const sources=[],faults=[],actions=[];let actionError;
   const schedule=fn=>{const action=Promise.resolve().then(fn).catch(error=>{actionError??=error;});actions.push(action);};
   const finishActions=async()=>{await Promise.all(actions.splice(0));if(actionError)throw actionError;};
-  let killedCommitment=false,killedReveal=false,killPartial=false,killedPartial=false;
+  let killedCommitment=false,killedReveal=false,killPartial=false,killedPartial=false,auditDuringSigningRefused=false;
   try{
     watchers=await createWatcherProcessTransport({configFiles:watcherFiles,directory:root,onEvent(type,payload){
       if(type!=='checkpoint')return;
@@ -51,6 +51,16 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
       if(payload.index===0&&payload.checkpoint==='beforeRevealConfirmation')schedule(async()=>{
         if(!killedReveal){killedReveal=true;await watchers.kill(0);}else await watchers.resume(0,payload.checkpoint);});
     }});
+    if(sourceFaults){
+      for(const [fault,reason]of [['diverge',/Monero endpoints disagree/],['remove',/Source block changed/]]){
+        await sourceFaults[fault]();
+        try{await assert.rejects(()=>watchers.publish(candidate),reason);await finishActions();
+          assert.equal(watchers.counts.uniqueCommitmentTransactions,0);assert.equal(killedCommitment,false);}
+        finally{await sourceFaults.restore();}
+        faults.push('watchers-source-'+fault+'-before-commitment');
+      }
+      stage('watchers-source-refusals-passed');
+    }
     fs.unlinkSync(watcherHomes[1].proof);
     await assert.rejects(()=>watchers.publish(candidate),/ENOENT/);await finishActions();
     assert.equal(watchers.counts.uniqueCommitmentTransactions,0);assert.equal(killedCommitment,false);
@@ -74,7 +84,9 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     });
     guards=await createGuardProcessCommittee({configFiles:guardFiles,guardKeys:deployment.guardPublicKeys,onEvent(type,payload){
       if(type==='checkpoint'&&payload.checkpoint==='beforePartial'&&killPartial&&!killedPartial){
-        killedPartial=true;schedule(()=>guards.kill(payload.index));}
+        killedPartial=true;schedule(async()=>{
+          if(sourceFaults){await assert.rejects(()=>guards.auditBacking(snapshot),/Committee unavailable/);auditDuringSigningRefused=true;}
+          await guards.kill(payload.index);});}
     }});
     assert.equal(new Set([...watchers.pids,...guards.pids,process.pid]).size,7,'Six distinct child processes required');
     const initialPids={watchers:watchers.pids,guards:guards.pids};stage('six-actors-ready');
@@ -97,8 +109,21 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     const retained=checkpoints(await guards.stats());claimed(retained);await guards.assertAssigned(assignment);
     faults.push('all-signing-messages-dropped');stage('dropped-transport-refused');
 
+    if(sourceFaults){
+      for(const [fault,reason]of [['diverge',/Monero endpoints disagree/],['remove',/Source block changed/]]){
+        await sourceFaults[fault]();
+        try{await assert.rejects(()=>guards.sign(snapshot),reason);
+          assert.equal(sum(guards.counts.guardCommitments),0);assert.equal(sum(guards.counts.guardPartialSigns),0);}
+        finally{await sourceFaults.restore();await guards.restartAll();}
+        assert.deepEqual(checkpoints(await guards.stats()),retained);await guards.assertAssigned(assignment);
+        faults.push('guards-source-'+fault+'-before-commitment');
+      }
+      stage('guards-source-refusals-passed');
+    }
+
     killPartial=true;
     await assert.rejects(()=>guards.sign(snapshot,{pausePartials:true}),/RPC client killed/);await finishActions();assert(killedPartial);
+    if(sourceFaults)assert(auditDuringSigningRefused,'Audit must refuse an active signing session');
     assert(sum(guards.counts.guardCommitments)>0);assert.equal(sum(guards.counts.guardPartialSigns),0);
     killPartial=false;await guards.restartAll();assert.deepEqual(checkpoints(await guards.stats()),retained);
     faults.push('guard-killed-before-native-partial');stage('guard-crash-recovery-passed');
@@ -130,6 +155,14 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     const signed=await guards.sign(snapshot,{delayMs:20,duplicate:true});assert.equal(guards.counts.completedGuards,4);
     const native=wasm.Transaction.sigma_parse_bytes(Buffer.from(signed.signedHex,'hex'));
     assert.equal(native.id().to_str(),snapshot.txId);assert.equal(await rpc('/transactions/check',JSON.parse(native.to_json())),snapshot.txId);
+    if(sourceFaults){
+      const before=await guards.stats();await sourceFaults.diverge();
+      try{await assert.rejects(()=>guards.verifyFresh(snapshot),/Monero endpoints disagree/);}
+      finally{await sourceFaults.restore();}
+      assert.deepEqual((await guards.stats()).map(s=>s.counts),before.map(s=>s.counts));
+      assert.deepEqual(checkpoints(await guards.stats()),retained);
+      faults.push('source-divergence-after-signing-before-submission');
+    }
     const fresh=await guards.verifyFresh(snapshot);for(const row of fresh)assert.deepEqual(row,assignment);
     const record={txId:snapshot.txId,signedHex:signed.signedHex,transaction:JSON.parse(native.to_json()),
       policyDigest:verifier.policyDigest,committee:guards.configurations(),counts:guards.counts};
@@ -146,11 +179,50 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     assert.deepEqual(checkpoints(await guards.stats()),retained);
     assert.equal((await confirmed(recovered.txId)).id,credit.id);
     assert.equal((await watchers.publish(candidate)).transaction.id,receipt.transaction.id);await finishActions();
+    let sourceAudit;
+    if(sourceFaults){
+      const before=await guards.stats(),counts=before.map(s=>s.counts);
+      const pendingAudit=guards.auditBacking(snapshot);
+      await assert.rejects(()=>guards.sign(snapshot),/Committee unavailable/);
+      await assert.rejects(()=>guards.auditBacking(snapshot),/Committee unavailable/);
+      const checked=await pendingAudit;assert(checked.every(row=>row.status==='checked'));
+      assert.deepEqual(checkpoints(await guards.stats()),retained);
+      fs.unlinkSync(guardHomes[2].proof);
+      try{const held=await guards.auditBacking(snapshot);assert.equal(held[2].status,'held');
+        assert.equal(held[2].reason,'backing-unavailable');assert(held.filter((_,i)=>i!==2).every(row=>row.status==='checked'));
+        assert.deepEqual(checkpoints(await guards.stats()),retained);}
+      finally{fs.writeFileSync(guardHomes[2].proof,proofBytes);}
+      await sourceFaults.diverge();
+      try{const held=await guards.auditBacking(snapshot);assert(held.every(row=>row.status==='held'&&row.reason==='source-unavailable'));
+        assert.deepEqual(checkpoints(await guards.stats()),retained);}
+      finally{await sourceFaults.restore();}
+      await sourceFaults.remove();let invalidated;
+      try{const quarantined=await guards.auditBacking(snapshot);
+        assert(quarantined.every(row=>row.status==='quarantined'&&row.claim.status==='invalidated'&&row.claim.reason==='source-block-changed'));
+        await assert.rejects(()=>guards.assertAssigned(assignment),/assignment:invalidated/);
+        invalidated=checkpoints(await guards.stats());claimed(invalidated);
+        assert(invalidated.every((row,i)=>row.revision===retained[i].revision+1));
+        assert.deepEqual((await guards.stats()).map(s=>s.counts),counts);
+        assert.equal((await confirmed(credit.id)).id,credit.id,'Source reorg cannot undo confirmed Ergo credit');
+      }finally{await sourceFaults.restore();}
+      await guards.restartAll();assert.deepEqual(checkpoints(await guards.stats()),invalidated);
+      const restarted=await guards.stats(),terminal=await guards.auditBacking(snapshot);
+      assert(terminal.every(row=>row.status==='quarantined'&&row.claim.status==='invalidated'));
+      assert.deepEqual((await guards.stats()).map(s=>s.proofCalls),restarted.map(s=>s.proofCalls),'Terminal audit must not reread proof');
+      assert.deepEqual(checkpoints(await guards.stats()),invalidated);
+      await assert.rejects(()=>guards.assertAssigned(assignment),/assignment:invalidated/);
+      sourceAudit={checked:4,proofOutageHeld:1,divergenceHeld:4,postCreditQuarantined:4,
+        retainedClaims:true,restartQuarantineStable:true,confirmedCreditRetained:true,automaticReactivation:false,
+        auditDuringSigningRefused,signingDuringAuditRefused:true};
+      faults.push('post-credit-proof-unavailable','post-credit-source-disagreement','post-credit-agreed-source-reorg');
+      stage('post-credit-source-audit-passed',sourceAudit);
+    }
     const result={stage:'multiprocess-local-qualified',watchers:2,guards:4,moneroDaemons:2,independentAdministrators:false,
       initialPids,finalPids:{watchers:watchers.pids,guards:guards.pids},watcherCounts:watchers.counts,
       faults,threeOfFour,delayedDuplicateTransport:true,guardCounts:record.counts,
       guardFreshProofCalls:finalStats.map(s=>s.proofCalls),durableClaimsRetained:true,
       confirmedCreditCount:1,creditTxId:credit.id,creditRestartStable:true};
+    if(sourceFaults){result.sourceResilience=sourceFaults.result();result.sourceAudit=sourceAudit;}
     return result;
   }finally{await guards?.close();await watchers?.close();verifier?.close();for(const source of sources)source.close();}
 }

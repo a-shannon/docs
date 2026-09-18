@@ -63,7 +63,7 @@ created no settlement. Restoring valid evidence allowed the positive case;
 replacing it with malformed evidence after credit made a fresh admission read
 return `pending`.
 
-The final multiprocess campaign passed in 141.0 seconds with six distinct
+The baseline multiprocess campaign passed in 141.0 seconds with six distinct
 participant PIDs plus the controller. Each watcher reconstructs the source independently, executes
 the pinned commitment/reveal jobs, and owns a durable observation/transaction
 queue. Each guard loads its own provisioned key, constructs its own source readers,
@@ -135,7 +135,58 @@ certificate; the certificate's embedded transaction is a tighter deposit limit
 than the discovery parser's 1 MiB transaction bound. The integration destination
 is Ergo testnet/devnet with fixture assets.
 
-## Gates before production qualification
+## Source continuity and post-credit quarantine
+
+The optional `sourceResilience` qualification first exercises proof-delivery
+retries across database reopening, two-daemon disagreement, pending/accepted
+candidate rollback and exact block restoration in the controller. The six-process
+campaign then injects disagreement and agreed replacement before watcher and
+guard commitments, and disagreement after signing before submission.
+
+The extended campaign passed in 445.0 seconds. It exercised 15 process/source
+fault cases and ten replacement/restoration cycles over a 63-block suffix,
+starting from a deposit at height 97 and restoring the exact original tip at 159.
+The proof was unavailable for 10.126 seconds across five attempts and one database
+reopen. Orphaned candidates could not be claimed; restoration readmitted exactly
+one observation. The final signing attempt produced four commitments and three
+partial signatures, with identical signed bytes at all four guards. Exactly one
+credit was confirmed and retained through restart.
+
+| Additional source transition | Observed result |
+| --- | --- |
+| Daemons disagree or agree on a replacement before watcher/guard commitments | Refused before the respective commitment jobs or native contributions; existing claims retained. |
+| Daemons disagree after signing | Final source verification refused before submission; restoration allowed the positive credit. |
+| One guard's proof disappears after credit | That guard reports `held`; the other three report `checked`; custody is unchanged. |
+| Daemons disagree after credit | All four report `held`; custody is unchanged. |
+| Daemons agree that the credited deposit block was replaced | All four claims become invalidated, retaining output/key-image reservations and the confirmed Ergo credit. |
+| Original branch restored, then all guards restarted | All four remain quarantined; no automatic reactivation or new contribution. |
+| Audit attempted during signing, or signing/another audit during an audit | Refused at the committee boundary. |
+
+The new [backing audit](source/ergo-node/credit-backing-audit.mjs) operates on an
+existing exact V2 claim. Each guard reads the selected height through its own
+configured source connection. Unavailable evidence or disagreement returns
+`held` without changing custody. An agreed different block hash permanently
+invalidates the local claim; its output/key-image reservations and the confirmed
+Ergo credit remain. Restoring the original source does not reactivate the claim.
+A matching anchor still requires exact fresh backing reconstruction.
+
+Audit and signing exclude each other in both directions. The returned status
+and claim derive from one final custody observation. Independent review caught
+both the inconsistent double-read result and the initially incomplete exclusion.
+The audit suite passes 13 tests, and four isolated mutations are detected:
+removing invalidation, the final observation, the anchor comparison or the
+backing comparison. The affected source/output/recovery suites total 44 passing
+tests. A primary-context audit also reran all 72 multisig tests successfully;
+that does not replace its pending independent re-review.
+
+The source check is explicitly invoked. It is not an autonomous monitoring
+service, an atomic action across four ledgers, an on-chain revocation, or a
+global vault halt. Startup still requires valid source evidence before opening
+the retained guard service; starting during divergence is not qualified.
+The experiment uses equal-height replacement branches under one operator and
+does not establish general reorg handling, finality or independent administration.
+
+## Remaining production gates
 
 | Gate | Evidence still required |
 | --- | --- |
@@ -145,10 +196,11 @@ is Ergo testnet/devnet with fixture assets.
 | Recovery and operations | Deep source reorg handling after credit, old-backup recovery, delayed/expired or malformed deposits, monitored candidate retention and an operator recovery procedure. |
 | Capacity and delivery | Representative historical catch-up and sustained-load tests, evidence availability and retention, certificate-size policy, OS-level custody isolation and protected executable custody. |
 
-The six-process campaign closes a useful local integration step. Further local
-work can exercise source reorgs, delivery retention and load before selecting the
-production hosts. Production qualification additionally needs persistent holder
-identities, certificate delivery and independently administered source endpoints;
-the selected services must replay these credit/refusal/recovery criteria.
+The six-process campaign now covers these bounded source replacements and
+delivery retries. Longer outages, retention under load, old-backup recovery and
+operational handling of an already issued credit remain separate work.
+Production qualification additionally needs persistent holder identities,
+certificate delivery and independently administered source endpoints; the selected
+services must replay these credit/refusal/recovery criteria.
 Valid old database snapshots remain outside local rollback detection, and a
 crash during first-time custody initialization may require operator recovery.

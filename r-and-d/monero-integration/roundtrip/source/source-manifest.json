@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 432,
-  "aggregateSha256": "ac7cb3117fd34cb7a8d1326dac16ef3d68eed98b64ef4ee3af645a28f654fd32",
+  "fileCount": 436,
+  "aggregateSha256": "a3af42df74601102c1f99d3c31b9d4044a90d766a1bd59e4fcd3b23c4d975334",
   "files": [
     {
       "path": "README.md",
-      "bytes": 18132,
-      "sha256": "e89dc668047249f15a0e2559789cbbd98107adff1d93fc4175530e42c728f667"
+      "bytes": 19988,
+      "sha256": "7b88123ff85ff70449871d8ec24bd78d64eec0713c608c824e379836510ced48"
     },
     {
       "path": "consumer/adapter.ts",
@@ -136,8 +136,8 @@
     },
     {
       "path": "consumer/depositAdapter.live.mjs",
-      "bytes": 19644,
-      "sha256": "3c4034fb169ade9b56e7c4dffb36dbb9fa3745b155b454a7be06182c98a9dd90"
+      "bytes": 29980,
+      "sha256": "d3c9435c0f69cf4ba237f834a4007fc82fc81e7893146ae11d1f1f11bcb3455d"
     },
     {
       "path": "consumer/depositDelivery.config.ts",
@@ -285,6 +285,16 @@
       "sha256": "dd7b525570ac8d7891681800f6b8e1e79c7d1beb88416ab913b74f981b422d5a"
     },
     {
+      "path": "consumer/moneroForkFixture.mjs",
+      "bytes": 8194,
+      "sha256": "cf028ca41458bb2a880677c23363840d26c2fcddff215a037ea6b4fe7b54cdbc"
+    },
+    {
+      "path": "consumer/moneroForkFixture.test.mjs",
+      "bytes": 5779,
+      "sha256": "dc2574bc715f90591a20308e24214215a59b5e0642e1355a5c3ce2a9df02810c"
+    },
+    {
       "path": "consumer/nativeDepositDiscovery.mjs",
       "bytes": 3815,
       "sha256": "524e36e566b56e7aec9aed3cfdfee33c441d012a04d1492175642faae1e0ea03"
@@ -366,8 +376,8 @@
     },
     {
       "path": "consumer/processAdapterScenario.mjs",
-      "bytes": 13053,
-      "sha256": "a25ace2e50cb0281aded2e650467e8b633148bf12da5b4b1c5ff7878a452e03b"
+      "bytes": 18126,
+      "sha256": "c8bb6c0c55e3e6f997b5fb1862eb7acee7de70725b19b6252ed82d7c7250dc9a"
     },
     {
       "path": "consumer/projectionFixture.ts",
@@ -531,8 +541,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 16844,
-      "sha256": "1ab8c0368825adfd8666327a1225150d0acc60b837c77d3317bc3a6c79bfa084"
+      "bytes": 17013,
+      "sha256": "b83a57cca41cfee2752b8a206e4a4e1de1d6e1e64bde6d6f3c8bd49cbc8f6382"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -573,6 +583,16 @@
       "path": "ergo-node/contracts/Permit.es",
       "bytes": 2212,
       "sha256": "192e7d6f065354ccf203d7d5170e7b9f838d606249d631e6a6e24bcea6814c59"
+    },
+    {
+      "path": "ergo-node/credit-backing-audit.mjs",
+      "bytes": 1848,
+      "sha256": "5da45ce1b8077769bdbb88dc3bd37c6f0cc1e7fb14ab20186712f3b1fd765d1d"
+    },
+    {
+      "path": "ergo-node/credit-backing-audit.test.mjs",
+      "bytes": 6786,
+      "sha256": "ee51c5648eb35e607d7c9f53289dfa94313c4fbcd2c620b849d5c7efc7a11f4f"
     },
     {
       "path": "ergo-node/credit-committee.mjs",
@@ -641,13 +661,13 @@
     },
     {
       "path": "ergo-node/guard-participant.mjs",
-      "bytes": 9712,
-      "sha256": "d9fe136da5b7630076ee9b9d26fa575e3ae5c5dc68605928c851836461dad8b3"
+      "bytes": 10230,
+      "sha256": "28782fbef527308a0216f95b508c5fd2dc9c3cf5e576244abc9690ede71ad2ea"
     },
     {
       "path": "ergo-node/guard-process-committee.mjs",
-      "bytes": 8279,
-      "sha256": "0730749f889af84b5b7040fe21947470c37c8b80ec4a0a58201fb7ee096ba157"
+      "bytes": 8685,
+      "sha256": "5661e9e77936b638a61d4add1702586cdf35c9e0b7e0185c8e82bee0a420f700"
     },
     {
       "path": "ergo-node/loader.mjs",
@@ -656,8 +676,8 @@
     },
     {
       "path": "ergo-node/process-source.mjs",
-      "bytes": 2138,
-      "sha256": "fc958baf62a06cbbb075d1c662b4179cd1744a7657a317c58a0def09bcd71c84"
+      "bytes": 2363,
+      "sha256": "fbc1c5517e8eae8513bb5b7151834bf493bd512f2edfeec38b50d54efca5f611"
     },
     {
       "path": "ergo-node/register.mjs",
