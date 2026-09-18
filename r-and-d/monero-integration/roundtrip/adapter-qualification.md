@@ -4,7 +4,9 @@ A. Shannon · 18 September 2026
 
 The deposit path now connects real isolated Monero transactions to Rosen scanner
 observations, actual watcher commitment/reveal transactions, and four fresh guard
-verifiers signing an Ergo credit. The source is public and executable.
+verifiers signing an Ergo credit. The local multiprocess campaign runs two
+watcher processes and four guard processes with individual persistent stores.
+The source is public and executable.
 **Production qualification remains open.** The test hosts, custody bootstrap and
 deployment profile are controlled fixtures.
 
@@ -15,7 +17,7 @@ deployment profile are controlled fixtures.
 - [Rust output reconstruction](source/native/src/deposit_block.rs), [certificate replay](source/native/src/source_certificate.rs) and [offline observer](source/native/src/deposit_observer.rs): exact block/transaction bytes, selected local/global output index, amount, vault ownership and holder-authorized key image.
 - [Fresh admission](source/consumer/freshDepositAdmission.mjs) and [guard join](source/ergo-node/authorized-credit.mjs): OutProofV2, on-chain memo, destination, output state, confirmations, watcher event, payment order and independent Ergo reduction.
 - [Permanent ledger](source/guard-service/src/db/moneroCreditAssignment.mjs) and [native contribution gate](source/guard-service/src/deposit/moneroCreditSigner.mjs): full V2 backing retention, output/key-image uniqueness, one-use refresh permits and adjacent local invalidation checks.
-- [Executable qualification case](source/consumer/depositAdapter.live.mjs) and [reproduction instructions](source/README.md#reproduce-the-deposit-adapter-candidate).
+- [Executable qualification case](source/consumer/depositAdapter.live.mjs), [six-process fault campaign](source/consumer/processAdapterScenario.mjs) and [reproduction instructions](source/README.md#reproduce-the-deposit-adapter-candidate).
 
 The RCS documentation proposal remains separate from these implementation branches.
 The existing CLSAG and Monero transaction-building source remains in the roundtrip
@@ -48,7 +50,7 @@ evidence does not qualify a V2 payout path.
 
 The scanner package passes 69 tests, build, type checking and lint. The multisig
 package passes 72 tests, build, type checking and lint; 15 targeted mutations of
-the checks are detected. The final full local path passed in 103.6 seconds using
+the checks are detected. The earlier in-process path passed in 103.6 seconds using
 the linked scanner and multisig commits. It confirmed one credit, two watcher
 commitments and exact credit recovery after restart. Four guard instances made
 8, 6, 5 and 6 fresh proof reads respectively in the same JavaScript host.
@@ -60,6 +62,36 @@ output/key-image claims across ledger reopen, left the trigger unspent and
 created no settlement. Restoring valid evidence allowed the positive case;
 replacing it with malformed evidence after credit made a fresh admission read
 return `pending`.
+
+The final multiprocess campaign passed in 141.0 seconds with six distinct
+participant PIDs plus the controller. Each watcher reconstructs the source independently, executes
+the pinned commitment/reveal jobs, and owns a durable observation/transaction
+queue. Each guard loads its own provisioned key, constructs its own source readers,
+and owns its permanent assignment database. Existing authenticated multisig
+envelopes pass through a controlled IPC relay.
+The final four-guard attempt generated four commitments and three native partial
+signatures; all four participants obtained identical signed bytes. Their fresh
+proof-read counts were 7, 7, 7 and 6 respectively.
+
+| Local fault or transition | Observed result |
+| --- | --- |
+| One watcher's proof unavailable | Refused before commitment jobs started. |
+| Watcher killed after durable queueing, before broadcast | Restart reused the same signed commitment. |
+| Revealing watcher killed after broadcast, before saving confirmation | Restart recovered the same reveal; two commitment transactions and one reveal remained. |
+| All signing messages dropped | Timed out with no partial signatures; all four output/key-image claims survived restart. |
+| Guard killed before its native partial signature | Attempt stopped after commitments, with zero partials; claims survived restart. |
+| One guard's proof unavailable | Refused before any native commitment. |
+| Guard config changed to a fresh state directory | Restart refused the changed bytes before creating that directory; restoring the original config reopened the retained claim. |
+| One non-coordinator guard offline | The other three completed signing; Ergo's transaction-check endpoint accepted the result without broadcast. |
+| Delayed and duplicate relay messages | Four guards completed with identical signed bytes; the node confirmed one credit. |
+| All six participants restarted after credit | Same reveal, same confirmed credit and unchanged permanent claims; no new credit submission. |
+
+The process RPC suite passes 13 actual-child tests, including unexpected parent
+disconnect with a hung cleanup hook. Participant-config tests pass 2 cases;
+watcher runtime tests pass 5; affected credit-source, output-policy and recovery
+tests pass 31. Independent review of the new process boundary found and corrected
+unbound restart directories and missing shutdown after parent disconnect. That
+review does not close the separately pending multisig re-review.
 
 The exercised native executable has SHA-256
 `89eeaee45c39ff7a46ece26ab04c5be5709d7d88e4fa9f4e729dd84cb8925067`.
@@ -74,6 +106,8 @@ The pinned multisig runtime aggregate and reproduction command are in the
 | Stable watcher descriptor and configured reader identities | Guard transaction verification; [source tests](source/ergo-node/fresh-credit-source.test.mjs) change namespace, backing, reader array, method and scope. | Awaited work can install a different source authority or signing obligation. |
 | Permanent economic claims | Signing and restart; [V2 ledger tests](source/guard-service/src/db/moneroCreditAssignmentV2.test.mjs) cover every retained descriptor field, output/key-image conflicts and atomic refusal. | Another transaction occurrence or failed attempt can release already assigned backing. |
 | Fresh native contribution permission | Native signer; [fresh signer tests](source/guard-service/src/deposit/moneroCreditSignerFresh.test.mjs) cover missing/reused permits, removed proof, changed assignment and local invalidation. The live case exercises both proof-removal timings with the real multisig package. | Queueing or an earlier successful check can authorize a later contribution without current evidence. |
+| Process/config identity and retained custody | [Config pins](source/tools/participant-config.mjs), child handshake and live changed-directory regression bind exact config bytes and resolved store path. | Restart can silently select an empty ledger. |
+| Bounded IPC lifecycle | [Process RPC tests](source/tools/process-rpc.test.mjs) exercise deadlines, crashes, disconnect, duplicate identifiers and message bounds; the live campaign drops and duplicates real envelopes. | Failed sessions can leave active children or unbounded requests. |
 
 | Evidence dimension | Status |
 | --- | --- |
@@ -86,7 +120,10 @@ The pinned multisig runtime aggregate and reproduction command are in the
 The integration uses two separate local Monero databases with real block/transaction
 replication and no public peers. It does not establish independent administration.
 The watcher executes pinned upstream jobs with configured node/database ports;
-this is not a deployed autonomous watcher service. No production CI result or
+the multiprocess campaign separates actor lifetimes, source readers and stores,
+but does not deploy an autonomous watcher service. Processes share one OS account
+and filesystem; fixture provisioning and the relay are controlled by the parent.
+No production CI result or
 deployment approval is claimed. Exact tested source files are bound by
 `source/source-manifest.json`; executable hashes identify the exercised build,
 not a reproducible-build attestation.
@@ -106,10 +143,12 @@ is Ergo testnet/devnet with fixture assets.
 | Persistent custody | Production holder enrollment, epoch/view-key custody, certificate production, backup/restore and rotation with rollback protection. Certificate export currently starts from the controlled participant fixture. |
 | Deployment integration | Full watcher and guard service processes using a chosen production network/asset profile and independently administered Monero sources. |
 | Recovery and operations | Deep source reorg handling after credit, old-backup recovery, delayed/expired or malformed deposits, monitored candidate retention and an operator recovery procedure. |
-| Capacity and delivery | Representative historical catch-up and sustained-load tests, evidence availability and retention, certificate-size policy, process isolation and protected executable custody. |
+| Capacity and delivery | Representative historical catch-up and sustained-load tests, evidence availability and retention, certificate-size policy, OS-level custody isolation and protected executable custody. |
 
-These gates cannot be replaced by more repetitions of the same local test.
-The next deciding deployment needs persistent holder identities and certificate
-delivery, two independently administered daemon sources, and the actual watcher
-and guard hosts. Qualification must replay the same credit/refusal/recovery
-criteria against those selected components.
+The six-process campaign closes a useful local integration step. Further local
+work can exercise source reorgs, delivery retention and load before selecting the
+production hosts. Production qualification additionally needs persistent holder
+identities, certificate delivery and independently administered source endpoints;
+the selected services must replay these credit/refusal/recovery criteria.
+Valid old database snapshots remain outside local rollback detection, and a
+crash during first-time custody initialization may require operator recovery.

@@ -107,6 +107,15 @@ test('actual source reaches watcher commitments and four fresh guards on the iso
     assert.equal(captured.length,1);const candidate={...captured[0],id:Number(captured[0].id),sourceHeight:Number(captured[0].sourceHeight)};
     assert.deepEqual(candidate,{id:1,scope:adapter.scope,txId:d.txId,transactionHex:d.txBytes,sourceBlockId:d.blockHash,sourceHeight:d.blockHeight});
 
+    if(config.processSimulation===true){
+      const {runProcessScenario}=await import('./processAdapterScenario.mjs');
+      const processResult=await runProcessScenario({directory,deployment,candidate,
+        sourceDescriptor:{endpoints,genesis,nativeOptions,configuration,deliveryDirectory:inbox,certificateDirectory:inbox},
+        proofFile,certificateFile:join(inbox,d.txId+'.'+d.outputIndex+'.certificate')});
+      writeFileSync(join(directory,'process-result.json'),JSON.stringify(processResult,null,2),{flag:'wx'});
+      console.log(JSON.stringify(processResult));return;
+    }
+
     // Every watcher and guard gets a separately configured admission reader and
     // native observer. The shared daemon connector is only the configured source.
     const makeReaders=(count,calls)=>Array.from({length:count},(_,index)=>createFreshDepositAdmission({...sourceOptions,

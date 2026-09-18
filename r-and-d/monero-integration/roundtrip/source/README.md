@@ -42,6 +42,29 @@ This direct qualification command is separate from the older roundtrip launcher
 profiles. It preserves private node, holder and proof material outside the source
 package. Its V2 deposit ledger explicitly refuses the older V1 withdrawal join.
 
+Set `processSimulation: true` in that external configuration to run the
+[multiprocess campaign](consumer/processAdapterScenario.mjs). It starts two
+watcher Node processes and four guard Node processes with separate SQLite stores,
+proof inboxes and fixture keys. The parent relays the existing authenticated
+multisig envelopes. It tests missing evidence, watcher queue/broadcast crashes,
+lost messages, guard death before a partial signature, config-directory drift,
+three-of-four signing with a non-coordinator offline, delayed duplicate messages,
+and recovery of the same confirmed credit. The three-of-four trial uses the node's
+transaction check endpoint without broadcasting; the final trial confirms one
+credit. The external `adapter-*/process-result.json` records the result and PIDs.
+
+Focused process checks need no running chain:
+
+```text
+node --test tools/process-rpc.test.mjs tools/participant-config.test.mjs
+```
+
+This profile uses controlled child processes under one OS account. It does not
+provide an autonomous production watcher/guard service, protected key custody,
+independent source administration or rollback-resistant backups. A crash between
+initial bootstrap-manifest creation and initial SQLite creation fails closed;
+that initialization window is not a qualified automatic recovery path.
+
 This experimental source package joins an actual isolated Monero deposit and native transaction proof to a real local Ergo credit, redemption of that exact credited box, and a separate-holder Monero payout. The `baseline` profile retains the original local operator trigger fixture. The `watcher-authority` profile uses two independently checked observations and actual Rosen commitment/reveal transactions in both directions, plus four guard instances with separate permanent output-assignment ledgers and actual three-of-four Ergo signatures. Both profiles use isolated chains and fixture tokens.
 
 The original signing and proof algorithms are retained. A public fixed-view native reader and the watcher/guard composition extend the baseline. `relocation-only-changes.json` records the historical baseline relocation; it does not describe these subsequent changes. `source-manifest.json` binds the current exact file set, sizes, and ordinal aggregate. Its SHA-256 must be obtained independently from the reviewed package.
@@ -117,7 +140,7 @@ occurrence through the complete credit/redemption/payout path.
 
 The
 observer uses the fixture's public view scalar and does not establish a general
-production view-key distribution scheme. Guard instances share one JS host;
+production view-key distribution scheme. In these older profiles, guard instances share one JS host;
 Monero holders and fresh source readers use separate native processes. The
 watcher host executes the upstream jobs with bounded SQLite/node ports, not the
 complete autonomous watcher daemon. Missing guard custody refuses reopening;

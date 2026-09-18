@@ -45,7 +45,7 @@ export function creditOrder(candidate,deployment,wids){
 const orderKey=order=>text(order.map(row=>({...row,address:tree(row.address)})));
 
 /** Local raw-source -> actual trigger/order/reduction verifier for each guard. */
-export async function openAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment,loadRequest,freshAdmission}){
+async function prepareAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment,loadRequest,freshAdmission},verifierOnly=false){
   const freshMode=freshAdmission!==undefined;
   let authenticatedSource,freshSource;
   if(!freshMode){
@@ -131,6 +131,12 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
     return {assignment,assertCurrent,...(freshMode?{async revalidate(){assertCurrent();const refreshed=await freshSource.revalidate(index,freshRead);assertCurrent();
       return {assignment:assignmentRequest(refreshed.decision,snapshot,refreshed.backing),assertCurrent};}}:{})};
   }
+  if(verifierOnly){
+    assert(freshMode,'Process verifier requires fresh admission');
+    return Object.freeze({verifyForGuard,readers,chain,policyDigest,activationId,custodyDomain,backingPolicy,
+      configurations:()=>structuredClone(configs),initial:Object.freeze({decision:runCandidate,observation:runObservation,backing:runBacking}),
+      expectedAssignment:snapshot=>assignmentRequest(runCandidate,snapshot,runBacking),close(){live=false;}});
+  }
   committee=await createCreditCommittee({directory:path.join(directory,'guards'),deployment,verifyForGuard,getStateContext:stateContext,policyDigest,activationId,custodyDomain,backingPolicy,
     ...(freshMode?{contributionPackage:config.contributionPackage}:{})});
   let confirmedAssignment;
@@ -165,3 +171,7 @@ export async function openAuthorizedCredit({directory,source,rawRequest,watcherR
       return {...record,...result,checkpoints:committee.checkpoints(),sourceReceipts:freshMode?[]:readers.map(r=>r.receipts())};
     }};
 }
+
+export const openAuthorizedCredit=options=>prepareAuthorizedCredit(options);
+/** Source, event, payment and reduction checks without creating any signer or ledger. */
+export const openCreditVerifier=options=>prepareAuthorizedCredit(options,true);
