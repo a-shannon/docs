@@ -2,12 +2,12 @@
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
   "fileCount": 468,
-  "aggregateSha256": "822dd3b0db9ea76d93320b3fb5c0177d854842e7a665f5948f525ff8d6068568",
+  "aggregateSha256": "db027d4c2abfb16e5e86f0db81d8b0dbbdd8f81f783da36dd3786153077b8d87",
   "files": [
     {
       "path": "README.md",
-      "bytes": 26885,
-      "sha256": "71b0a4725ff1216e53280f2b9f1ef18bb9378a0f1b7687e3a6afe8d011c354bb"
+      "bytes": 27185,
+      "sha256": "fcdb113344775fa86860540cdcd2a2991213a3b8e98e96fe06f5548a88e158a5"
     },
     {
       "path": "consumer/adapter.ts",

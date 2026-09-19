@@ -182,7 +182,12 @@ node --experimental-vm-modules --import tsx --test ergo-node/watcher-return-runt
 ```
 
 Set `ROUNDTRIP_CONFIG` to the external configuration for the loader-dependent
-checks and `WATCHER_DEPENDENCY_ROOT` to the prepared Rosen root for watcher tests.
+checks. The V2 withdrawal command also requires `MONERO_NODE_NATIVE_SHA256`:
+independently compute the SHA-256 of the configured `nativeBinary`, verify it
+matches `nativeSha256`, then set this variable to that lowercase 64-hex digest.
+The full launcher supplies this variable; direct test commands do not.
+Set `WATCHER_DEPENDENCY_ROOT` to the prepared Rosen root for watcher tests.
+
 The [qualification report](../adapter-qualification.md#complete-local-v2-roundtrip)
 records exact transaction evidence and limitations. Fixture reserves subsidize
 the miner fee; shared administration and production fee-token redemption remain
