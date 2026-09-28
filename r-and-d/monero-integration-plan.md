@@ -77,29 +77,50 @@ to the same intent that watchers and guards are accepting.
    credit ledger. Each guard must atomically reserve that backing before release
    and recheck source facts at its pre-signing boundary.
 
-The [local watcher credit view](https://github.com/a-shannon/docs/blob/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip/source/ergo-node/watcher-credit-view.mjs)
-reads all four configured custody stores and refuses an existing claim or an
-unavailable store. Guards retain the atomic assignment that closes concurrent
-admission races. Independent operators need an authenticated ledger-view delivery
-contract; direct access to local files is the experiment's transport.
+The [published local watcher credit view](https://github.com/a-shannon/docs/blob/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip/source/ergo-node/watcher-credit-view.mjs)
+reads all four configured custody stores from files and refuses an existing claim
+or an unavailable store. Guards retain the atomic assignment that closes
+concurrent admission races. Independent operators need an authenticated
+ledger-view delivery contract; direct access to local files is the published
+experiment's transport.
 
-The proposed independent-operator contract, still to be implemented and reviewed,
-is to replace each of those four file reads with an authenticated response from
-that store's configured guard/custody operator. Before committing, a watcher
-needs the complete intent/payment proof and original-holder certificate, two
-independently administered source views, and fresh responses covering every
-configured credit store for the selected output key and associated image.
-Responses must bind chain, vault, committee/epoch, queried backing, claim state,
-store identity, revision and freshness challenge under configured operator keys.
-The watcher verifies signatures, scope, freshness and retained revision floors;
-any missing response, existing claim, rollback or conflicting evidence blocks
-admission. An unsigned aggregator or a simple majority of available stores is
-not a replacement for this all-store rule. The endpoint roster, key provisioning,
-rotation, freshness bounds and independently retained rollback protection remain
-design decisions. A signed response proves its origin, not that its operator is
-honest. It is also only a read: guards must still reserve atomically and recheck
-before signing to close races after the watcher reads. Operators do not give
-watchers custody databases, spend shares or signing keys.
+Separately, an unpublished local candidate replaces those file reads with four
+authenticated HTTP endpoints. Its uncommitted source trees have base commits
+`rosen-bridge/utils@f1e1c6ea4cd796beed11d4cfc35bf4cffb73458d`,
+`rosen-bridge/watcher@13b4c76ee7803bdf5f052e33cdc12b66acac2db0` and
+`rosen-bridge/guard-service@25bea1bc89f299bc897991123745b162c106e66f`;
+the commits identify repository bases, not the unpublished HTTP implementation.
+A Node 22 integration test starts four actual Fastify routes over four real SQLite
+ledgers, signs each response with the installed Rosen guard ECDSA implementation,
+and drives the real HTTP client through fresh, assigned and invalidated states.
+That test captures the checkpoints delivered to its retention callback. A
+separate bounded five-process run connects those actual route, ledger and signer
+implementations to the real HTTP client, watcher SQLite watermark and signing
+gate. It rejects one corrupt guard signature, changes source state only after a
+guard signer reports that the request is pending, rejects fresh guard stores at
+revision 0 after retaining revision 2 and reopening the watermark, then accepts
+the same revision-2 state after another guard-worker restart. The source
+inspection remains a fixture and the watcher process itself is not restarted;
+the services also share locally controlled keys and data. This qualifies the
+local producer-to-consumer and persisted rollback joins, not an independently
+operated deployment.
+
+The production contract still requires review and qualification. Before
+committing, a watcher needs the complete intent/payment proof and original-holder
+certificate, two independently administered source views, and fresh responses
+covering every configured credit store for the selected output key and associated
+image. The experimental signed response binds the queried backing and fresh
+request nonce, guard/store identity, claim state, configuration digest, revision
+and state digest under its configured key. The watcher verifies signatures,
+scope, freshness and retained revision floors; any missing response, existing
+claim, rollback or conflicting evidence blocks admission. An unsigned aggregator
+or a simple majority of available stores is not a replacement for this all-store
+rule. Production TLS, endpoint ownership, key provisioning and rotation,
+freshness bounds, independently retained rollback protection and operator-fault
+exercises remain open. A signed response proves its origin, not that its operator
+is honest. It is also only a read: guards must still reserve atomically and
+recheck before signing to close races after the watcher reads. Operators do not
+give watchers custody databases, spend shares or signing keys.
 
 The identity has two uses. `(txid, local output index)` locates the intended
 receipt. The output key and associated image prevent a second economic claim
@@ -178,9 +199,21 @@ arrival times and local retrieval identifiers must not enter the event hash.
 Every eventual commitment must reconstruct the same descriptor, while each
 reader rechecks current canonical state, expiry and novelty. Unavailable readers
 can therefore stall the quorum; availability is not solved by determinism.
-Production acceptance needs a two-watcher test with proof/certificate arrival
-orders reversed, a missing reader, conflicting delivery, restart and expiry,
-demonstrating equal commitments or no commitment as appropriate.
+Local source/proof tests cover reversed endpoint completion order, missing or
+faulty evidence, expiry, restart and a source reorg while admission waits. A
+separate two-database test runs two real admission consumers, two observation
+extractors/candidate stores and four SQLite connections. Opposite availability
+of the atomic intent/proof envelope and certificate produces no observation;
+after completion in reversed order, both stores persist the same 16 observation
+fields without duplication. Evidence completed after expiry still produces no
+observation and does not invoke proof verification. The network, native observer
+and proof-verifier ports use existing synthetic fixtures, and the current API
+carries intent and proof together in one envelope. This therefore does not prove
+three independently arriving components, HTTP/node compatibility, cryptographic
+proof validity, independently operated watchers or equal signed event bytes.
+Production acceptance still needs that service-level two-watcher exercise,
+including a missing reader and conflicting delivery, demonstrating equal
+commitments or no commitment as appropriate.
 
 Copied output keys are not resolved by globally blacklisting every repeated
 key: that could let an unrelated copied output disable an authenticated deposit.
@@ -324,10 +357,17 @@ and render the origin descriptor as non-sendable in operator and user views.
 ### FCMP++/Carrot migration gate
 
 The [signing note's protocol boundary](monero-signing.md#protocol-upgrade-boundary)
-identifies the upstream work and the missing replacement. No post-fork threshold
-spend engine is supplied by this proposal. Before any deployment, assign an
-upgrade owner and a halt/drain plan that leaves time to stop new deposits and
-settle outstanding liabilities while the qualified spend path remains valid.
+identifies the upstream work and the missing integration. At upstream
+`monero-oxide` commit
+[`77788c368145127f2dde2ac3e2ddce919f3ddd01`](https://github.com/monero-oxide/monero-oxide/tree/77788c368145127f2dde2ac3e2ddce919f3ddd01),
+the modern and legacy SAL threshold primitive tests both pass under the locked
+`multisig` feature. Those tests exercise the two signing/verification primitive
+paths; they do not qualify a post-fork wallet spend engine. The pinned wallet/send path
+still constructs and completes CLSAG transactions and has not demonstrated a
+node-accepted FCMP++/Carrot transaction, including for an old vault output.
+Before any deployment, assign an upgrade owner and a halt/drain plan that leaves
+time to stop new deposits and settle outstanding liabilities while the qualified
+spend path remains valid.
 If a replacement is unavailable, remain paused; keeping old outputs is not a
 migration strategy. Production certificate and event formats must bind an
 explicit protocol/profile version, with unknown versions refused and accepted

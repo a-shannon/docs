@@ -254,7 +254,23 @@ Tests that exercise these boundaries include:
 
 This walkthrough qualifies the pinned CLSAG path only. FCMP++ changes membership
 proofs, while spend authorization remains a separate obligation; it does not
-make the imported threshold-CLSAG machine a post-fork signer. The upstream
+make the imported threshold-CLSAG machine a post-fork signer. At upstream
+`monero-oxide` commit
+[`77788c368145127f2dde2ac3e2ddce919f3ddd01`](https://github.com/monero-oxide/monero-oxide/tree/77788c368145127f2dde2ac3e2ddce919f3ddd01),
+the locked command `cargo test --locked -p monero-fcmp-plus-plus --features
+multisig test_sal_ -- --nocapture` passes both real SAL threshold tests:
+[`test_sal_multisig`](https://github.com/monero-oxide/monero-oxide/blob/77788c368145127f2dde2ac3e2ddce919f3ddd01/monero-oxide/ringct/fcmp%2B%2B/src/tests/sal/multisig.rs#L17)
+and
+[`test_sal_legacy_multisig`](https://github.com/monero-oxide/monero-oxide/blob/77788c368145127f2dde2ac3e2ddce919f3ddd01/monero-oxide/ringct/fcmp%2B%2B/src/tests/sal/legacy_multisig.rs#L20).
+These tests exercise modern and legacy SAL signing/verification primitives. They
+do not qualify wallet transaction construction or node acceptance. At the same
+pin, wallet multisig still instantiates
+[`ClsagMultisig`](https://github.com/monero-oxide/monero-oxide/blob/77788c368145127f2dde2ac3e2ddce919f3ddd01/monero-oxide/wallet/src/send/multisig.rs#L24-L104),
+completes
+[`RctPrunable::Clsag`](https://github.com/monero-oxide/monero-oxide/blob/77788c368145127f2dde2ac3e2ddce919f3ddd01/monero-oxide/wallet/src/send/multisig.rs#L363),
+and accepts only the two
+[`Clsag` RingCT forms](https://github.com/monero-oxide/monero-oxide/blob/77788c368145127f2dde2ac3e2ddce919f3ddd01/monero-oxide/wallet/src/send/mod.rs#L297-L299).
+The upstream
 [FCMP++ integration draft](https://github.com/monero-project/monero/pull/9436),
 reviewed at `23b1b35ba7c7a8e758e1729546b71a9a97291dde`, includes migration of
 legacy outputs into the membership tree and key-image handling. Outputs created
@@ -269,7 +285,8 @@ for continuity of payment proofs, not qualification of this Core `wallet2`
 helper, holder certificate or output-bound composition across the fork. The
 [Carrot integration draft](https://github.com/monero-project/monero/pull/9697),
 reviewed at `40b04ef372d191f8991da22c220ccce2ba457b47`, still lists wallet/proof
-integration and multisig work; no replacement threshold engine is delivered here.
+integration and multisig work. The SAL primitives above narrow the missing
+cryptographic work, but no integrated replacement spend path is delivered here.
 
 The migration acceptance check must pin the actual node, wallet and threshold
 engine, then demonstrate a spend of a pre-upgrade vault output under post-upgrade
