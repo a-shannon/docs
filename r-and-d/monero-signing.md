@@ -250,6 +250,39 @@ Tests that exercise these boundaries include:
 - [`participantSigningFaults.spec.ts`](https://github.com/a-shannon/docs/blob/60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7/r-and-d/monero-integration/roundtrip/source/consumer/participantSigningFaults.spec.ts) and [`distributedWithdrawal.spec.ts`](https://github.com/a-shannon/docs/blob/60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7/r-and-d/monero-integration/roundtrip/source/consumer/distributedWithdrawal.spec.ts) for authenticated process exchange, interruption, replay, recovery, and single use;
 - [`nodeWithdrawal.spec.ts`](https://github.com/a-shannon/docs/blob/60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7/r-and-d/monero-integration/roundtrip/source/consumer/nodeWithdrawal.spec.ts) for exact-byte submission, altered-byte rejection, and node observation.
 
+## Protocol upgrade boundary
+
+This walkthrough qualifies the pinned CLSAG path only. FCMP++ changes membership
+proofs, while spend authorization remains a separate obligation; it does not
+make the imported threshold-CLSAG machine a post-fork signer. The upstream
+[FCMP++ integration draft](https://github.com/monero-project/monero/pull/9436),
+reviewed at `23b1b35ba7c7a8e758e1729546b71a9a97291dde`, includes migration of
+legacy outputs into the membership tree and key-image handling. Outputs created
+before activation therefore need a qualified post-upgrade spend path too.
+Monero's [current key-image implementation](https://github.com/monero-project/monero/blob/2f9d1bbb2c553dc75f3335bd1452117dfddd86fa/src/crypto/crypto.cpp)
+explicitly labels its existing derivation as pre-FCMP++/Carrot. These source
+snapshots do not establish an activation date or deployed consensus rules.
+
+Carrot's [core payment-proof tests](https://github.com/monero-project/monero/blob/79aa8910218b889b0c0bacfa00efda1405b0f53e/tests/unit_tests/carrot_core.cpp)
+exercise version-2 incoming/outgoing proof primitives. That is useful evidence
+for continuity of payment proofs, not qualification of this Core `wallet2`
+helper, holder certificate or output-bound composition across the fork. The
+[Carrot integration draft](https://github.com/monero-project/monero/pull/9697),
+reviewed at `40b04ef372d191f8991da22c220ccce2ba457b47`, still lists wallet/proof
+integration and multisig work; no replacement threshold engine is delivered here.
+
+The migration acceptance check must pin the actual node, wallet and threshold
+engine, then demonstrate a spend of a pre-upgrade vault output under post-upgrade
+rules and a full new-format deposit/return. Cover output scanning, key-image
+association and spentness, transaction construction/serialization, payment-proof
+message and amount binding, holder-certificate protocol versions, and retained
+uniqueness/liability state. Include unsupported-version rejection, invalid
+cross-version proof/certificate combinations and recovery across activation or
+rollback. The production certificate schema must authenticate a protocol/profile
+version and explicit migration rules; existing version/domain fields alone do
+not prove those rules. Until this gate passes, the integration needs an owned
+halt/drain plan as described in the [integration document](monero-integration-plan.md#fcmpcarrot-migration-gate).
+
 ## Limitations
 
 This is a bounded, offline fakechain qualification profile. It fixes hard fork 16,

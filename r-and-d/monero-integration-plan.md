@@ -1,6 +1,6 @@
 # Monero integration into Rosen
 
-A. Shannon · 18 September 2026 · Draft integration document — RCS-003
+A. Shannon · Updated 28 September 2026 · Draft integration document — RCS-003
 
 The proposed first adapter connects native XMR to Ergo using output-specific
 deposit verification and the Rust wallet's threshold CLSAG signing path. A
@@ -8,6 +8,13 @@ runnable local experiment exercises the deposit, Rosen credit, redemption,
 Monero payment and Ergo reward distribution on isolated nodes. Adopting it as a production Rosen network
 requires decisions on deposit-proof delivery and output agreement, followed by
 adapter and operational qualification.
+
+The demonstrated custody profile is **2-of-4 Monero holders**, with a separate
+**3-of-4 Rosen guard approval** enforced by the participant software. Two
+colluding holders can bypass that software check; this is not 3-of-4 custody.
+Both thresholds and their fault assumptions require Rosen approval. The profile
+is pre-FCMP++/Carrot; retaining old vault outputs does not establish that its
+signer can spend them after a protocol upgrade.
 
 This is the single integration document for the RCS requirements review.
 [CLSAG signing and transaction construction](monero-signing.md) is its detailed
@@ -76,6 +83,24 @@ unavailable store. Guards retain the atomic assignment that closes concurrent
 admission races. Independent operators need an authenticated ledger-view delivery
 contract; direct access to local files is the experiment's transport.
 
+The proposed independent-operator contract, still to be implemented and reviewed,
+is to replace each of those four file reads with an authenticated response from
+that store's configured guard/custody operator. Before committing, a watcher
+needs the complete intent/payment proof and original-holder certificate, two
+independently administered source views, and fresh responses covering every
+configured credit store for the selected output key and associated image.
+Responses must bind chain, vault, committee/epoch, queried backing, claim state,
+store identity, revision and freshness challenge under configured operator keys.
+The watcher verifies signatures, scope, freshness and retained revision floors;
+any missing response, existing claim, rollback or conflicting evidence blocks
+admission. An unsigned aggregator or a simple majority of available stores is
+not a replacement for this all-store rule. The endpoint roster, key provisioning,
+rotation, freshness bounds and independently retained rollback protection remain
+design decisions. A signed response proves its origin, not that its operator is
+honest. It is also only a read: guards must still reserve atomically and recheck
+before signing to close races after the watcher reads. Operators do not give
+watchers custody databases, spend shares or signing keys.
+
 The identity has two uses. `(txid, local output index)` locates the intended
 receipt. The output key and associated image prevent a second economic claim
 under another txid. A different locator does not by itself create new backing.
@@ -97,7 +122,8 @@ and decoded trigger. This avoids changing the generic event/register format for
 the experiment. **This overload needs Rosen's explicit schema approval:** RCS
 defines `fromAddress` as the source address. Monero does not expose a dependable
 sender address to reconstruct. The proposal is to accept the typed descriptor
-and audit every consumer, API, display and refund path; alternatively Rosen can
+and audit every consumer, including watcher UI/API, third-party monitors, displays
+and refund paths; alternatively Rosen can
 select a separate origin field and its encoding. A refund destination needs
 separate authorization in either case. Generic address-based refunds cannot
 consume this descriptor. The experiment does not settle that schema decision.
@@ -137,6 +163,24 @@ Bounded local retries and database reopening have been exercised; production
 certificate provisioning, retention, redundant retrieval and wallet support
 remain open. The experimental format and network tags are not assigned Rosen
 standards.
+
+For the proposed service contract, observing a memo creates a durable pending
+candidate, not an admissible event. Readers must obtain and validate the complete
+matching intent, proof and holder-certificate bundle before producing any
+commitment. Missing or late components leave it pending with a visible
+`proof-unavailable` state and bounded retry/backoff until its authenticated
+expiry; expired or invalid evidence cannot commit. Retrieval must address an
+immutable, digest-bound bundle rather than silently replacing bytes under a txid.
+The holder certificate must bind the same output and intent; mixing versions or
+conflicting valid bundles for one candidate must stop admission and raise an
+alert. A watcher with all valid evidence may advance while another waits;
+arrival times and local retrieval identifiers must not enter the event hash.
+Every eventual commitment must reconstruct the same descriptor, while each
+reader rechecks current canonical state, expiry and novelty. Unavailable readers
+can therefore stall the quorum; availability is not solved by determinism.
+Production acceptance needs a two-watcher test with proof/certificate arrival
+orders reversed, a missing reader, conflicting delivery, restart and expiry,
+demonstrating equal commitments or no commitment as appropriate.
 
 Copied output keys are not resolved by globally blacklisting every repeated
 key: that could let an unrelated copied output disable an authenticated deposit.
@@ -213,6 +257,83 @@ restart. Removing its backing block quarantines the liability rather than
 erasing the credit or issuing a replacement. These are bounded local checks,
 not a claim about production storage failure or network fork selection.
 
+### Confirmation and reorg policy
+
+Ten confirmations are a fixture setting, not economic finality. The
+[first-party reorg archive](https://github.com/WeebDataHoarder/Monero-Timeline-Sep14/tree/5fc8a5b9b43e4ba6e446728048a9973c4da167e1)
+records 18 orphaned blocks on 14 September 2025 and 10 on 18 September 2025.
+Choosing a number above those observations would still not guarantee finality.
+Rosen must select a risk-based production depth, exposure limits and emergency
+pause/recovery ownership separately from Monero's output unlock rules.
+
+The service integration must distinguish these cases:
+
+| Source reorg timing | Required response |
+| --- | --- |
+| Candidate only | Invalidate the removed occurrence and rescan. Reinclusion requires fresh canonical evidence and the full confirmation policy. |
+| Watcher commitment or trigger already on Ergo, no credit released | Stop advancement of that occurrence and reject its stale descriptor at guard revalidation. An existing Ergo commitment is not erased by a Monero rollback; expiry/cleanup must follow Rosen's accepted lifecycle. Revalidate immediately before each release contribution. |
+| Credit already released, or signed destination payment exists | Retain the liability and permanent output-key/image uniqueness claims, quarantine affected backing and pause affected releases pending reconciliation. Do not assume source rollback reverses destination settlement or authorizes another payment. |
+
+Reinclusion changes the occurrence's block anchor; it must not create a second
+economic credit. The pinned lab exercises source replacement and post-credit
+quarantine, but production watcher commitment/trigger cleanup, a reorg racing
+release and reserve-wide recovery still need qualification through the actual
+services. A short fakechain reorg demonstrates the transition, not resilience
+to every public-network attack depth.
+
+### Node access and operator visibility
+
+The proposed first deployment requires **two independent daemon views per
+watcher**, not necessarily two locally hosted daemons. One operator-owned
+`monerod` plus a second independently administered daemon is a possible topology;
+two URLs backed by one node or operator do not establish independence. Neither
+endpoint may be silently dropped on disagreement or outage. Endpoint ownership,
+historical availability and failover policy need acceptance and a live trial.
+
+Use restricted RPC bound to loopback for local watcher access. Remote comparison
+access requires an authenticated private tunnel or equivalent protected channel
+to the remote restricted interface; do not expose an unrestricted daemon RPC.
+Qualify every required RPC under that restriction, including historical
+transaction/output retrieval and key-image spentness, rather than relaxing the
+restriction to make the adapter run.
+
+A pruned daemon still validates the chain and retains its transaction history,
+but removes most old ring-signature data ([Monero pruning documentation](https://www.getmonero.org/resources/moneropedia/pruning.html)).
+That is not yet proof that this adapter's complete historical replay works on
+pruned responses. Qualify scanning, output indices, proof verification,
+spentness, restart/rescan and reorg recovery on genuinely pruned old data; if
+any consumer needs unavailable full bytes, require an archival source explicitly.
+Pruned-only deployment remains unqualified until that check passes.
+
+For initial budgeting, the [official node guide](https://docs.getmonero.org/running-node/monerod-systemd/#assumptions)
+recommends 4 GB or more RAM and available SSD capacity of 625 GiB or more for a
+full node, or 250 GiB or more for a pruned node. Its measured chain sizes are
+dated 20 January 2026; these are provisioning references, not measured Rosen
+requirements or a forecast for FCMP++/Carrot. Budget each hosted node separately,
+plus watcher databases, proof retention, logs, growth and rescan headroom; record
+peak RAM, disk and catch-up time against the actual deployment version.
+
+Watcher sync health must ship with the first service join. Report source tip and
+scan lag, last agreed block, endpoint disagreement/unavailability, missing or
+invalid proof, unavailable/stale credit view, reorg quarantine and unsupported
+protocol as separate degraded or blocked states. Surface them in the watcher
+API/UI and monitoring integration; a healthy daemon or reserve balance must not
+hide blocked admission. Display the 2-of-4 holder / 3-of-4 approval distinction
+and render the origin descriptor as non-sendable in operator and user views.
+
+### FCMP++/Carrot migration gate
+
+The [signing note's protocol boundary](monero-signing.md#protocol-upgrade-boundary)
+identifies the upstream work and the missing replacement. No post-fork threshold
+spend engine is supplied by this proposal. Before any deployment, assign an
+upgrade owner and a halt/drain plan that leaves time to stop new deposits and
+settle outstanding liabilities while the qualified spend path remains valid.
+If a replacement is unavailable, remain paused; keeping old outputs is not a
+migration strategy. Production certificate and event formats must bind an
+explicit protocol/profile version, with unknown versions refused and accepted
+legacy verification rules preserved for reconciliation. Adding a field alone
+does not migrate existing certificates, key images, uniqueness records or keys.
+
 ## Scope for the next implementation contribution
 
 The requested review is acceptance or correction of this integration profile:
@@ -223,8 +344,10 @@ The requested review is acceptance or correction of this integration profile:
    extraction, agreement, API/display and credit consumers.
 3. Rust threshold CLSAG custody, including the guard-to-holder mapping,
    cryptographic threshold, fault assumptions and recovery ownership above.
-4. Effective-fee and confirmation policies, supported wallet/address forms and
-   independently administered source endpoints for the first deployment.
+4. Effective-fee and confirmation policies, post-commitment reorg handling,
+   supported wallet/address forms and independently administered source endpoints.
+5. Authenticated watcher credit-view delivery, immutable proof-bundle timing,
+   node/pruning qualification and an owned FCMP++/Carrot migration or halt plan.
 
 After that review, take the module contributions in the sequence above and then
 close their service joins. Existing experiments and the signer draft are evidence
