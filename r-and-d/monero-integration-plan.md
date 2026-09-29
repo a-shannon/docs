@@ -1,6 +1,6 @@
 # Monero integration into Rosen
 
-A. Shannon · Updated 28 September 2026 · Draft integration document — RCS-003
+A. Shannon · Updated 29 September 2026 · Draft integration document — RCS-003
 
 The proposed first adapter connects native XMR to Ergo using output-specific
 deposit verification and the Rust wallet's threshold CLSAG signing path. A
@@ -74,13 +74,15 @@ to the same intent that watchers and guards are accepting.
    A daemon's answer about an arbitrary supplied key image is insufficient.
 4. Require canonical inclusion, confirmations and current policy. Before watcher
    commitments, check that the output key and associated image are new to the
-   credit ledger. Each guard must atomically reserve that backing before release
-   and recheck source facts at its pre-signing boundary.
+   credit ledger. Each guard must atomically reserve that backing in its own store
+   before contributing to credit and recheck source facts at its pre-signing
+   boundary. Local atomicity does not choose a common winner across guards.
 
 The [published local watcher credit view](https://github.com/a-shannon/docs/blob/9466cf2fadd266f20e927da938e074b8ef60dacf/r-and-d/monero-integration/roundtrip/source/ergo-node/watcher-credit-view.mjs)
 reads all four configured custody stores from files and refuses an existing claim
-or an unavailable store. Guards retain the atomic assignment that closes
-concurrent admission races. Independent operators need an authenticated
+or an unavailable store. Guards retain atomic local assignments; the all-store
+read itself neither reserves backing nor closes concurrent admission races.
+Independent operators need an authenticated
 ledger-view delivery contract; direct access to local files is the published
 experiment's transport.
 
@@ -105,22 +107,92 @@ the services also share locally controlled keys and data. This qualifies the
 local producer-to-consumer and persisted rollback joins, not an independently
 operated deployment.
 
-The production contract still requires review and qualification. Before
-committing, a watcher needs the complete intent/payment proof and original-holder
-certificate, two independently administered source views, and fresh responses
-covering every configured credit store for the selected output key and associated
-image. The experimental signed response binds the queried backing and fresh
-request nonce, guard/store identity, claim state, configuration digest, revision
-and state digest under its configured key. The watcher verifies signatures,
-scope, freshness and retained revision floors; any missing response, existing
-claim, rollback or conflicting evidence blocks admission. An unsigned aggregator
-or a simple majority of available stores is not a replacement for this all-store
-rule. Production TLS, endpoint ownership, key provisioning and rotation,
-freshness bounds, independently retained rollback protection and operator-fault
-exercises remain open. A signed response proves its origin, not that its operator
-is honest. It is also only a read: guards must still reserve atomically and
-recheck before signing to close races after the watcher reads. Operators do not
-give watchers custody databases, spend shares or signing keys.
+### Credit-view filtering and reservation safety
+
+The credit view is preflight filtering to reduce watcher commitments that guards
+would later refuse. Ergo contracts do not verify these HTTP responses or store
+checkpoints. The experimental signed response binds the queried backing and a
+random request nonce, guard/store identity, claim state, configuration digest,
+revision and state digest under its configured key. The client checks signatures,
+scope, request binding and retained revision floors, within a local request
+timeout. This proves response origin and request binding, not ledger currency,
+completeness or operator honesty. The response has no authenticated issuance
+time, expiry or source-tip anchor.
+
+Every configured store must respond with unclaimed backing. One missing or
+refusing store blocks admission, so the least available store has a liveness veto
+and can selectively deny service. A majority-of-available fallback would change
+the policy. Production acceptance must explicitly accept this availability cost
+and require persistent per-store diagnostics: identity, request digest, received
+time, authenticated checkpoint when available, and distinct unavailable, invalid,
+claimed, rollback, conflicting and policy-stale outcomes. The current client
+returns aggregate refusal categories; it does not provide that diagnostic history.
+An unavailable response alone cannot distinguish deliberate denial from failure.
+
+The local assignment is first-arrival-wins at each guard, with no global winner
+rule. A bounded check against four real SQLite assignment stores starts with four
+`new` responses, then delivers conflicting candidates in opposite orders: two
+stores reserve A, two reserve B, and all refuse the other candidate. This proves
+divergent reservations and loss of progress, not two released credits.
+
+In the coordinated service candidate, Monero-to-Ergo credit requires 3-of-4
+Ergo guard contributions, with assignment checked before each contribution. Two
+conflicting sets of three guards intersect in at least two guards. With at most
+one Byzantine guard, a fixed committee, durable non-rollbackable honest
+reservations and active contribution hooks, an honest intersecting guard must
+refuse the second credit. These are necessary assumptions, not a distributed
+reservation implementation or a completed service qualification. The local
+installed `ergo-multi-sig` 3.0.1 lacks the required hook and is rejected by the
+candidate's version gate; the coordinated hook remains a separate draft.
+
+The 2-of-4 Monero custody threshold concerns withdrawals, not issuance of credit
+on Ergo. The tested withdrawal service fixes participants 1 and 2; it does not
+implement arbitrary disjoint signer subsets. Two colluding holders can still
+spend outside that software policy. Rosen must choose either an explicit halt
+and reconciliation policy for reservation divergence or a reviewed inter-guard
+agreement mechanism. Local sorting, timeout or invalidation cannot justify
+automatically freeing a claim. The next service test must carry opposite-order
+reservations through the actual Ergo contribution hooks and demonstrate the
+absence of two conflicting 3-of-4 authorizations, including the blocked 2/2 case.
+
+### Enrollment, equivocation and freshness
+
+The SQLite watermark only protects history that a watcher has retained. An empty
+watcher starts with no revision floor and accepts its first otherwise valid
+signed snapshot. Opening a missing existing database already fails closed;
+deleting the volume and explicitly bootstrapping again loses that history.
+It needs an independently trusted enrollment checkpoint and a
+defined store identity/incarnation and recovery policy before production use;
+durability alone is not bootstrap trust. Key provisioning, rotation, endpoint
+ownership and protected transport remain unqualified. Watchers must not receive
+custody databases, spend shares or signing keys.
+
+A watcher rejects a changed state digest at an equal retained revision. Two
+watchers shown different signed states at that revision do not compare them in
+the current implementation. Cross-watcher equivocation detection needs an
+accepted receipt exchange, audit or transparency mechanism, with evidence
+retention and an operator response. A larger revision is not proof of a current
+snapshot, and a fresh nonce does not stop an operator signing an old state again.
+
+The clocks currently have different authorities and starting points:
+
+| Boundary | Clock and current rule | Limit |
+| --- | --- | --- |
+| Deposit intent admission | Authenticated `expiry_height`, interpreted as Monero height; admission checks `current tip + 1 <= expiry_height`. | Not a wall-clock deadline or an Ergo refund rule. |
+| Credit-view request | Local elapsed request timeout and nonce binding. | No authenticated age or expiry of the returned ledger snapshot. |
+| Guard pending-payment timeout | For events in `pendingPayment`, wall-clock timeout defaults to 24 hours from `firstTry`. | Not a deadline shared by all event states or derived from intent expiry or watcher commitment time. |
+| Unmerged commitment redemption | Watcher policy uses Ergo confirmations, configured as 1,440; observation absence has its own invalid-commitment path. | The contract's WID-authorized self-redeem branch does not itself impose this timeout. |
+| Trigger cleanup eligibility | Contract configuration uses 21,600 Ergo blocks from trigger creation, approximately 30 days at nominal spacing. | Enables the punitive cleanup branch, not automatic return of permits. |
+
+No common deadline invariant connects these clocks. Production policy must choose
+authenticated freshness anchors and age/skew limits, a source-tip agreement rule,
+and an admission margin that leaves time for guard processing before the intent
+expires. Watchers must not create commitments after the accepted processing
+window has closed. Timeout or expiry must not release an existing reservation or
+erase a signed/settled liability. Those policies and their cross-chain boundary
+tests are acceptance gates, not implied by the present local timeout checks.
+
+### Event identity and diagnostic receipts
 
 The identity has two uses. `(txid, local output index)` locates the intended
 receipt. The output key and associated image prevent a second economic claim
@@ -136,6 +208,15 @@ excluded so independent readers can agree. Each reader still checks its own
 current source snapshot. Reinclusion changes the occurrence descriptor without
 freeing the permanent economic claim. The earlier delivery profile used V1;
 its evidence does not imply a V1-to-V2 custody migration.
+
+The descriptor does not currently bind the proof-bundle bytes or store
+checkpoints. For refusal diagnosis, the proposed service should retain an
+authenticated sidecar receipt linking the event descriptor, immutable bundle
+digest, request digest and each signed store response. That receipt is not yet
+implemented. Store revisions must not simply be added to the common event hash:
+honest watchers querying at different times can see different revisions for the
+same unclaimed output. Any event-level proof-bundle commitment needs an accepted
+canonical bundle schema and migration, distinct from per-reader diagnostics.
 
 The existing watcher commitment and EventTrigger serialization include this
 field; the guard compares the reconstructed descriptor with both the observation
@@ -304,8 +385,32 @@ The service integration must distinguish these cases:
 | Source reorg timing | Required response |
 | --- | --- |
 | Candidate only | Invalidate the removed occurrence and rescan. Reinclusion requires fresh canonical evidence and the full confirmation policy. |
-| Watcher commitment or trigger already on Ergo, no credit released | Stop advancement of that occurrence and reject its stale descriptor at guard revalidation. An existing Ergo commitment is not erased by a Monero rollback; expiry/cleanup must follow Rosen's accepted lifecycle. Revalidate immediately before each release contribution. |
+| Unmerged watcher commitment, no credit released | Stop advancement and reject the stale descriptor. After deletion of the observation, the existing watcher invalid-commitment path can self-redeem the unmerged commitment using its WID. Source rollback alone does not spend it. |
+| Trigger exists, no credit released | Stop advancement and reject the stale descriptor. RWT already merged into the trigger remains locked until that trigger is spent. There is no autonomous expiry-and-return branch; a qualified guard-authorized return or an explicitly accepted punitive cleanup outcome is required. Unmerged commitments remain a separate case. |
 | Credit already released, or signed destination payment exists | Retain the liability and permanent output-key/image uniqueness claims, quarantine affected backing and pause affected releases pending reconciliation. Do not assume source rollback reverses destination settlement or authorizes another payment. |
+
+At [contract `d451b36`](https://github.com/rosen-bridge/contract/blob/d451b367ea87efa4c8f770c5af8f3a75b5629848/src/main/scala/rosen/bridge/scripts/EventTrigger.es#L16),
+the trigger can return permits with a guard-authorized Lock input or create Fraud
+boxes after the cleanup delay. [Lock](https://github.com/rosen-bridge/contract/blob/d451b367ea87efa4c8f770c5af8f3a75b5629848/src/main/scala/rosen/bridge/scripts/Lock.es#L1)
+requires the guard quorum; it does not itself prove an external payment. Thus a
+non-punitive guard-authorized return may fit the existing permit branch, but no
+service workflow for refusing a Monero trigger that way is qualified here.
+[Commitment self-redemption](https://github.com/rosen-bridge/contract/blob/d451b367ea87efa4c8f770c5af8f3a75b5629848/src/main/scala/rosen/bridge/scripts/Commitment.es#L102)
+does not require the trigger to have been spent; the
+[watcher policy](https://github.com/rosen-bridge/watcher/blob/f478f6c07cfebde0a51053c33c484235ba9d0c11/src/utils/watcherUtils.ts#L432)
+treats a missing observation as an invalid commitment.
+
+Cleanup creates Fraud boxes before a separate slash transaction removes the RSN
+backing the returned RWT; this is not a refund guarantee or immediate destruction
+of every watcher's entire collateral. The public cleanup service at
+[`3b3cdb5`](https://github.com/rosen-bridge/cleanup-service/blob/3b3cdb596516abc1ffaa53e0c6c6925fbc87ee39/src/main/scala/rosen/cleanup/Procedures.scala#L29)
+attempts cleanup based on age without classifying source reorg versus fraud.
+Its embedded register and transaction-input layouts predate `d451b36`, so that
+source does not establish compatible or deployed cleanup behavior. Activation
+must identify the actual cleanup implementation and policy and explicitly accept
+the pre-commitment reorg exposure, including watcher RWT/RSN consequences. Neither
+a depth above the observed 18-block orphan nor a future cleanup timer resolves
+this operational decision by itself.
 
 Reinclusion changes the occurrence's block anchor; it must not create a second
 economic credit. The pinned lab exercises source replacement and post-credit
@@ -322,6 +427,15 @@ watcher**, not necessarily two locally hosted daemons. One operator-owned
 two URLs backed by one node or operator do not establish independence. Neither
 endpoint may be silently dropped on disagreement or outage. Endpoint ownership,
 historical availability and failover policy need acceptance and a live trial.
+
+Agreement on a block is not proof that either daemon is current. Two views can
+agree on a stale fork, and the current guard source adapter revalidates through
+its single configured connector. Its block/tip consistency checks do not establish
+independent chain agreement or a freshness bound. Before qualification, select
+the independent reference views, acceptable tip age/lag and disagreement rules,
+then bind and recheck that accepted source context at each release contribution.
+Exercise two agreeing stale views, one lagging/unavailable view, and a reorg
+during authorization. Depth-only acceptance cannot pass those cases.
 
 Use restricted RPC bound to loopback for local watcher access. Remote comparison
 access requires an authenticated private tunnel or equivalent protected channel
@@ -387,7 +501,10 @@ The requested review is acceptance or correction of this integration profile:
 4. Effective-fee and confirmation policies, post-commitment reorg handling,
    supported wallet/address forms and independently administered source endpoints.
 5. Authenticated watcher credit-view delivery, immutable proof-bundle timing,
-   node/pruning qualification and an owned FCMP++/Carrot migration or halt plan.
+   including enrollment anchors, cross-watcher equivocation evidence, per-store
+   visibility, explicit clock/freshness rules and a reservation-divergence policy.
+6. Node/pruning qualification, current independent source agreement at guard
+   contribution, and an owned FCMP++/Carrot migration or halt plan.
 
 After that review, take the module contributions in the sequence above and then
 close their service joins. Existing experiments and the signer draft are evidence
