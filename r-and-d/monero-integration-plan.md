@@ -29,6 +29,14 @@ establish approval of the integration or completion of the upstream module and
 service contributions. The existing [sign-protocols draft](https://github.com/rosen-bridge/sign-protocols/pull/2)
 is a proposed reusable authorization hook, not acceptance of this Monero design.
 
+**Implementation status:** further implementation is paused pending Rosen's
+review of this RCS document and agreement on the next scope. The proposal below
+incorporates the operator-review corrections and separates existing experimental
+evidence from unresolved design choices. Existing candidate code is retained for
+review; its presence does not imply an accepted implementation direction.
+The contribution sequence and qualification tests below are conditional future
+work; current work is limited to documentation for this review.
+
 ## RCS requirements
 
 This mapping follows [Rosen Contribution Standards](https://github.com/rosen-bridge/rcs/tree/7b9784dae9d8d5b66b80de7a6043d1ba36a3a4bf).
@@ -488,7 +496,7 @@ explicit protocol/profile version, with unknown versions refused and accepted
 legacy verification rules preserved for reconciliation. Adding a field alone
 does not migrate existing certificates, key images, uniqueness records or keys.
 
-## Scope for the next implementation contribution
+## Decisions requested for RCS review
 
 The requested review is acceptance or correction of this integration profile:
 
