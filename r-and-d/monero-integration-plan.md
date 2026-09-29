@@ -394,7 +394,7 @@ The service integration must distinguish these cases:
 | --- | --- |
 | Candidate only | Invalidate the removed occurrence and rescan. Reinclusion requires fresh canonical evidence and the full confirmation policy. |
 | Unmerged watcher commitment, no credit released | Stop advancement and reject the stale descriptor. After deletion of the observation, the existing watcher invalid-commitment path can self-redeem the unmerged commitment using its WID. Source rollback alone does not spend it. |
-| Trigger exists, no credit released | Stop advancement and reject the stale descriptor. RWT already merged into the trigger remains locked until that trigger is spent. There is no autonomous expiry-and-return branch; a qualified guard-authorized return or an explicitly accepted punitive cleanup outcome is required. Unmerged commitments remain a separate case. |
+| Trigger exists, no credit released | Stop advancement and reject the stale descriptor. RWT already merged into the trigger remains locked until that trigger is spent. There is no autonomous expiry-and-return branch. The reported cleanup behavior is punitive; the proposed non-punitive resolution below remains an RCS decision and qualification gate. Unmerged commitments remain a separate case. |
 | Credit already released, or signed destination payment exists | Retain the liability and permanent output-key/image uniqueness claims, quarantine affected backing and pause affected releases pending reconciliation. Do not assume source rollback reverses destination settlement or authorizes another payment. |
 
 At [contract `d451b36`](https://github.com/rosen-bridge/contract/blob/d451b367ea87efa4c8f770c5af8f3a75b5629848/src/main/scala/rosen/bridge/scripts/EventTrigger.es#L16),
@@ -414,11 +414,58 @@ of every watcher's entire collateral. The public cleanup service at
 [`3b3cdb5`](https://github.com/rosen-bridge/cleanup-service/blob/3b3cdb596516abc1ffaa53e0c6c6925fbc87ee39/src/main/scala/rosen/cleanup/Procedures.scala#L29)
 attempts cleanup based on age without classifying source reorg versus fraud.
 Its embedded register and transaction-input layouts predate `d451b36`, so that
-source does not establish compatible or deployed cleanup behavior. Activation
-must identify the actual cleanup implementation and policy and explicitly accept
-the pre-commitment reorg exposure, including watcher RWT/RSN consequences. Neither
-a depth above the observed 18-block orphan nor a future cleanup timer resolves
-this operational decision by itself.
+source alone does not establish compatible or deployed cleanup behavior.
+In his [29 September operator follow-up](https://github.com/rosen-bridge/docs/pull/1#issuecomment-5890465995),
+Odiseus reports the Rosen team's Telegram clarification: a guard-rejected trigger
+remains unspent and, if still unspent at cleanup-confirm, is fraud-spent without
+re-verifying the event. This is reported operational behavior, distinct from a
+verified deployment/version pin. It makes punitive cleanup of a rejected trigger
+an explicit operator exposure; rejection does not itself establish watcher fault.
+Activation still needs the actual cleanup version/configuration and an accepted
+resolution policy. Neither a depth above the observed 18-block orphan nor a future
+cleanup timer resolves that decision by itself.
+
+### Operator proposal for refused triggers and reservation stalls
+
+The same follow-up recommends making non-punitive terminal return a precondition
+for Monero activation. It proposes distinguishing attributable watcher fraud from
+source reorg after a valid commitment, guard-side reservation/store refusal,
+proof expiry after a timely valid commitment, and guard unavailability. The latter
+cases would return merged permits without slashing. This is an operator proposal
+for Rosen's review, not an accepted protocol or implemented recovery mechanism.
+It requires evidence of validity at commitment and attributable fault; a published
+refusal label or an event missing from a current source view is not that evidence.
+
+The proposed return window is substantially shorter than cleanup-confirm, with
+its relationship to the guard's pending-payment timeout made explicit. A stall
+before commitment has no on-chain permit lock from that candidate; a stall after
+trigger creation exposes merged permits to both lock-up and punitive cleanup.
+A deadline can make a return eligible, but cannot guarantee execution when its
+required guard quorum is unavailable or the chain is not progressing. Rosen must
+accept an authorization and recovery path for those conditions. Any terminal
+return must exclude subsequent payment or punitive cleanup of the same trigger,
+reconcile already-produced signatures and preserve outstanding liabilities.
+
+For competing reservations, Odiseus proposes the earliest eligible Ergo trigger
+for the same backing, ordered by height and a fixed tie-break such as box ID.
+This option needs a common canonical view, accepted finality, complete visibility
+of competing triggers, and shared backing identity and eligibility rules.
+Ordering alone supplies none of those guarantees. Replacing a reservation with
+an earlier winner must not invalidate the honest durable-claim assumption of the
+3-of-4 credit argument: no timeout or newly discovered trigger authorizes freeing
+backing after a contribution, signature or uncertain settlement. A losing trigger
+would need the same qualified non-punitive terminal path, not a local database
+reset. The proposal remains unimplemented while RCS review is pending.
+
+As an interim operator measure for existing chains, the follow-up suggests
+withholding automatic fraud spends for recorded guard-side refusals. That is a
+policy for Rosen to assess, not an instruction to change live cleanup. Indefinite
+withholding leaves permits locked and permits accumulation/capacity attacks;
+any accepted measure needs bounded escalation, an owner and explicit manual
+resolution and resumption rules. Trigger-level visibility should distinguish
+paid, refused with reason, return pending/completed and cleanup scheduled, with
+blocks remaining to cleanup-confirm. A status label is diagnostic evidence,
+not proof that recovery or fault attribution has been completed.
 
 Reinclusion changes the occurrence's block anchor; it must not create a second
 economic credit. The pinned lab exercises source replacement and post-credit
@@ -507,10 +554,12 @@ The requested review is acceptance or correction of this integration profile:
 3. Rust threshold CLSAG custody, including the guard-to-holder mapping,
    cryptographic threshold, fault assumptions and recovery ownership above.
 4. Effective-fee and confirmation policies, post-commitment reorg handling,
+   including whether non-punitive terminal return is an activation precondition,
    supported wallet/address forms and independently administered source endpoints.
 5. Authenticated watcher credit-view delivery, immutable proof-bundle timing,
    including enrollment anchors, cross-watcher equivocation evidence, per-store
-   visibility, explicit clock/freshness rules and a reservation-divergence policy.
+   visibility, explicit clock/freshness rules and a reservation-divergence policy;
+   the operator's Ergo-ordering proposal remains subject to the boundaries above.
 6. Node/pruning qualification, current independent source agreement at guard
    contribution, and an owned FCMP++/Carrot migration or halt plan.
 
