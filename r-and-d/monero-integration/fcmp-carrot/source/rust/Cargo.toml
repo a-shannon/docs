@@ -1,0 +1,36 @@
+[package]
+name = "rosen-monero-fcmp-sal"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+license = "MIT"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[[bin]]
+name = "fixture-sign"
+path = "src/bin/fixture_sign.rs"
+required-features = ["fixture-cli"]
+
+[features]
+fixture-cli = ["modular-frost/tests"]
+
+[dependencies]
+ciphersuite = "0.4"
+dalek-ff-group = "0.5"
+dleq = "0.4.1"
+transcript = { package = "flexible-transcript", version = "0.3", features = ["recommended"] }
+modular-frost = { version = "0.11", features = ["ed25519"] }
+monero-fcmp-plus-plus = { git = "https://github.com/monero-oxide/monero-oxide", rev = "31c26d96eaadbba910ffe3613ad8b4cf9c598a93", features = ["multisig", "rand_chacha"] }
+monero-fcmp-plus-plus-generators = { git = "https://github.com/monero-oxide/monero-oxide", rev = "31c26d96eaadbba910ffe3613ad8b4cf9c598a93" }
+multiexp = "0.5"
+rand_core = { version = "0.6", features = ["getrandom"] }
+thiserror = "2"
+zeroize = "1"
+
+[dev-dependencies]
+modular-frost = { version = "0.11", features = ["ed25519", "tests"] }
+
+[patch.crates-io]
+crypto-bigint = { git = "https://github.com/kayabaNerve/crypto-bigint", rev = "78352771313f1e9b8e48abe5ce30d50d6bdd291d" }

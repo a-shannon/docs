@@ -1,0 +1,113 @@
+{
+  "format": "rosen-monero-adapter-source-v1",
+  "recipe": "SHA256 of UTF-8 without BOM: lowercase SHA256 + TAB + POSIX relative path + LF for each file in explicit StringComparer.Ordinal order",
+  "file_count": 25,
+  "aggregate_sha256": "39b4d7ba284e7bfcc032cdb57ba8591783b50a5d0b1966d67fa1696ece14c992",
+  "excluded": [
+    ".git/",
+    "ignored build/runtime/cache files",
+    "external upstream and toolchain sources; separately pinned"
+  ],
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "84f74a8339f4329f2d89e4eecddfd605d86699b4a99314911f073ace96c454c5"
+    },
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "f8a116202d4082ce2fd94cd64ecaae34eb5d1027c2202376293303f31b459569"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "9a650b8ef55190933cd0f366815e9d3d6d091c50db888b613a98951aa1383494"
+    },
+    {
+      "path": "README.md",
+      "sha256": "ba00951c714ce6844d3de3d8bf0ffeaf7ccede584d683697ce49540f5745b754"
+    },
+    {
+      "path": "admission/local_campaign.py",
+      "sha256": "1cca5f81dbdb9e82c412370714d4fae9e456f8ecaf9bd1fa703904136e2c763f"
+    },
+    {
+      "path": "admission/replay_roundtrip.py",
+      "sha256": "cfa9fc57553b47e33faf28ce778007ffcd91a5be149ca80c07ade6e730793125"
+    },
+    {
+      "path": "admission/retained_gate.py",
+      "sha256": "ffd7d56a7befca237f8214e9f728adb56cfc5c425671c2e3427b0da99aff16bf"
+    },
+    {
+      "path": "admission/test_campaign_binding.py",
+      "sha256": "b63c9f6ded0640f6af9cf9799d167c9ce07ffd72f2773376680df94333d5833b"
+    },
+    {
+      "path": "admission/test_replay_processes.py",
+      "sha256": "bf233682886295f79debae02ccf4c2d5e7e7950700c3407705e8cedd766a0d85"
+    },
+    {
+      "path": "admission/test_retained_gate.py",
+      "sha256": "cc564724f20227a9bdde2a421f39e3ba14fd80736f82493977414bdb30714651"
+    },
+    {
+      "path": "core/adapter_fixture.cpp",
+      "sha256": "75428de7bae745ed86a95885ae8567574285a1437ea3ab96ecd353a79d186d73"
+    },
+    {
+      "path": "core/legacy_node_fixture.cpp",
+      "sha256": "393fbd37e2ba81f45e05dddd056784324a7eaccf26b0f1a5e2b85aa7b6f3d4f2"
+    },
+    {
+      "path": "core/threshold_spend_device.cpp",
+      "sha256": "9eecb4c8bbfe8e90ae756ea9aceff86ef590b655a4474861d4614e53f9106260"
+    },
+    {
+      "path": "core/threshold_spend_device.h",
+      "sha256": "13a704acb07d604d5b156ff4d8f2c6a66419311386c133054fd16a573efba58f"
+    },
+    {
+      "path": "deposit/deposit_observer.py",
+      "sha256": "65a3c56aaa2d4df40cf1167a57d213a5cfed2dc1be9ea576369687f22f3bf879"
+    },
+    {
+      "path": "deposit/test_deposit_observer.py",
+      "sha256": "eb5ac0c3ece34004e403fa542ca9eb623048e4879a553b35d0f71896eb4dd930"
+    },
+    {
+      "path": "monero_hook.cmake",
+      "sha256": "9585356da5c0cedfea94a01c882fd1f704f7938ed09515d7281d8918ea58215d"
+    },
+    {
+      "path": "proof/carrot_receipt.cpp",
+      "sha256": "45916547100adfc44cebdddf31ab582f1ad5d74e98d1705eec4d972b4dfeba42"
+    },
+    {
+      "path": "proof/carrot_receipt.h",
+      "sha256": "2ddd743bdb2c9062d4db1a081588be7647938bb3c591aeea7a7b4bd3fd468b97"
+    },
+    {
+      "path": "proof/carrot_receipt_tests.cpp",
+      "sha256": "aba9d2a407b65b9a319d2d8535af56333db433debfc19acbda5ba160571b5da7"
+    },
+    {
+      "path": "rust/Cargo.lock",
+      "sha256": "92e610144f8d6b14911d3620bc003cbeab74f26be214a3231dd12d2c8d4bf75b"
+    },
+    {
+      "path": "rust/Cargo.toml",
+      "sha256": "10e57263421d4077d17c86fd7ca28f42d3bd72d40cc6468a78062643af74d27f"
+    },
+    {
+      "path": "rust/src/bin/fixture_sign.rs",
+      "sha256": "2b69be0e1544beb4fc16cfde48b2b8f34e6f6e73c1fae870a7d0dbfefc20bcd9"
+    },
+    {
+      "path": "rust/src/lib.rs",
+      "sha256": "ff1710c8f745eb4b535cf9727c46db3fcffaca4c8d56e778f4db58cc52fc7185"
+    },
+    {
+      "path": "rust/tests/threshold.rs",
+      "sha256": "df567d71c76894b2e49e92ccab6c592c7033b550804ce38190d22f353598196c"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+target/
+build/
+runtime/
+__pycache__/
+*.py[cod]
+*.sqlite3*
+*.db*
+*.log
+.env*
