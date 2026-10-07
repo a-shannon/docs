@@ -285,10 +285,37 @@ for continuity of payment proofs, not qualification of this Core `wallet2`
 helper, holder certificate or output-bound composition across the fork. The
 [Carrot integration draft](https://github.com/monero-project/monero/pull/9697),
 reviewed at `40b04ef372d191f8991da22c220ccce2ba457b47`, still lists wallet/proof
-integration and multisig work. The SAL primitives above narrow the missing
-cryptographic work, but no integrated replacement spend path is delivered here.
+integration and multisig work. Those snapshots did not deliver a replacement for
+the CLSAG wallet path documented above.
 
-The migration acceptance check must pin the actual node, wallet and threshold
+A separate [7 October FCMP++/CARROT adapter](https://github.com/a-shannon/docs/tree/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot)
+now composes Core beta3 `d816367cb1aa405bfa68a20ac3e034d0759d968e` with threshold
+SAL at the node's Rust pin `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
+The [Core spend-device adapter](https://github.com/a-shannon/docs/blob/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot/source/core/threshold_spend_device.cpp)
+reconstructs the full request and requires authorization before invoking the
+signer. The [Rust wrapper](https://github.com/a-shannon/docs/blob/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot/source/rust/src/lib.rs)
+uses imported threshold SAL machines and verifies DLEQ-associated image shares
+before legacy SAL preprocessing. Core verifies the completed SAL and finalizes
+the membership proof, BP+ and transaction. The reusable device takes no aggregate
+spend-secret parameter; the disposable CLI uses public synthetic fixture keys.
+
+The [fresh-node replay](https://github.com/a-shannon/docs/blob/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot/source/admission/replay_roundtrip.py)
+executes an actual pre-upgrade output spend, CARROT deposit, exact-output return,
+retained-byte recovery and reorg/reintroduction without second credit. The
+receipt binds the full transaction, selected output, intent, destination and
+amount; the observer independently scans the receiver image before spentness
+checks. The final audit checks approved body/fee, key image, SAL and receipt;
+daemon consensus supplies membership/BP+ validation. This is not an independent
+proof-system audit.
+
+The executed join uses the legacy address hierarchy with CARROT outputs; modern
+SAL has primitive tests, not an end-to-end new-CARROT-address wallet. The custom
+two-output RCR1 receipt is not upstream `OutProofV2` or a qualified production
+proof contract. Synthetic 3-of-4 approval votes remain separate from 2-of-4 SAL
+custody. No Ergo settlement leg, production Guard authorization, distributed
+custody deployment or Rosen service integration is established by this replay.
+
+The production migration acceptance check must pin the actual node, wallet and threshold
 engine, then demonstrate a spend of a pre-upgrade vault output under post-upgrade
 rules and a full new-format deposit/return. Cover output scanning, key-image
 association and spentness, transaction construction/serialization, payment-proof
@@ -307,7 +334,8 @@ testnet-form transaction construction, two inputs, ring size 16, a 2-of-4 roster
 selected participants 1 and 2, and deterministic fixture rings. The ceremony
 bootstrap and process environment remain locally controlled. There is no production
 transport, production decoy policy, mainnet qualification, independent operator
-reproduction, committee rotation, or FCMP++/Carrot transaction engine here.
+reproduction or committee rotation in this CLSAG profile. The separate beta3
+FCMP++/CARROT adapter above has its own source pin and narrower replay scope.
 
 Recovery covers a durably committed final after a lost response; it cannot reconstruct
 an in-flight nonce machine after interruption between share creation and terminal
