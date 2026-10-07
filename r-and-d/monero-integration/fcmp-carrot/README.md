@@ -57,8 +57,9 @@ cryptographic audit or an independently operated deployment.
   primitive tests only.
 - RCR1 is a bounded custom two-output receipt composed from Core primitives.
   It is not upstream `OutProofV2` or a qualified production proof contract.
-- Public synthetic fixture keys and a locally controlled threshold signer/vote
-  generator make replay possible. They are not production custody, DKG transport
+- Public synthetic fixture keys, a locally controlled 2-of-4 SAL signer and
+  synthetic 3-of-4 approval votes make replay possible. The approval votes do
+  not increase the cryptographic custody threshold. These are not production custody, DKG transport
   or independently operated Rosen Guards. A certificate uses Rosen's real
   encoding, but this replay does not obtain approval from live Guards.
 - This replay has no Ergo credit/redemption/reward leg, production service wiring,
