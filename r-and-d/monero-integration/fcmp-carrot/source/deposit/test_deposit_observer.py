@@ -3,10 +3,13 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from deposit_observer import (
     ChainView, ConflictError, Deposit, Ledger, ObservationError,
-    event_origin, parse_core_output, receipt_selector, validate_node_url,
+    event_origin, observe as observe_command, parse_core_output, receipt_selector,
+    tip_extends, validate_node_url,
 )
 
 
@@ -178,6 +181,195 @@ class DepositObserverTests(unittest.TestCase):
         self.assertEqual(self.ledger.db.execute(
             "SELECT credited,credit_count FROM deposits").fetchone(), (1, 1))
 
+    def test_precredit_reorg_reinclusion_can_receive_its_first_credit(self):
+        item = deposit()
+        self.assertEqual(self.ledger.observe(item, view(2), 0, False, "insufficient confirmations"),
+                         "suspended")
+        moved = dataclasses.replace(item, block_height=91, block_hash="22" * 32,
+                                    global_output_index=7)
+        moved_view = dataclasses.replace(view(), block_height=91, block_hash="22" * 32,
+                                         confirmations=9, output_indices=(5, 7))
+        self.assertEqual(self.ledger.observe(moved, moved_view, 0, True, None), "credited")
+        self.assertEqual(self.ledger.observe(moved, moved_view, 0, True, None), "idempotent")
+        self.assertEqual(self.ledger.db.execute("""
+            SELECT block_height,block_hash,global_output_index,status,credited,credit_count
+            FROM deposits
+        """).fetchone(), (91, "22" * 32, 7, "active", 1, 1))
+
+    def test_healthy_tip_advances_do_not_suspend_existing_credit(self):
+        item = deposit()
+        self.ledger.observe(item, view(), 0, True, None)
+        self.ledger.close()
+        intent = Path(self.temp.name) / "intent.bin"
+        receipt_path = Path(self.temp.name) / "receipt.bin"
+        intent.write_bytes(bytes.fromhex(item.intent))
+        receipt_path.write_bytes(receipt(intent=bytes.fromhex(item.intent),
+                                         txid=bytes.fromhex(item.txid),
+                                         index=item.output_index, amount=item.amount))
+        tips = [(100, "10" * 32), (103, "13" * 32)]
+        headers = {
+            0: {"hash": item.genesis, "orphan_status": False},
+            99: {"hash": "10" * 32, "orphan_status": False},
+            100: {"hash": "11" * 32, "orphan_status": False},
+            101: {"hash": "12" * 32, "orphan_status": False},
+        }
+
+        class AdvancingClient:
+            url = item.endpoint
+
+            def __init__(self, _url):
+                self.identities = iter(tips)
+
+            def identity(self):
+                return next(self.identities)
+
+            def header(self, height):
+                return headers[height]
+
+            def spent(self, _key_image):
+                return 0
+
+        first = dataclasses.replace(view(), tip_height=101, tip_hash="11" * 32)
+        second = dataclasses.replace(view(12), tip_height=102, tip_hash="12" * 32)
+        args = SimpleNamespace(
+            runtime=self.temp.name, receipt=str(receipt_path), intent=str(intent),
+            url=item.endpoint, core="core", profile="user", min_confirmations=10,
+        )
+        core_result = (item.txid, item.output_index, item.k_o, item.amount,
+                       item.key_image, item.destination, item.intent)
+        with patch("deposit_observer.DaemonClient", AdvancingClient), \
+                patch("deposit_observer.chain_view", side_effect=(first, second)), \
+                patch("deposit_observer.verify_core", return_value=core_result):
+            self.assertEqual(observe_command(args), 0)
+        self.ledger = Ledger(self.path)
+        self.assertEqual(self.ledger.db.execute(
+            "SELECT status,credited,credit_count FROM deposits").fetchone(),
+            ("active", 1, 1))
+
+    def test_tip_advance_requires_the_prior_tip_to_remain_canonical(self):
+        class Headers:
+            def __init__(self, old_hash):
+                self.old_hash = old_hash
+
+            def header(self, height):
+                self.assert_height = height
+                return {"hash": self.old_hash, "orphan_status": False}
+
+        self.assertTrue(tip_extends(Headers("10" * 32), (100, "10" * 32),
+                                    (103, "13" * 32)))
+        self.assertFalse(tip_extends(Headers("ff" * 32), (100, "10" * 32),
+                                     (103, "13" * 32)))
+        self.assertFalse(tip_extends(Headers("10" * 32), (103, "13" * 32),
+                                     (100, "10" * 32)))
+        self.assertFalse(tip_extends(Headers("10" * 32), (100, "10" * 32),
+                                     (100, "11" * 32)))
+
+    def test_inflight_confirmation_advance_retries_real_chain_view(self):
+        item = deposit()
+        self.ledger.observe(item, view(), 0, True, None)
+        self.ledger.close()
+        intent = Path(self.temp.name) / "retry-intent.bin"
+        receipt_path = Path(self.temp.name) / "retry-receipt.bin"
+        intent.write_bytes(bytes.fromhex(item.intent))
+        receipt_path.write_bytes(receipt(intent=bytes.fromhex(item.intent),
+                                         txid=bytes.fromhex(item.txid),
+                                         index=item.output_index, amount=item.amount))
+
+        class AdvancingClient:
+            url = item.endpoint
+
+            def __init__(self):
+                self.heights = iter(((100, "10" * 32), (101, "11" * 32),
+                                     (101, "11" * 32)))
+                self.identities = iter(((100, "10" * 32), (101, "11" * 32)))
+                self.height_calls = 0
+
+            def height(self):
+                self.height_calls += 1
+                return next(self.heights)
+
+            def identity(self):
+                return next(self.identities)
+
+            def header(self, height):
+                hashes = {0: item.genesis, 90: item.block_hash,
+                          99: "10" * 32, 100: "11" * 32}
+                return {"height": height, "hash": hashes[height], "orphan_status": False}
+
+            def transaction(self, _txid):
+                return {"blob": item.tx_blob, "in_pool": False,
+                        "double_spend_seen": False, "output_indices": [5, 6],
+                        "block_height": item.block_height, "confirmations": 11}
+
+            def spent(self, _key_image):
+                return 0
+
+        client = AdvancingClient()
+        args = SimpleNamespace(
+            runtime=self.temp.name, receipt=str(receipt_path), intent=str(intent),
+            url=item.endpoint, core="core", profile="user", min_confirmations=10,
+        )
+        core_result = (item.txid, item.output_index, item.k_o, item.amount,
+                       item.key_image, item.destination, item.intent)
+        with patch("deposit_observer.DaemonClient", return_value=client), \
+                patch("deposit_observer.verify_core", return_value=core_result):
+            self.assertEqual(observe_command(args), 0)
+        self.assertEqual(client.height_calls, 3)
+        self.ledger = Ledger(self.path)
+        self.assertEqual(self.ledger.db.execute(
+            "SELECT status,credited,credit_count FROM deposits").fetchone(),
+            ("active", 1, 1))
+
+    def test_unsettled_snapshot_drift_fails_without_suspension(self):
+        item = deposit()
+        self.ledger.observe(item, view(), 0, True, None)
+        self.ledger.close()
+        intent = Path(self.temp.name) / "unsettled-intent.bin"
+        receipt_path = Path(self.temp.name) / "unsettled-receipt.bin"
+        intent.write_bytes(bytes.fromhex(item.intent))
+        receipt_path.write_bytes(receipt(intent=bytes.fromhex(item.intent),
+                                         txid=bytes.fromhex(item.txid),
+                                         index=item.output_index, amount=item.amount))
+
+        class UnsettledClient:
+            url = item.endpoint
+
+            def __init__(self):
+                self.height_calls = 0
+
+            def height(self):
+                self.height_calls += 1
+                return 100, "10" * 32
+
+            def identity(self):
+                return 100, "10" * 32
+
+            def header(self, height):
+                hashes = {0: item.genesis, 90: item.block_hash, 99: "10" * 32}
+                return {"height": height, "hash": hashes[height], "orphan_status": False}
+
+            def transaction(self, _txid):
+                return {"blob": item.tx_blob, "in_pool": False,
+                        "double_spend_seen": False, "output_indices": [5, 6],
+                        "block_height": item.block_height, "confirmations": 11}
+
+            def spent(self, _key_image):
+                return 0
+
+        client = UnsettledClient()
+        args = SimpleNamespace(
+            runtime=self.temp.name, receipt=str(receipt_path), intent=str(intent),
+            url=item.endpoint, core="core", profile="user", min_confirmations=10,
+        )
+        with patch("deposit_observer.DaemonClient", return_value=client), \
+                patch("deposit_observer.verify_core"):
+            self.assertEqual(observe_command(args), 2)
+        self.assertEqual(client.height_calls, 3)
+        self.ledger = Ledger(self.path)
+        self.assertEqual(self.ledger.db.execute(
+            "SELECT status,credited,credit_count FROM deposits").fetchone(),
+            ("active", 1, 1))
+
     def test_reorg_origin_change_suspends_without_replacement(self):
         item = deposit()
         self.ledger.observe(item, view(), 0, True, None)
@@ -187,8 +379,8 @@ class DepositObserverTests(unittest.TestCase):
                                          confirmations=9, output_indices=(5, 7))
         self.assertEqual(self.ledger.observe(moved, moved_view, 0, True, None), "suspended")
         self.assertEqual(self.ledger.db.execute(
-            "SELECT block_height,block_hash,status,credit_count FROM deposits").fetchone(),
-            (90, "03" * 32, "suspended", 1))
+            "SELECT block_height,block_hash,global_output_index,status,credit_count FROM deposits"
+        ).fetchone(), (90, "03" * 32, 6, "suspended", 1))
 
     def test_sqlite_constraints_exist_independently(self):
         item = deposit()

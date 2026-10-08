@@ -11,7 +11,7 @@ does not replace the submitted Rosen service implementation.
 The [complete source](source/) includes the C++ spend-device adapter, Rust SAL
 wrapper, receipt composition, observer, admission journal and replay runner.
 The [25-file manifest](source-manifest.json) binds the reviewed source with
-aggregate SHA256 `39b4d7ba284e7bfcc032cdb57ba8591783b50a5d0b1966d67fa1696ece14c992`.
+aggregate SHA256 `69ebcb0fc50f3fb36d8cd76a4ce5a6c950bacb668223734b350e0fbf7f357bf2`.
 Core is pinned to `d816367cb1aa405bfa68a20ac3e034d0759d968e`; Rust uses the
 node's `monero-oxide` revision `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
 
@@ -24,7 +24,7 @@ directories and non-loopback, online or non-fakechain node endpoints.
 
 ## Executed result
 
-The fresh replay accepted and confirmed these exact transactions:
+The 7 October replay accepted and confirmed these exact transactions:
 
 | Path | XMR | Transaction ID |
 | --- | --- | --- |
@@ -49,6 +49,30 @@ consumed-attempt persistence, retained-byte reconciliation, output uniqueness,
 receipt parsing, reorg suspension and process cleanup. The scoped source received
 an independent local implementation review. These checks are not an independent
 cryptographic audit or an independently operated deployment.
+
+## 8 October correction and replay
+
+The corrected observer accepts canonical tip growth while retaining reorg
+suspension, and permits an uncredited deposit to receive its first credit after
+valid reinclusion. Admission keeps a candidate's backed or unbacked mode fixed,
+finalizes into private output files, and restores only the SQLite-retained final
+bytes. A backed candidate is checked against its deposit before new signing and
+before first submission. Recovery of an exact payment already on the daemon
+does not require the now-spent backing to appear unspent again.
+
+A second fresh offline fakechain replay with the corrected Python sources and
+the unchanged pinned Core/Rust binaries completed the old-output spend, CARROT
+deposit and exact-output return. Its transaction IDs were respectively
+`03d34de7fb0b412d63e15ea85771a250019d04b1a5ce63b991c4284cf04162d9`,
+`18a10f90226757f65ee8683ea4fffe5d9ea84a6c93e8350639806b960bd91696`
+and `069d382bd6ac31048da9a98bbe4d411bfd5944082e2c7d3e8f2eb34f0f4b9cce`.
+Both readers credited the deposit at 12 confirmations. Recovery restored the
+seven exact files with one signing attempt; spending, a 24-block rollback and
+reintroduction left `credit_count = 1` and the original credit suspended.
+Focused Python checks passed 15 admission tests (three process tests skipped on
+Windows) and 19 deposit tests. The healthy-tip interleaving and two-finalizer
+arbitration were exercised as isolated regressions; the complete replay did not
+force those two races.
 
 ## Remaining boundaries
 

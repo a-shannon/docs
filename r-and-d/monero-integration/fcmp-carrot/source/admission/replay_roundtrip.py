@@ -478,7 +478,10 @@ def execute(args: argparse.Namespace) -> int:
         _, recovered_out, _ = run_logged(logs, "06-return-recovery", [
             sys.executable, campaign_cli, "--core", core, "--signer", signer,
             "--node", node_url, "--runtime", return_runtime, "--era", "carrot",
-            "--profile", "return", "--submit",
+            "--profile", "return", "--input-key", observed_a["K_o"],
+            "--deposit-observer", observer_cli, "--deposit-runtime", reader_a,
+            "--deposit-receipt", deposit_receipt, "--deposit-intent", deposit_intent,
+            "--deposit-confirmations", "10", "--submit",
         ])
         recovered_digest, recovered_txid = campaign_result(recovered_out)
         require((recovered_digest, recovered_txid) == (return_digest, return_txid),

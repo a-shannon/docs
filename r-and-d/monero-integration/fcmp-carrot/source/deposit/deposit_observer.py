@@ -47,6 +47,10 @@ class ChainStateError(ObservationError):
     """Observed chain state requires suspension of an existing event."""
 
 
+class SnapshotChangedError(ObservationError):
+    """The daemon changed during a read; no adverse chain state was established."""
+
+
 def _hex64(value: Any, field: str) -> str:
     if not isinstance(value, str) or not HEX64.fullmatch(value):
         raise ObservationError(f"invalid {field}")
@@ -230,7 +234,7 @@ def chain_view(client: DaemonClient, txid: str, output_index: int) -> ChainView:
     genesis_header = client.header(0)
     tip_header = client.header(tip_height - 1)
     if tip_header["hash"] != tip_hash or tip_header["orphan_status"]:
-        raise ChainStateError("daemon tip changed or is orphaned")
+        raise SnapshotChangedError("daemon tip changed during observation")
     entry = client.transaction(txid)
     in_pool = entry.get("in_pool")
     if not isinstance(in_pool, bool) or not isinstance(entry.get("double_spend_seen"), bool):
@@ -249,7 +253,7 @@ def chain_view(client: DaemonClient, txid: str, output_index: int) -> ChainView:
         if (not isinstance(block_height, int) or block_height < 0 or block_height >= tip_height
                 or not isinstance(confirmations, int)
                 or confirmations != tip_height - block_height):
-            raise ChainStateError("inconsistent transaction confirmations")
+            raise SnapshotChangedError("inconsistent transaction confirmations")
         header = client.header(block_height)
         if header["orphan_status"]:
             raise ChainStateError("transaction block is orphaned")
@@ -261,6 +265,28 @@ def chain_view(client: DaemonClient, txid: str, output_index: int) -> ChainView:
         tx_blob=entry["blob"], in_pool=in_pool, block_height=block_height,
         block_hash=block_hash, confirmations=confirmations, output_indices=tuple(indices),
     )
+
+
+def retry_chain_view(client: DaemonClient, txid: str, output_index: int,
+                     attempts: int = 3) -> ChainView:
+    if attempts < 1:
+        raise ValueError("chain-view attempts must be positive")
+    for attempt in range(attempts):
+        try:
+            return chain_view(client, txid, output_index)
+        except SnapshotChangedError:
+            if attempt + 1 == attempts:
+                raise
+    raise AssertionError("unreachable chain-view retry state")
+
+
+def tip_extends(client: DaemonClient, earlier: tuple[int, str], later: tuple[int, str]) -> bool:
+    if later[0] < earlier[0]:
+        return False
+    if later[0] == earlier[0]:
+        return later[1] == earlier[1]
+    old_tip = client.header(earlier[0] - 1)
+    return not old_tip["orphan_status"] and old_tip["hash"] == earlier[1]
 
 
 def parse_core_output(output: str) -> tuple[str, int, str, int, str, str, str]:
@@ -390,7 +416,8 @@ class Ledger:
         with self.write():
             rows = self.db.execute("""
                 SELECT id,genesis,txid,output_index,k_o,key_image,intent,destination,amount,event_origin,
-                       tx_blob,receipt,block_height,block_hash,status,credited,credit_count,suspension_reason
+                       tx_blob,receipt,block_height,block_hash,global_output_index,status,credited,
+                       credit_count,suspension_reason
                 FROM deposits WHERE genesis=? AND ((txid=? AND output_index=?) OR k_o=? OR key_image=?)
             """, (deposit.genesis, deposit.txid, deposit.output_index, deposit.k_o, deposit.key_image)).fetchall()
             if len(rows) > 1:
@@ -413,10 +440,11 @@ class Ledger:
                 deposit_id = row[0]
                 if row[1:12] != self._immutable(deposit):
                     raise ConflictError("same backing is already bound to different event data")
-                old_height, old_hash, old_status, credited, credit_count, old_reason = row[12:]
+                old_height, old_hash, old_global_index, old_status, credited, credit_count, old_reason = row[12:]
+                was_credited = bool(credited)
                 origin_changed = (old_height is not None and
                     (old_height != deposit.block_height or old_hash != deposit.block_hash))
-                if origin_changed:
+                if origin_changed and was_credited:
                     qualified = False
                     reason = "event origin changed"
                 if credited:
@@ -428,19 +456,27 @@ class Ledger:
                     else:
                         status = "active"
                         decision = "idempotent"
-                elif qualified and not origin_changed:
+                elif qualified:
                     status = "active"
                     credited = credit_count = 1
                     decision = "credited"
                 else:
                     status = "suspended"
                     decision = "suspended"
+                if was_credited:
+                    stored_height = old_height if old_height is not None else deposit.block_height
+                    stored_hash = old_hash if old_hash is not None else deposit.block_hash
+                    stored_global_index = (old_global_index if old_global_index is not None
+                                           else deposit.global_output_index)
+                else:
+                    stored_height = deposit.block_height
+                    stored_hash = deposit.block_hash
+                    stored_global_index = deposit.global_output_index
                 self.db.execute("""
                     UPDATE deposits SET status=?,credited=?,credit_count=?,suspension_reason=?,last_seen=?,
-                        block_height=COALESCE(block_height,?),block_hash=COALESCE(block_hash,?),
-                        global_output_index=COALESCE(global_output_index,?) WHERE id=?
-                """, (status, credited, credit_count, reason, now, deposit.block_height,
-                    deposit.block_hash, deposit.global_output_index, deposit_id))
+                        block_height=?,block_hash=?,global_output_index=? WHERE id=?
+                """, (status, credited, credit_count, reason, now, stored_height,
+                    stored_hash, stored_global_index, deposit_id))
             self.db.execute("""
                 INSERT INTO observations(deposit_id,observed_at,endpoint,decision,reason,tip_height,
                     tip_hash,confirmations,spent_status,tx_blob_sha256) VALUES(?,?,?,?,?,?,?,?,?,?)
@@ -471,8 +507,9 @@ def observe(args: argparse.Namespace) -> int:
     try:
         identity_first = client.identity()
         genesis = client.header(0)["hash"]
-        first = chain_view(client, txid, output_index)
-        if first.genesis != genesis or identity_first != (first.tip_height, first.tip_hash):
+        first = retry_chain_view(client, txid, output_index)
+        if (first.genesis != genesis or not tip_extends(
+                client, identity_first, (first.tip_height, first.tip_hash))):
             raise ChainStateError("daemon identity changed before transaction observation")
         core = verify_core(Path(args.core).resolve(), args.profile, first.tx_blob,
                            receipt_path, intent_path, runtime)
@@ -481,16 +518,17 @@ def observe(args: argparse.Namespace) -> int:
                 or amount != receipt_amount):
             raise ObservationError("Core result differs from receipt selector")
         spent_first = client.spent(key_image)
-        second = chain_view(client, txid, output_index)
+        second = retry_chain_view(client, txid, output_index)
         spent_second = client.spent(key_image)
         identity_second = client.identity()
         stable = (first.genesis == second.genesis and first.tx_blob == second.tx_blob
                   and first.in_pool == second.in_pool and first.block_height == second.block_height
                   and first.block_hash == second.block_hash
                   and first.output_indices == second.output_indices
-                  and second.tip_height >= first.tip_height
-                  and (second.tip_height != first.tip_height or second.tip_hash == first.tip_hash)
-                  and identity_second == (second.tip_height, second.tip_hash))
+                   and tip_extends(client, (first.tip_height, first.tip_hash),
+                                   (second.tip_height, second.tip_hash))
+                   and tip_extends(client, (second.tip_height, second.tip_hash),
+                                   identity_second))
         if not stable:
             reason = "daemon observation changed during verification"
         elif first.in_pool:

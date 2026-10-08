@@ -6,9 +6,11 @@ stored candidate and transaction; it never rebuilds a finalized transaction.
 """
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.request
 from pathlib import Path
 
@@ -79,8 +81,19 @@ def txid_from_core(output):
 def require_bytes(path, expected):
     if path.exists() and path.read_bytes() != expected:
         raise ValueError("retained file differs from database: " + path.name)
-    if not path.exists():
-        path.write_bytes(expected)
+    if path.exists():
+        return
+    descriptor, temporary = tempfile.mkstemp(prefix="." + path.name + ".",
+                                             suffix=".tmp", dir=path.parent)
+    temporary_path = Path(temporary)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(expected)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 def backing_observation(args):
@@ -104,10 +117,25 @@ def match_backing(value, observed):
         raise ValueError("withdrawal candidate differs from independently reconstructed deposit")
 
 
+def finalize_private(args, gate, digest, request, proposal, response, transaction, intent,
+                     expected_intent):
+    with tempfile.TemporaryDirectory(prefix=".finalize-", dir=transaction.parent) as directory:
+        private_transaction = Path(directory) / transaction.name
+        output = run(core_command(args, "node-verify", args.node, request, proposal,
+                                  response, private_transaction, intent))
+        private_receipt = Path(str(private_transaction) + ".receipt")
+        private_intent = Path(str(private_transaction) + ".intent")
+        if private_intent.read_bytes() != expected_intent:
+            raise ValueError("Core derived intent differs from retained candidate")
+        gate.finalize(digest, private_transaction.read_bytes(), txid_from_core(output),
+                      private_receipt.read_bytes())
+
+
 def execute(args):
     supplied = (args.deposit_observer, args.deposit_runtime, args.deposit_receipt, args.deposit_intent)
     if any(supplied) and not all(supplied):
         raise ValueError("all four deposit consumer arguments are required")
+    backing_mode = all(supplied)
     if args.deposit_confirmations < 1:
         raise ValueError("deposit confirmations must be positive")
     info = rpc(args.node, "get_info")
@@ -126,11 +154,15 @@ def execute(args):
         cert = strict_json((directory / "certificate.json").read_text())
         if value["genesis"] != genesis:
             raise ValueError("retained candidate belongs to a different genesis")
+        if backing_mode and "backing_event" not in value:
+            raise ValueError("retained candidate was admitted without deposit backing")
+        if not backing_mode and "backing_event" in value:
+            raise ValueError("deposit-bound candidate requires its independent consumer")
         require_bytes(request, bytes.fromhex(value["request"]))
         require_bytes(proposal, bytes.fromhex(value["proposal"]))
         require_bytes(intent, bytes.fromhex(value["intent"]))
     else:
-        backing = backing_observation(args) if all(supplied) else None
+        backing = backing_observation(args) if backing_mode else None
         if backing:
             if args.input_key and args.input_key != backing["K_o"]:
                 raise ValueError("requested input differs from deposit event")
@@ -157,8 +189,6 @@ def execute(args):
         retained = gate.recover(digest)
         if retained[1] is None:
             if "backing_event" in value:
-                if not all(supplied):
-                    raise ValueError("deposit-bound signing requires its independent consumer")
                 match_backing(value, backing_observation(args))
             # Reconstruct and authorize the complete Core request before any
             # external SAL preprocessing, not merely after receiving a signature.
@@ -171,13 +201,11 @@ def execute(args):
         else:
             require_bytes(response, retained[1])
         if retained[2] is None:
-            output = run(core_command(args, "node-verify", args.node, request, proposal,
-                                      response, transaction, intent))
-            gate.finalize(digest, transaction.read_bytes(), txid_from_core(output),
-                          Path(str(transaction) + ".receipt").read_bytes())
-        else:
-            require_bytes(transaction, retained[2])
-            require_bytes(Path(str(transaction) + ".receipt"), retained[5])
+            finalize_private(args, gate, digest, request, proposal, response, transaction, intent,
+                             bytes.fromhex(value["intent"]))
+        retained = gate.recover(digest)
+        require_bytes(transaction, retained[2])
+        require_bytes(Path(str(transaction) + ".receipt"), retained[5])
         require_bytes(Path(str(transaction) + ".intent"), bytes.fromhex(value["intent"]))
 
         # Reauthorize exact stored bytes. This performs no membership proving.
@@ -194,8 +222,6 @@ def execute(args):
                 print("recovered exact payment already present on daemon", flush=True)
             else:
                 if "backing_event" in value:
-                    if not all(supplied):
-                        raise ValueError("first submission requires the deposit consumer")
                     match_backing(value, backing_observation(args))
                 run(core_command(args, "node-submit", args.node, transaction))
             gate.submitted(digest, retained[2], retained[3])

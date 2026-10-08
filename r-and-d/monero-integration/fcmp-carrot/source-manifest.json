@@ -2,7 +2,7 @@
   "format": "rosen-monero-adapter-source-v1",
   "recipe": "SHA256 of UTF-8 without BOM: lowercase SHA256 + TAB + POSIX relative path + LF for each file in explicit StringComparer.Ordinal order",
   "file_count": 25,
-  "aggregate_sha256": "39b4d7ba284e7bfcc032cdb57ba8591783b50a5d0b1966d67fa1696ece14c992",
+  "aggregate_sha256": "69ebcb0fc50f3fb36d8cd76a4ce5a6c950bacb668223734b350e0fbf7f357bf2",
   "excluded": [
     ".git/",
     "ignored build/runtime/cache files",
@@ -27,11 +27,11 @@
     },
     {
       "path": "admission/local_campaign.py",
-      "sha256": "1cca5f81dbdb9e82c412370714d4fae9e456f8ecaf9bd1fa703904136e2c763f"
+      "sha256": "571c4837d542583896a8dc57264dcb02de44853399db87b6248b534e4e14ad1a"
     },
     {
       "path": "admission/replay_roundtrip.py",
-      "sha256": "cfa9fc57553b47e33faf28ce778007ffcd91a5be149ca80c07ade6e730793125"
+      "sha256": "e6073fccbdc4a68baec8269abe3a05466a4d253e34ae0ad12c73a2f2af56fc1e"
     },
     {
       "path": "admission/retained_gate.py",
@@ -39,7 +39,7 @@
     },
     {
       "path": "admission/test_campaign_binding.py",
-      "sha256": "b63c9f6ded0640f6af9cf9799d167c9ce07ffd72f2773376680df94333d5833b"
+      "sha256": "34f78b69ad0d257884600f2141415efe351ea99de8b507dd8d02ce328dd4ed09"
     },
     {
       "path": "admission/test_replay_processes.py",
@@ -67,11 +67,11 @@
     },
     {
       "path": "deposit/deposit_observer.py",
-      "sha256": "65a3c56aaa2d4df40cf1167a57d213a5cfed2dc1be9ea576369687f22f3bf879"
+      "sha256": "1879bf937180257c28d428ab1957da3301cfdc02aac628521115c53b92e4b118"
     },
     {
       "path": "deposit/test_deposit_observer.py",
-      "sha256": "eb5ac0c3ece34004e403fa542ca9eb623048e4879a553b35d0f71896eb4dd930"
+      "sha256": "e9d511216811698aa02ba6405c8eb9c8aba63731ae87cdafd408e50fd3d3b028"
     },
     {
       "path": "monero_hook.cmake",
