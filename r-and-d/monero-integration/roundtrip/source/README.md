@@ -161,6 +161,14 @@ reply, restarts all four guards and recovers the same bytes without another
 signature. Rosen's TransactionProcessor completes the reward transaction and
 event. Ledger schema 3 is required; older schemas are refused without migration.
 
+If the owner stops after guard signing but before writing its signed record,
+each guard can retain the final public transaction bytes next to its custody
+database. Recovery requires three matching guard records for the same reward
+assignment, then checks the original candidate, snapshot, current source and
+signed transaction before restoring the owner record. It never starts a second
+signing session for an assigned reward. If fewer than three guards retained the
+same final bytes, automatic recovery stops without submission.
+
 The minimum-fee reader reconstructs the configured NFT/asset fee box from complete
 node pagination and applies its historical row at the source height. New
 withdrawals use the maximum of declared, minimum and proportional fees before

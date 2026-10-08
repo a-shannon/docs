@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 468,
-  "aggregateSha256": "db027d4c2abfb16e5e86f0db81d8b0dbbdd8f81f783da36dd3786153077b8d87",
+  "fileCount": 470,
+  "aggregateSha256": "628d8d401d2b4bc64596336c9902a6a63a4d3a00393902c0bcb9db882d01aebc",
   "files": [
     {
       "path": "README.md",
-      "bytes": 27185,
-      "sha256": "fcdb113344775fa86860540cdcd2a2991213a3b8e98e96fe06f5548a88e158a5"
+      "bytes": 27716,
+      "sha256": "d5c067ba738ef69fa4f16d66c4bcee368167b7814e2a5562baef71610d12f2b5"
     },
     {
       "path": "consumer/adapter.ts",
@@ -711,13 +711,13 @@
     },
     {
       "path": "ergo-node/guard-participant.mjs",
-      "bytes": 14794,
-      "sha256": "73f0c4a954a0968f03040c6450aec950ab9808ca9d0bd1a6636b58092bb45a96"
+      "bytes": 15672,
+      "sha256": "1243900471c77642bb61414def00ead6fcb703c9d692cf6d9b17c92d196d2df0"
     },
     {
       "path": "ergo-node/guard-process-committee.mjs",
-      "bytes": 11707,
-      "sha256": "59c03be1ac77d491cf7405d82e404325752de6c69d500d867e8ea7a6a96cf8a4"
+      "bytes": 11787,
+      "sha256": "696800dd1e5a273462c607d3116a50dcc3b587341487376d6077f09818f1d39d"
     },
     {
       "path": "ergo-node/loader.mjs",
@@ -791,13 +791,23 @@
     },
     {
       "path": "ergo-node/reward-settlement.mjs",
-      "bytes": 19590,
-      "sha256": "10ecf40d4bc23b45ea8f864a1bf30127d9ded49ebf86c1db773dba52b83128db"
+      "bytes": 22682,
+      "sha256": "bb3b2e765fdb97e95c584ece1e4e675a85c960b9d55bbe3bb4a986bff4d43644"
     },
     {
       "path": "ergo-node/reward-settlement.test.mjs",
-      "bytes": 11491,
-      "sha256": "82c4afb6fd3043c2db5a89a4cfac1bc4c597f8b0b029fe9becef79bd6608e056"
+      "bytes": 14290,
+      "sha256": "28a4e8dc43785065e4d5dd6f562bc73fde3b7e8408763324d3091782baa75b52"
+    },
+    {
+      "path": "ergo-node/reward-signed-custody.mjs",
+      "bytes": 6976,
+      "sha256": "37e11621b21df4be4b1e504659962684ed68358869715c1933502a2691926c4e"
+    },
+    {
+      "path": "ergo-node/reward-signed-custody.test.mjs",
+      "bytes": 6823,
+      "sha256": "404e9e9cb9503a085aba71d7ee4918bf14597885a0a3e5396bf9aa19ab22199b"
     },
     {
       "path": "ergo-node/rosen-node.mjs",

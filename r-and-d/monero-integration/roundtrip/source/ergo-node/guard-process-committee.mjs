@@ -5,6 +5,7 @@ import {randomUUID} from 'node:crypto';
 import {launchProcessRpc} from '../tools/process-rpc.mjs';
 import {pinParticipantConfig} from '../tools/participant-config.mjs';
 import {committeeConfigDigest,canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
+import {aggregateRewardStates} from './reward-signed-custody.mjs';
 
 const entry=fileURLToPath(new URL('./guard-participant.mjs',import.meta.url));
 const custodyHandles=new WeakMap();
@@ -94,7 +95,7 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
     rewardState(request,anchor){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
       try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('rewardState',{request,anchor},{timeoutMs})));
         const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
-        current();return matching(rows.map(row=>row.value));}finally{auditing=false;}});},
+        current();return aggregateRewardStates(rows.map(row=>row.value));}finally{auditing=false;}});},
     verifyReward(snapshot,reward){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
       try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('verifyReward',{snapshot,reward},{timeoutMs})));
         const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
