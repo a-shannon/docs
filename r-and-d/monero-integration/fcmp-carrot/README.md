@@ -11,7 +11,7 @@ does not replace the submitted Rosen service implementation.
 The [complete source](source/) includes the C++ spend-device adapter, Rust SAL
 wrapper, receipt composition, observer, admission journal and replay runner.
 The [25-file manifest](source-manifest.json) binds the reviewed source with
-aggregate SHA256 `69ebcb0fc50f3fb36d8cd76a4ce5a6c950bacb668223734b350e0fbf7f357bf2`.
+aggregate SHA256 `019a8a70fbf1094429c69299db2cab81c008ecc0e4290fc199157519af265bfb`.
 Core is pinned to `d816367cb1aa405bfa68a20ac3e034d0759d968e`; Rust uses the
 node's `monero-oxide` revision `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
 
@@ -50,7 +50,7 @@ receipt parsing, reorg suspension and process cleanup. The scoped source receive
 an independent local implementation review. These checks are not an independent
 cryptographic audit or an independently operated deployment.
 
-## 8 October correction and replay
+## Earlier 8 October correction and replay
 
 The corrected observer accepts canonical tip growth while retaining reorg
 suspension, and permits an uncredited deposit to receive its first credit after
@@ -73,6 +73,25 @@ Focused Python checks passed 15 admission tests (three process tests skipped on
 Windows) and 19 deposit tests. The healthy-tip interleaving and two-finalizer
 arbitration were exercised as isolated regressions; the complete replay did not
 force those two races.
+
+## Restart and return-only reorg correction
+
+The current backed candidate certifies the deposit ledger, credit identity and
+original block/output anchor. On process interruption, the candidate marker is
+published only after its certificate and intent sidecars. Submission and
+ten-block return confirmation
+have separate retained states. After a return-only reorg, exact return replay
+requires the prior confirmation and a fresh, unspent deposit at its original
+anchor; a later confirmation preserves the first inclusion record.
+
+The current admission suite ran 27 tests: 24 passed and three Linux-only cases
+were skipped on Windows; the deposit suite passed 26. A fresh offline fakechain
+run completed
+the normal deposit/return and 24-block deposit rollback/reintroduction with one
+suspended credit. A separate fresh run removed only the confirmed return while
+the deposit remained, resubmitted identical return bytes with one signing
+attempt, and reconfirmed them 12 blocks deep. Both use the pinned Core/Rust
+binaries and one local endpoint. Neither run includes Ergo settlement.
 
 ## Remaining boundaries
 

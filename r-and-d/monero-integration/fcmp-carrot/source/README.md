@@ -99,11 +99,18 @@ python admission/local_campaign.py \
 Use `--profile vault`, `--profile user`, or `--profile return` as appropriate;
 the default is `vault`. Add `--input-key` to require an exact scanned input,
 `--deposit-confirmations N` to change the positive confirmation threshold, or
-`--submit` only for the isolated fixture workflow. The observer command used by
-the deposit hook is:
+`--submit` only for the isolated fixture workflow. A backed candidate certifies
+the observer ledger, one credit identity and its original block/output anchor;
+an older backed candidate cannot start a new signing attempt. `--submit`
+records daemon acceptance, while the separate `--confirm` action requires ten
+canonical confirmations of the exact retained return. If that return is later
+removed without removing its deposit, replay requires the prior confirmation
+and a fresh view of the still-unspent deposit at its certified original anchor.
+Reconfirmation of the same return retains the first inclusion record. The
+observer command used by the deposit hook is:
 
 ```text
-deposit_observer.py node URL CORE RUNTIME RECEIPT INTENT [--min-confirmations N]
+deposit_observer.py node URL CORE RUNTIME RECEIPT INTENT [--min-confirmations N] [--expected-ledger-id LEDGER_ID]
 ```
 
 For a complete fresh replay from the adapter root:
@@ -116,6 +123,11 @@ python admission/replay_roundtrip.py \
   --runtime /outside/new-replay \
   --rpc-port 58381 --p2p-port 58380
 ```
+
+To exercise a return-only reorganization, use a different fresh runtime and
+ports and add `--return-only-reorg`. The runner confirms the initial return,
+removes only its blocks, verifies that the credited deposit remains, then
+resubmits and reconfirms the identical retained transaction.
 
 The fresh `replay-01` run completed the real Core path: an HF16 input
 migration under FCMP++ (`6d65733718a0bfff0a1225e2948ad14675aa12731404791399a8aada910b7b46`),
