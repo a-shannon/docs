@@ -4,7 +4,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -38,6 +38,13 @@ def deposit(receipt_bytes=None, intent="04" * 32):
                    90, "03" * 32, 6, "http://127.0.0.1:18081")
 
 
+def command_deposit():
+    item = deposit()
+    return dataclasses.replace(item, receipt=receipt(
+        intent=bytes.fromhex(item.intent), txid=bytes.fromhex(item.txid),
+        index=item.output_index, amount=item.amount))
+
+
 def database_state(path):
     connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
     try:
@@ -63,6 +70,11 @@ class DepositObserverTests(unittest.TestCase):
 
     def restart(self):
         self.ledger.close()
+        self.ledger = Ledger(self.path)
+
+    def use_command_ledger(self):
+        self.ledger.close()
+        self.path = Path(self.temp.name) / "deposits.sqlite3"
         self.ledger = Ledger(self.path)
 
     def test_receipt_selector_binds_standalone_fields(self):
@@ -176,6 +188,162 @@ class DepositObserverTests(unittest.TestCase):
             (1, "suspended", 1, 1, "transaction is absent from daemon"),
         ])
 
+    def test_reincluded_transaction_suspends_credited_sibling_before_new_credit(self):
+        first = deposit()
+        sibling = dataclasses.replace(
+            first, output_index=0, k_o="41" * 32, key_image="42" * 32,
+            receipt=b"s" * 284, block_height=91, block_hash="22" * 32,
+            global_output_index=7)
+        moved_view = dataclasses.replace(
+            view(), tip_height=101, tip_hash="23" * 32,
+            block_height=91, block_hash="22" * 32,
+            confirmations=10, output_indices=(7, 8))
+        self.assertEqual(self.ledger.observe(first, view(), 0, True, None), "credited")
+        self.assertEqual(self.ledger.observe(sibling, moved_view, 0, True, None), "credited")
+        rows = self.ledger.db.execute("""
+            SELECT output_index,block_height,block_hash,status,credited,credit_count,suspension_reason
+            FROM deposits ORDER BY output_index
+        """).fetchall()
+        self.assertEqual(rows, [
+            (0, 91, "22" * 32, "active", 1, 1, None),
+            (1, 90, "03" * 32, "suspended", 1, 1, "event origin changed"),
+        ])
+        moved_first = dataclasses.replace(
+            first, block_height=91, block_hash="22" * 32, global_output_index=8)
+        self.assertEqual(self.ledger.observe(moved_first, moved_view, 0, True, None), "suspended")
+
+    def test_reincluded_transaction_suspends_already_credited_sibling(self):
+        first = deposit()
+        sibling = dataclasses.replace(
+            first, output_index=0, k_o="41" * 32, key_image="42" * 32,
+            receipt=b"s" * 284, global_output_index=5)
+        self.assertEqual(self.ledger.observe(first, view(), 0, True, None), "credited")
+        self.assertEqual(self.ledger.observe(sibling, view(), 0, True, None), "credited")
+        moved = dataclasses.replace(sibling, block_height=91, block_hash="22" * 32,
+                                    global_output_index=7)
+        moved_view = dataclasses.replace(
+            view(), tip_height=101, tip_hash="23" * 32,
+            block_height=91, block_hash="22" * 32,
+            confirmations=10, output_indices=(7, 8))
+        self.assertEqual(self.ledger.observe(moved, moved_view, 0, True, None), "suspended")
+        self.assertEqual(self.ledger.db.execute("""
+            SELECT output_index,status,credited,credit_count,suspension_reason
+            FROM deposits ORDER BY output_index
+        """).fetchall(), [
+            (0, "suspended", 1, 1, "event origin changed"),
+            (1, "suspended", 1, 1, "event origin changed"),
+        ])
+
+    def test_unconfirmed_reinclusion_suspends_credited_sibling(self):
+        first = deposit()
+        sibling = dataclasses.replace(
+            first, output_index=0, k_o="41" * 32, key_image="42" * 32,
+            receipt=b"s" * 284, block_height=91, block_hash="22" * 32,
+            global_output_index=7)
+        moved_view = dataclasses.replace(
+            view(), tip_height=92, tip_hash="23" * 32, block_height=91,
+            block_hash="22" * 32, confirmations=1, output_indices=(7, 8))
+        self.assertEqual(self.ledger.observe(first, view(), 0, True, None), "credited")
+        self.assertEqual(self.ledger.observe(sibling, moved_view, 0, False,
+                         "insufficient confirmations", stable_observation=True), "suspended")
+        self.assertEqual(self.ledger.credit_state(first.genesis, first.txid,
+                         first.output_index)["credit_status"], "suspended")
+
+    def test_stable_pool_reappearance_suspends_credited_sibling(self):
+        first = deposit()
+        sibling = dataclasses.replace(
+            first, output_index=0, k_o="41" * 32, key_image="42" * 32,
+            receipt=b"s" * 284, block_height=None, block_hash=None,
+            global_output_index=None)
+        pool_view = dataclasses.replace(
+            view(), in_pool=True, block_height=None, block_hash=None,
+            confirmations=0, output_indices=())
+        self.assertEqual(self.ledger.observe(first, view(), 0, True, None), "credited")
+        self.assertEqual(self.ledger.observe(sibling, pool_view, 0, False,
+                         "transaction is still in pool", stable_observation=True), "suspended")
+        self.assertEqual(self.ledger.credit_state(first.genesis, first.txid,
+                         first.output_index)["credit_status"], "suspended")
+
+    def test_unstable_sibling_observation_does_not_invalidate_credit(self):
+        first = deposit()
+        sibling = dataclasses.replace(
+            first, output_index=0, k_o="41" * 32, key_image="42" * 32,
+            receipt=b"s" * 284, block_height=91, block_hash="22" * 32,
+            global_output_index=7)
+        moved_view = dataclasses.replace(
+            view(), tip_height=101, tip_hash="23" * 32,
+            block_height=91, block_hash="22" * 32,
+            confirmations=10, output_indices=(7, 8))
+        self.assertEqual(self.ledger.observe(first, view(), 0, True, None), "credited")
+        self.assertEqual(self.ledger.observe(sibling, moved_view, 0, False,
+                         "daemon observation changed during verification",
+                         stable_observation=False), "suspended")
+        self.assertEqual(self.ledger.credit_state(first.genesis, first.txid,
+                         first.output_index)["credit_status"], "active")
+
+    def test_qualified_deposit_requires_a_frozen_block_anchor(self):
+        item = dataclasses.replace(deposit(), block_height=None, block_hash=None)
+        with self.assertRaisesRegex(ObservationError, "qualified deposit lacks block anchor"):
+            self.ledger.observe(item, view(), 0, True, None)
+        self.assertEqual(self.ledger.db.execute("SELECT COUNT(*) FROM deposits").fetchone()[0], 0)
+
+    def test_command_propagates_stable_unconfirmed_reinclusion_to_sibling_ledger(self):
+        self.use_command_ledger()
+        first = deposit()
+        self.assertEqual(self.ledger.observe(first, view(), 0, True, None), "credited")
+        sibling = dataclasses.replace(
+            first, output_index=0, k_o="41" * 32, key_image="42" * 32,
+            receipt=b"s" * 284, block_height=91, block_hash="22" * 32,
+            global_output_index=7)
+        intent_path = Path(self.temp.name) / "sibling-intent.bin"
+        receipt_path = Path(self.temp.name) / "sibling-receipt.bin"
+        intent_path.write_bytes(bytes.fromhex(sibling.intent))
+        receipt_path.write_bytes(receipt(intent=bytes.fromhex(sibling.intent),
+                                         txid=bytes.fromhex(sibling.txid), index=0,
+                                         amount=sibling.amount))
+        moved_view = dataclasses.replace(
+            view(), tip_height=92, tip_hash="23" * 32,
+            block_height=91, block_hash=sibling.block_hash,
+            confirmations=1, output_indices=(7, 8))
+
+        class StableClient:
+            url = sibling.endpoint
+
+            def __init__(self, _url):
+                pass
+
+            def identity(self):
+                return (92, "23" * 32)
+
+            def header(self, height):
+                self.assert_height = height
+                return {"hash": sibling.genesis, "orphan_status": False}
+
+            def spent(self, _key_image):
+                return 0
+
+        args = SimpleNamespace(
+            runtime=self.temp.name, receipt=str(receipt_path), intent=str(intent_path),
+            url=sibling.endpoint, core="core", profile="user", min_confirmations=10,
+        )
+        core_result = (sibling.txid, sibling.output_index, sibling.k_o, sibling.amount,
+                       sibling.key_image, sibling.destination, sibling.intent)
+        output = io.StringIO()
+        errors = io.StringIO()
+        with patch("deposit_observer.DaemonClient", StableClient), \
+                patch("deposit_observer.chain_view", side_effect=(moved_view, moved_view)), \
+                patch("deposit_observer.verify_core", return_value=core_result), \
+                redirect_stdout(output), redirect_stderr(errors):
+            self.assertEqual(observe_command(args), 2)
+        self.assertTrue(output.getvalue(), errors.getvalue())
+        self.assertEqual(json.loads(output.getvalue())["chain_qualified"], False)
+        reasons = self.ledger.db.execute(
+            "SELECT reason FROM observations ORDER BY id"
+        ).fetchall()
+        self.assertEqual(reasons[-1], ("insufficient confirmations",))
+        self.assertEqual(self.ledger.credit_state(first.genesis, first.txid,
+                         first.output_index)["credit_status"], "suspended")
+
     def test_all_three_uniqueness_axes_are_enforced(self):
         base = deposit()
         self.ledger.observe(base, view(), 0, True, None)
@@ -224,8 +392,11 @@ class DepositObserverTests(unittest.TestCase):
         """).fetchone(), (91, "22" * 32, 7, "active", 1, 1))
 
     def test_healthy_tip_advances_do_not_suspend_existing_credit(self):
-        item = deposit()
+        self.use_command_ledger()
+        item = command_deposit()
         self.ledger.observe(item, view(), 0, True, None)
+        initial_credit_id = self.ledger.credit_state(item.genesis, item.txid,
+                                                     item.output_index)["credit_id"]
         self.ledger.close()
         intent = Path(self.temp.name) / "intent.bin"
         receipt_path = Path(self.temp.name) / "receipt.bin"
@@ -256,7 +427,7 @@ class DepositObserverTests(unittest.TestCase):
             def spent(self, _key_image):
                 return 0
 
-        first = dataclasses.replace(view(), tip_height=101, tip_hash="11" * 32)
+        first = dataclasses.replace(view(11), tip_height=101, tip_hash="11" * 32)
         second = dataclasses.replace(view(12), tip_height=102, tip_hash="12" * 32)
         args = SimpleNamespace(
             runtime=self.temp.name, receipt=str(receipt_path), intent=str(intent),
@@ -288,6 +459,8 @@ class DepositObserverTests(unittest.TestCase):
         self.assertIs(observed["in_pool"], False)
         self.assertEqual(observed["global_output_index"], item.global_output_index)
         self.assertIs(observed["chain_qualified"], True)
+        self.assertEqual(observed["decision"], "idempotent")
+        self.assertEqual(observed["credit_id"], initial_credit_id)
         self.assertEqual((observed["status"], observed["credited"], observed["credit_count"]),
                          ("active", 1, 1))
         self.ledger = Ledger(self.path)
@@ -314,7 +487,8 @@ class DepositObserverTests(unittest.TestCase):
                                      (100, "11" * 32)))
 
     def test_inflight_confirmation_advance_retries_real_chain_view(self):
-        item = deposit()
+        self.use_command_ledger()
+        item = command_deposit()
         self.ledger.observe(item, view(), 0, True, None)
         self.ledger.close()
         intent = Path(self.temp.name) / "retry-intent.bin"
@@ -370,7 +544,8 @@ class DepositObserverTests(unittest.TestCase):
             ("active", 1, 1))
 
     def test_unsettled_snapshot_drift_fails_without_suspension(self):
-        item = deposit()
+        self.use_command_ledger()
+        item = command_deposit()
         self.ledger.observe(item, view(), 0, True, None)
         self.ledger.close()
         intent = Path(self.temp.name) / "unsettled-intent.bin"

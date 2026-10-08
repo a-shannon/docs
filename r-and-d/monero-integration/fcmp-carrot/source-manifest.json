@@ -2,7 +2,7 @@
   "format": "rosen-monero-adapter-source-v1",
   "recipe": "SHA256 of UTF-8 without BOM: lowercase SHA256 + TAB + POSIX relative path + LF for each file in explicit StringComparer.Ordinal order",
   "file_count": 25,
-  "aggregate_sha256": "019a8a70fbf1094429c69299db2cab81c008ecc0e4290fc199157519af265bfb",
+  "aggregate_sha256": "c29c361efaa4b5197341d8025cb81e309f1212dfe8d9092874429975fefa22a8",
   "excluded": [
     ".git/",
     "ignored build/runtime/cache files",
@@ -67,11 +67,11 @@
     },
     {
       "path": "deposit/deposit_observer.py",
-      "sha256": "f9cf63781f4c3c425f05d865bfc72c1242776c67ac16e6fcfa3f078f0bd24173"
+      "sha256": "42372606915da582eb41d0ad9ef12999a552a3d20a4b7d2ebdc8c7feeb2cc94b"
     },
     {
       "path": "deposit/test_deposit_observer.py",
-      "sha256": "e5603ea7c66e9fcdd85e47dabdf1d4c00860f325a05f7f8bd8d8765889d75c1c"
+      "sha256": "7225ce70f47865e87106b1146d960b15637bdc169a62481e5df9c35c68c39494"
     },
     {
       "path": "monero_hook.cmake",

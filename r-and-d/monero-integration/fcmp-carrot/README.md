@@ -11,7 +11,7 @@ does not replace the submitted Rosen service implementation.
 The [complete source](source/) includes the C++ spend-device adapter, Rust SAL
 wrapper, receipt composition, observer, admission journal and replay runner.
 The [25-file manifest](source-manifest.json) binds the reviewed source with
-aggregate SHA256 `019a8a70fbf1094429c69299db2cab81c008ecc0e4290fc199157519af265bfb`.
+aggregate SHA256 `c29c361efaa4b5197341d8025cb81e309f1212dfe8d9092874429975fefa22a8`.
 Core is pinned to `d816367cb1aa405bfa68a20ac3e034d0759d968e`; Rust uses the
 node's `monero-oxide` revision `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
 
@@ -92,6 +92,20 @@ suspended credit. A separate fresh run removed only the confirmed return while
 the deposit remained, resubmitted identical return bytes with one signing
 attempt, and reconfirmed them 12 blocks deep. Both use the pinned Core/Rust
 binaries and one local endpoint. Neither run includes Ergo settlement.
+
+## Same-transaction output re-inclusion correction
+
+A stable observation that a transaction has moved to another block now
+suspends any previously credited sibling output frozen at the old block. A
+stable return to the mempool has the same effect. The ledger updates the
+observed output and its siblings in one SQLite transaction, including when
+the new block has not yet reached the credit confirmation threshold. An
+unstable two-view observation does not establish a sibling re-inclusion.
+
+The deposit suite passed 33 tests, including the command-to-ledger path using
+the same database and receipt bytes, and the admission suite passed 24 tests
+with three Linux-only tests skipped on Windows. These checks did not rerun the
+offline fakechain or exercise a live multi-output deposit.
 
 ## Remaining boundaries
 

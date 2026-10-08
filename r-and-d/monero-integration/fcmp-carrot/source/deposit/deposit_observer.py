@@ -568,7 +568,17 @@ class Ledger:
                 deposit.tx_blob, deposit.receipt)
 
     def observe(self, deposit: Deposit, view: ChainView, spent_status: int,
-                qualified: bool, reason: str | None) -> str:
+                qualified: bool, reason: str | None,
+                stable_observation: bool | None = None) -> str:
+        # The CLI supplies the independently checked daemon stability result.
+        # Direct callers retain the qualified-only default used by local tests.
+        if stable_observation is None:
+            stable_observation = qualified
+        if qualified and (deposit.block_height is None or deposit.block_hash is None):
+            raise ObservationError("qualified deposit lacks block anchor")
+        if stable_observation and not view.in_pool and (
+                deposit.block_height is None or deposit.block_hash is None):
+            raise ObservationError("stable mined deposit lacks block anchor")
         now = int(time.time())
         with self.write():
             rows = self.db.execute("""
@@ -634,6 +644,17 @@ class Ledger:
                         block_height=?,block_hash=?,global_output_index=? WHERE id=?
                 """, (status, credited, credit_count, reason, now, stored_height,
                     stored_hash, stored_global_index, deposit_id))
+            if stable_observation:
+                # A stable view of one transaction output also updates the
+                # credit state of its siblings. A re-mined transaction has one
+                # block anchor, even before it reaches the credit threshold.
+                self.db.execute("""
+                    UPDATE deposits SET status='suspended',suspension_reason='event origin changed',
+                        last_seen=? WHERE genesis=? AND txid=? AND output_index<>?
+                        AND credited=1 AND status='active'
+                        AND (? OR block_height IS NOT ? OR block_hash IS NOT ?)
+                """, (now, deposit.genesis, deposit.txid, deposit.output_index,
+                      view.in_pool, deposit.block_height, deposit.block_hash))
             self.db.execute("""
                 INSERT INTO observations(deposit_id,observed_at,endpoint,decision,reason,tip_height,
                     tip_hash,confirmations,spent_status,tx_blob_sha256) VALUES(?,?,?,?,?,?,?,?,?,?)
@@ -712,7 +733,8 @@ def observe(args: argparse.Namespace) -> int:
             tx_blob=second.tx_blob, receipt=receipt, block_height=second.block_height,
             block_hash=second.block_hash, global_output_index=global_index, endpoint=client.url,
         )
-        decision = ledger.observe(deposit, second, spent_second, chain_qualified, reason)
+        decision = ledger.observe(deposit, second, spent_second, chain_qualified,
+                                  reason, stable_observation=stable)
         credit = ledger.credit_state(second.genesis, txid, output_index)
         origin = event_origin(second.genesis, txid, output_index, k_o, key_image,
                               intent_hex, destination, amount)
