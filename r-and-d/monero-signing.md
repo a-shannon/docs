@@ -288,25 +288,28 @@ reviewed at `40b04ef372d191f8991da22c220ccce2ba457b47`, still lists wallet/proof
 integration and multisig work. Those snapshots did not deliver a replacement for
 the CLSAG wallet path documented above.
 
-A separate [7 October FCMP++/CARROT adapter](https://github.com/a-shannon/docs/tree/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot)
+A separate [8 October corrected FCMP++/CARROT adapter](https://github.com/a-shannon/docs/tree/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot)
 now composes Core beta3 `d816367cb1aa405bfa68a20ac3e034d0759d968e` with threshold
 SAL at the node's Rust pin `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
-The [Core spend-device adapter](https://github.com/a-shannon/docs/blob/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot/source/core/threshold_spend_device.cpp)
+The [Core spend-device adapter](https://github.com/a-shannon/docs/blob/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot/source/core/threshold_spend_device.cpp)
 reconstructs the full request and requires authorization before invoking the
-signer. The [Rust wrapper](https://github.com/a-shannon/docs/blob/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot/source/rust/src/lib.rs)
+signer. The [Rust wrapper](https://github.com/a-shannon/docs/blob/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot/source/rust/src/lib.rs)
 uses imported threshold SAL machines and verifies DLEQ-associated image shares
 before legacy SAL preprocessing. Core verifies the completed SAL and finalizes
 the membership proof, BP+ and transaction. The reusable device takes no aggregate
 spend-secret parameter; the disposable CLI uses public synthetic fixture keys.
 
-The [fresh-node replay](https://github.com/a-shannon/docs/blob/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot/source/admission/replay_roundtrip.py)
+The [fresh-node replay](https://github.com/a-shannon/docs/blob/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot/source/admission/replay_roundtrip.py)
 executes an actual pre-upgrade output spend, CARROT deposit, exact-output return,
 retained-byte recovery and reorg/reintroduction without second credit. The
 receipt binds the full transaction, selected output, intent, destination and
 amount; the observer independently scans the receiver image before spentness
 checks. The final audit checks approved body/fee, key image, SAL and receipt;
 daemon consensus supplies membership/BP+ validation. This is not an independent
-proof-system audit.
+proof-system audit. The corrected source also fixes retained deposit-backing mode,
+concurrent finalization files, healthy tip advancement and precredit reinclusion.
+Its second fresh fakechain replay recovered an already accepted return from exact
+retained bytes after that return had spent the backing output.
 
 The executed join uses the legacy address hierarchy with CARROT outputs; modern
 SAL has primitive tests, not an end-to-end new-CARROT-address wallet. The custom

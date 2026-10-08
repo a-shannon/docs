@@ -1,6 +1,6 @@
 # Monero integration into Rosen
 
-A. Shannon · Updated 7 October 2026 · Draft integration document — RCS-003
+A. Shannon · Updated 8 October 2026 · Draft integration document — RCS-003
 
 The proposed first adapter connects native XMR to Ergo using output-specific
 deposit verification and the Rust wallet's threshold CLSAG signing path. A
@@ -36,8 +36,8 @@ incorporates the operator-review corrections and separates existing experimental
 evidence from unresolved design choices. Existing candidate code is retained for
 review; its presence does not imply an accepted implementation direction.
 The contribution sequence and qualification tests below are conditional future
-work. A separate [7 October FCMP++/CARROT source and replay snapshot](https://github.com/a-shannon/docs/tree/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot)
-is now available as bounded protocol-compatibility evidence. It is not an
+work. A separate [8 October corrected FCMP++/CARROT source and replay snapshot](https://github.com/a-shannon/docs/tree/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot)
+is available as bounded protocol-compatibility evidence. It is not an
 accepted service architecture or an upgraded Rosen bridge.
 
 ## RCS requirements
@@ -356,7 +356,7 @@ deployment are separate milestones.
 
 ### Contribution conventions and shared consumers
 
-The RCS source pin was rechecked unchanged at `7b9784d` on 7 October 2026.
+The RCS source pin was rechecked unchanged at `7b9784d` on 8 October 2026.
 [RCS-001](https://github.com/rosen-bridge/rcs/blob/7b9784dae9d8d5b66b80de7a6043d1ba36a3a4bf/rcs-001.md)
 applies to TypeScript/ErgoScript tests: Vitest, mirrored `tests/**/*.spec.ts`
 paths, function-level synchronous `describe` groups and asynchronous `it` only
@@ -377,19 +377,18 @@ do not replace the new-package `0.0.0` rule. These are contribution conventions,
 not evidence of operational compatibility.
 
 The published [sign-protocols draft](https://github.com/rosen-bridge/sign-protocols/pull/2)
-at `4a97dc96f4ad404961e0e3317503f0c457089054` does not yet meet those conventions:
-its four new spec files contain 38 `it`/`it.each` declarations without the four
-RCS-001 test-document tags, and five new private multisig methods lack RCS-002
-JSDoc. This is a source-level delivery finding, not a failed runtime assertion.
-A separately retained 5 October corrective candidate supplies scenario-specific documentation for the
-same 38 definitions / 64 expanded cases, mirrored class/method test groups,
-separate data/generator/mock helpers, class-method spies and the missing JSDoc.
+at `924501e8458ee72028354573acd0200a1f75c621` now includes the 8 October
+contribution-conventions correction. It supplies scenario-specific RCS-001
+documentation for 38 test definitions / 64 expanded cases, mirrored
+class/method test groups, separate data/generator/mock helpers, class-method
+spies and the missing RCS-002 JSDoc.
 Communication passes 15 tests and multisig passes 97 under Node 22.18.0,
-npm 11.6.2, TypeScript 5.8.3 and Vitest 3.2.4, with focused type/style checks.
-These corrections have not been submitted; they do not qualify the Monero
-service candidates or establish Rosen acceptance. The intended `communication`
-and `ergo-multi-sig` `3.1.0` releases still have no qualified registry-install/build
-closure in the 5 October evidence. That local Changesets rehearsal builds the producer graph, packs
+npm 11.6.2, TypeScript 5.8.3 and Vitest 3.2.4; the repository commit hook
+also passed type, lint, format and package checks on the corrected tree.
+Submission does not qualify the Monero service candidates or establish Rosen
+acceptance. The intended `communication` and `ergo-multi-sig` `3.1.0` releases
+still have no qualified registry-installed consumer closure. The local Changesets
+rehearsal builds the producer graph, packs
 four packages and installs those archives into a separate consumer; its seven
 signing/transport tests pass. This remains release preparation, not a published
 dependency closure. The local service candidates also
@@ -439,12 +438,13 @@ the UI repository.
 Chain PRs contain the chain implementation and necessary registrations.
 Independent shared behavior changes need separate PRs and an explicit dependency
 order; separate commits or changesets within one chain PR are insufficient.
-The generic authorization draft is already separate. Its local corrective
-candidate excludes the independent ESM import-suffix, LICENSE and package-file
-cleanup hunks; the tested consumer uses the repository's configured `tsx`
-loader. Those earlier changes remain preserved in the published draft's history
-for separate disposition. Equivalent rewrites and unrelated cleanup must also
-be removed from the retained chain/service candidates after scope agreement.
+The generic authorization draft is already separate. Its 8 October correction
+is published in PR2. It excludes the independent ESM import-suffix,
+LICENSE and package-file cleanup hunks from the proposed correction; the tested
+consumer uses the repository's configured `tsx` loader. Those earlier changes
+remain preserved in the draft's history for separate disposition. Equivalent
+rewrites and unrelated cleanup must also be removed from the retained
+chain/service candidates after scope agreement.
 This generic correction does not resume the paused Monero module implementation.
 
 ### Proposed chain and network contract
@@ -590,12 +590,13 @@ claim of maintainer agreement. **I** records implementation, **T** executed
 checks, **S** submission to Rosen and **A** acceptance. **Design only** means
 the proposal in docs PR1, not chain code submitted to a Rosen consumer repository.
 A public fork or replay archive is not that submission. No Monero design/module
-acceptance or document review by Rosen is established as of 7 October; operator
+acceptance or document review by Rosen is established as of 8 October; operator
 comments remain separate feedback. **L** is the published lab source/results at
 `9466cf2fadd266f20e927da938e074b8ef60dacf`; **V** is its complete-return command
-above. **F** is the separate 7 October beta3 adapter and its fresh-node replay,
+above. **F** is the separate corrected 8 October beta3 adapter and fresh-node replay,
 linked in the migration section; it does not extend L's Ergo settlement scope.
-Unchanged L/Q and package results were not rerun for this documentary update.
+Unchanged L/Q and earlier archive-consumer results were not rerun. The focused
+PR2 correction checks and F replay are recorded above.
 Future service gates have no qualified command/candidate yet; their executable
 recipe is contributor work after scope agreement, not evidence marked passed.
 
@@ -613,12 +614,12 @@ recipe is contributor work after scope agreement, not evidence marked passed.
 | RCS-003 Abstract Chain/Network / requirements | Applies; direct base/output representation proposed | Method table; `@rosen-chains/monero` / `monero-rpc`; missing/refused interfaces noted above | Inventory/reservation, proposal→final-ID and real processor recovery gates, current-candidate recipe pending | I: local candidate against abstract-chain 17.0.0 / `25bea1b`; T: frozen Q 27 September standard-service credit/return/payout/reward, not current installation or complete interface closure; S: design only; A: deviations pending | Rosen decides representation/target version; contributor supplies complete accepted method implementation |
 | RCS-003 Health, Watcher, Guard / requirements | Applies beyond asset balance | Shared asset-check, scanner sync, jobs, config, `BalanceHandler` and custody | Valid/failed startup, disabled-chain and real database/restart gates, current-candidate recipe pending | I: local wiring, XMR balance/asset health absent; T: frozen standard-service roundtrip and later HTTP join, not complete health/disabled-chain qualification; S: design only; A: pending | Contributor supplies implementation/configuration/recovery fixtures; operators validate deployment |
 | RCS-003 UI / requirements; team ownership/conventions direction | Applies even with native-only scope | Shared constants/types/URLs, network, calculator, Rosen Service, app, wallet and npm/Turbo build graph | Clean builds plus actual wallet→UI→Service→Watcher/Guard path; static Firo comparison above | I: complete Monero UI/Service path absent; T: source comparison only; S: design only; A: wallet/API and ownership design pending | Contributor prepares full accepted graph; Rosen selects supported wallet/API contract |
-| RCS-001 tests; RCS-002 contribution guides; RCS-003 Integration Notes / conventions | TypeScript/ErgoScript/backend PR surfaces; Rust tests separately | Contribution-conventions section, manifests/changesets/tests/logs | Exact-candidate case/layout review, hook checks and clean install/build; commands pinned per accepted repository | I: generic PR2 corrective candidate; T: 15 communication / 97 multisig tests plus focused convention/type/style checks; local Monero node-test/layout gaps and missing Guard-major changeset remain; S: PR2 draft at `4a97dc9`, corrections not submitted; A: pending | Contributor submits the bounded correction when authorized and closes accepted module conventions; maintainers review/release |
+| RCS-001 tests; RCS-002 contribution guides; RCS-003 Integration Notes / conventions | TypeScript/ErgoScript/backend PR surfaces; Rust tests separately | Contribution-conventions section, manifests/changesets/tests/logs | Exact-candidate case/layout review, hook checks and clean install/build; commands pinned per accepted repository | I: generic PR2 correction published; T: 15 communication / 97 multisig tests and commit-hook checks; local Monero node-test/layout gaps and missing Guard-major changeset remain; S: PR2 draft at `924501e`, correction submitted; A: pending | Contributor closes accepted module conventions and registry consumer checks; maintainers review/release |
 | Team direction: one-purpose PRs and no equivalent rewrites | Chain implementation/required registration versus independent shared behavior | Separate generic authorization PR; service/package hunk disposition | Review each changed hunk against target base; keep/split/remove with dependency order | I: generic correction excludes independent ESM/LICENSE/package cleanup; T: source disposition and fresh archive consumer, chain/service splitting pending; S: docs PR1 and generic PR2, no complete chain PR set; A: scope disposition pending | Contributor splits remaining shared behavior and removes equivalent churn after scope agreement; Rosen resolves interface choices |
 | Team direction: published external dependencies first | Backend libraries/consumers; private UI workspaces use normal local builds | Producer releases before normal consumer lockfile/install/build | Exact versions resolve from intended registry; clean install/build without overlays | I: manifests/locks incomplete; Guard lock references registry `ergo-multi-sig` 3.1.0, absent in the 5 October registry check, and omits Monero graph; T: four-archive rehearsal and 7 consumer tests, not clean registry installation; S: intended paired 3.1.0 in PR2; A: release/registry consumer closure pending | Package owners publish accepted versions; contributor regenerates ordinary locks and qualifies consumers |
 | Team direction: Rosen supplies new UI component/interaction | Any required new wallet/proof workflow | Existing component reuse or team-supplied contract, not a contributor replacement | Map supported-wallet inputs/status/failure needs to actual component/version | I: Monero user interaction absent; T: no wallet/proof UI qualification; S: design needs only; A: component/contract decision pending | Contributor prepares requirements/reuse analysis; Rosen supplies any new component |
 | Zcash/BCH review links above / operator concerns | Shared startup, scan budgets, persistence, runtime and package changes apply; node-specific rules do not | Lifecycle table | Each row's isolated failure/recovery trial on real consumers; recipes pending | I: proposed qualification criteria; T: no new Monero runtime result; S: design only; A: not a maintainer acceptance record | Contributor translates applicable concerns into accepted-candidate checks; operator/maintainer decisions kept separate |
-| Monero protocol upgrade / compatibility gate | Old vault inputs and new transaction format | F's Core/Rust SAL composition; migration section | F's fresh offline fakechain replay; accepted production migration/service gate pending | I: legacy-address FCMP++ spend and CARROT output adapter; T: old-output spend, exact-output deposit/return, recovery and reorg; S: public fork evidence linked by this document, no upgraded Rosen modules; A: production architecture/proof/migration pending | Contributor closes accepted proof/address/service path; Rosen accepts profile and activation/finality/custody policy |
+| Monero protocol upgrade / compatibility gate | Old vault inputs and new transaction format | F's Core/Rust SAL composition; migration section | F's fresh offline fakechain replay; accepted production migration/service gate pending | I: legacy-address FCMP++ spend and CARROT output adapter; T: corrected 8 October old-output spend, exact-output deposit/return, recovery and reorg plus focused observer/concurrency regressions; S: public fork at `5f5cf88`, no upgraded Rosen modules; A: production architecture/proof/migration pending | Contributor closes accepted proof/address/service path; Rosen accepts profile and activation/finality/custody policy |
 | RCS-003 single integration document; team review/location direction | Applies before chain-code review; external to UI | This document in docs PR1, signing reference and public evidence links | Actual Rosen document review with revision/outcome; no integration dossier added to UI | I: documentary clarification of `8b7abb19c3deb63f15aa9c345987ad4be185b017`; T: documentary and source/evidence checks; S: this update in PR1; A: no documented Rosen review | Rosen reviews the design/next scope; contributor closes the accepted implementation and delivery gates |
 
 ## Withdrawal and recovery
@@ -805,7 +806,7 @@ the modern and legacy SAL threshold primitive tests both pass under the locked
 paths; they do not qualify a post-fork wallet spend engine. That pinned
 wallet/send path still constructs and completes CLSAG transactions.
 
-The [7 October adapter](https://github.com/a-shannon/docs/tree/b5d4441b73bcd4eb565643c4977362f1d8804637/r-and-d/monero-integration/fcmp-carrot)
+The [8 October corrected adapter](https://github.com/a-shannon/docs/tree/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot)
 instead uses Core beta3 `d816367cb1aa405bfa68a20ac3e034d0759d968e` for proposal
 construction, transaction serialization and membership/BP+ finalization, with
 threshold SAL from the node's Rust pin `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
