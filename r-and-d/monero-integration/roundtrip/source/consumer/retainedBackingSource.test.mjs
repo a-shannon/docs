@@ -68,6 +68,15 @@ test('fresh and retained entry points reconstruct the same full descriptor',asyn
   const f=fixture(),fresh=await f.adapter.inspect(f.candidate,new AbortController().signal);
   assert.deepEqual(fresh.backing,f.backing);assert.deepEqual((await f.read()).backing,fresh.backing);
 });
+test('retained backing refuses an unrepresentable Ergo recipient output',async()=>{
+  const f=fixture(),amount=String(9223372036854775808n+120n);
+  f.intent.amount=amount;f.intent.outputs[0].amount=amount;f.memo.amount=amount;
+  f.output.amountAtomic=amount;f.output.depositData=[encodeDepositMemo(f.memo).toString('hex')];
+  f.state.proofReceived=amount;f.backing.amountAtomic=amount;
+  f.backing.creditedAtomic='9223372036854775808';
+  f.backing.intentHash=intentHash(encodeIntent(f.intent));f.deliver();
+  await assert.rejects(f.read(),/Ergo token recipient amount/);
+});
 for(const field of ['version','genesis','committeeDigest','vaultSpend','vaultAddress','intentHash','txId','blockHash',
   'blockHeight','outputIndex','globalIndex','outputKey','keyImage','amountAtomic','destinationNetwork','destinationAsset',
   'recipient','creditedAtomic'])test('retained equality binds '+field,async()=>{

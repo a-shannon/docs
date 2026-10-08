@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 470,
-  "aggregateSha256": "628d8d401d2b4bc64596336c9902a6a63a4d3a00393902c0bcb9db882d01aebc",
+  "fileCount": 472,
+  "aggregateSha256": "febadf7809c242407915fe99fe3a7fedff3f4d55873a4f264a04bdd1d26bf4b2",
   "files": [
     {
       "path": "README.md",
-      "bytes": 27716,
-      "sha256": "d5c067ba738ef69fa4f16d66c4bcee368167b7814e2a5562baef71610d12f2b5"
+      "bytes": 28714,
+      "sha256": "d9deb29f5b4cde6f70f063e9d5232b70656dd884a357391cccc70e43b32a157a"
     },
     {
       "path": "consumer/adapter.ts",
@@ -66,13 +66,13 @@
     },
     {
       "path": "consumer/authenticatedDepositSource.mjs",
-      "bytes": 14744,
-      "sha256": "27d2dd315372cc2c94fe384344b6f0e645fba368357c58a4cbcc3be05601546e"
+      "bytes": 14920,
+      "sha256": "946324bef85048145338d1c1bbe178823e255af8213fcd41c7555eef69bf591b"
     },
     {
       "path": "consumer/authenticatedDepositSource.test.mjs",
-      "bytes": 14057,
-      "sha256": "733fa04a8def2864b557afeeb6036ab5dd3821ba1ff56875f7d31b88e99a97e5"
+      "bytes": 15306,
+      "sha256": "7069bc01e530113868a12e80d3058ba43b6705a402b888b7bf16466b724a09a2"
     },
     {
       "path": "consumer/authorityRoundtrip.ts",
@@ -195,19 +195,29 @@
       "sha256": "b3a679a6d726d1aad1d065cef665b550d38478d29df8926f40070268f9959ffe"
     },
     {
+      "path": "consumer/ergoTokenAmount.mjs",
+      "bytes": 567,
+      "sha256": "e4528e515396660db55a6ae9a933d730d89731fbb2c272a40e83d886fe1301a1"
+    },
+    {
+      "path": "consumer/ergoTokenAmount.test.mjs",
+      "bytes": 1449,
+      "sha256": "9713f3bf8fa18d99def47f7402a495faa1238ff437a117304c3c0f60c57b8470"
+    },
+    {
       "path": "consumer/fixturePorts.ts",
       "bytes": 462,
       "sha256": "2d63acc6a230f9091c5af62f496e0ea50ff3ccb60bf0f598656d2e6db26a5f05"
     },
     {
       "path": "consumer/freshDepositAdmission.mjs",
-      "bytes": 13973,
-      "sha256": "17584e74a76f35498f6a82fb502ce06dbf71febea8efbaaa83a8e11904a084cd"
+      "bytes": 14178,
+      "sha256": "1c35533eec9e28300077dfda0c9cbe227a6cad4c3b9429947b2ed8d5dbdbe0e7"
     },
     {
       "path": "consumer/freshDepositAdmission.test.mjs",
-      "bytes": 8489,
-      "sha256": "f662057ab822971fd8456129e6711576bb78d3b5cc76153c1e28e3feeb56dd71"
+      "bytes": 9623,
+      "sha256": "65533c16ae6f48b1aa2f87df12fbfb4b8b79d42e852444c114c5f2c766d449d3"
     },
     {
       "path": "consumer/gate-fixture.config.ts",
@@ -401,8 +411,8 @@
     },
     {
       "path": "consumer/retainedBackingSource.test.mjs",
-      "bytes": 10223,
-      "sha256": "203c3795750b7bfe391032d48b04db9afbb3549280c1acf4bafec558d5a4cb80"
+      "bytes": 10798,
+      "sha256": "b45f290d39185d34797996e0750b3d42d0627cf98134905e0de695b1dd5172d8"
     },
     {
       "path": "consumer/retainedCodec.ts",
@@ -571,8 +581,8 @@
     },
     {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 16980,
-      "sha256": "a3542e5acce71030c702cd965dd2a9f19eca516be4981d801877982ae6e7d40c"
+      "bytes": 17185,
+      "sha256": "d3df59ce25158b60830309b8de370a381288df1cf15f8daa74a469e0844d5be0"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -671,13 +681,13 @@
     },
     {
       "path": "ergo-node/deposit-credit.mjs",
-      "bytes": 23309,
-      "sha256": "0c53c31acadc3aa7d5c47256ac4e5006b9e8f0864fe192afaa7c26ccf66e0a18"
+      "bytes": 23799,
+      "sha256": "c6d9ba9b6f390b8c711e610244505952454e3ffac2806e88c8aabf5d4cc7743d"
     },
     {
       "path": "ergo-node/deposit-credit.test.mjs",
-      "bytes": 8021,
-      "sha256": "228d03ccbfd59d4f552a5e83dd5788d8c096a75ded360974f61022cece0acc93"
+      "bytes": 9380,
+      "sha256": "dbfaf19f44ed83c30c7322431dc79fa8bf890b2ab576eae55947de75c63dcde4"
     },
     {
       "path": "ergo-node/deposit-loader.mjs",
@@ -791,13 +801,13 @@
     },
     {
       "path": "ergo-node/reward-settlement.mjs",
-      "bytes": 22682,
-      "sha256": "bb3b2e765fdb97e95c584ece1e4e675a85c960b9d55bbe3bb4a986bff4d43644"
+      "bytes": 23432,
+      "sha256": "a9af6e0b0b103aa547535991808ee1be23541fb728524bb116a787fbdb615bfc"
     },
     {
       "path": "ergo-node/reward-settlement.test.mjs",
-      "bytes": 14290,
-      "sha256": "28a4e8dc43785065e4d5dd6f562bc73fde3b7e8408763324d3091782baa75b52"
+      "bytes": 16188,
+      "sha256": "023655f587b1c2b7787321932b52889015fdea3f7bbd7640e7fd3e4b1b62e8a2"
     },
     {
       "path": "ergo-node/reward-signed-custody.mjs",
@@ -811,8 +821,8 @@
     },
     {
       "path": "ergo-node/rosen-node.mjs",
-      "bytes": 15407,
-      "sha256": "fe23ba6ae880e9a0f68ecc4dcf388d66abed8c760e25c76f77e1587226a75412"
+      "bytes": 15469,
+      "sha256": "71f8ca8c059f686d8ebc86b0a626c00a2d4be543d7d7ce62360870b75d36ed83"
     },
     {
       "path": "ergo-node/trigger-funding.test.mjs",

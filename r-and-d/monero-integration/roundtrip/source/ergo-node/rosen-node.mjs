@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
+import {checkedErgoCreditAmounts} from '../consumer/ergoTokenAmount.mjs';
 const require = createRequire(config.rosenRoot+'/package.json');
 export const wasm = require('ergo-lib-wasm-nodejs');
 const { blake2b } = require('@noble/hashes/blake2b');
@@ -89,8 +90,7 @@ export async function credit(observation,label) {
   for(const field of ['amount','bridgeFee','networkFee'])assert.match(observation[field],/^(0|[1-9][0-9]*)$/);
   assert.match(observation.sourceTxId,/^[0-9a-f]{64}$/);assert.match(observation.sourceBlockId,/^[0-9a-f]{64}$/);
   assert(Number.isSafeInteger(observation.height)&&observation.height>=0);
-  const amount=BigInt(observation.amount),fee=BigInt(observation.bridgeFee)+BigInt(observation.networkFee);
-  assert(amount>fee&&fee>0n);
+  const {fee,net}=checkedErgoCreditAmounts(BigInt(observation.amount),BigInt(observation.bridgeFee),BigInt(observation.networkFee));
   const {DefaultLogger,DummyLogger}=await import(pathToFileURL(require.resolve('@rosen-bridge/abstract-logger')));
   DefaultLogger.init(new DummyLogger());
   const {TokenMap}=await import(pathToFileURL(require.resolve('@rosen-bridge/tokens')));
@@ -115,7 +115,7 @@ export async function credit(observation,label) {
   const secrets=new wasm.SecretKeys();JSON.parse(fs.readFileSync(runtime+'/rosen-keys-private.json')).slice(0,2).forEach(k=>secrets.add(wasm.SecretKey.dlog_from_bytes(Buffer.from(k,'hex'))));
   const signer=wasm.Wallet.from_secrets(secrets);
   const chain=new ErgoChain(network,{fee:1100000n,confirmations:{payment:1,cold:1,manual:1,arbitrary:1},addresses:{lock:d.contracts.Lock.address,permit:d.contracts.Permit.address,fraud:d.contracts.Fraud.address,cold:d.fundingAddress},rwtId:d.tokens.RWT,minBoxValue:1000000n,eventTxConfirmation:1},new TokenMap(),{isInSign:async()=>false,sign:async(reduced,required)=>{assert.equal(required,2);return signer.sign_reduced_transaction(reduced);}});
-  const order=[{address:d.contracts.Permit.address,assets:{nativeToken:2000000n,tokens:[{id:d.tokens.RWT,value:10n}]},extra:d.tokens.WID},{address:observation.toAddress,assets:{nativeToken:10000000n,tokens:[{id:d.tokens.Asset,value:amount-fee}]}},{address:d.fundingAddress,assets:{nativeToken:1000000n,tokens:[{id:d.tokens.Asset,value:fee}]},extra:''}];
+  const order=[{address:d.contracts.Permit.address,assets:{nativeToken:2000000n,tokens:[{id:d.tokens.RWT,value:10n}]},extra:d.tokens.WID},{address:observation.toAddress,assets:{nativeToken:10000000n,tokens:[{id:d.tokens.Asset,value:net}]}},{address:d.fundingAddress,assets:{nativeToken:1000000n,tokens:[{id:d.tokens.Asset,value:fee}]},extra:''}];
   const guard=wasm.ErgoBox.from_json(JSON.stringify(await rpc('/utxo/byId/'+d.guard.boxId)));
   const hex=b=>Buffer.from(b.sigma_serialize_bytes()).toString('hex');
   const payment=await chain.generateTransaction(extracted.eventId,TransactionType.payment,order,[],[],[hex(trigger)],[hex(guard)]);

@@ -7,6 +7,7 @@ import {decodeIntent,intentHash} from '../packages/monero-deposit/lib/intentCode
 import {verifyDeposit} from '../packages/monero-deposit/lib/depositPolicy.ts';
 import {NATIVE_SOURCE_PIN} from '../packages/monero-deposit/lib/evidence.ts';
 import {decodeDepositData,decodeDepositEnvelope} from './depositDelivery.mjs';
+import {assertErgoTokenAmount} from './ergoTokenAmount.mjs';
 
 const canonical=value=>JSON.stringify(value,(_,item)=>item&&Object.getPrototypeOf(item)===Object.prototype
   ?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
@@ -39,6 +40,7 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
     'maxObservationAge','minConfirmations','networkFee','vaultAddress','vaultEpoch','vaultSpend'].sort(),'Admission configuration');
   for(const key of ['committeeDigest','destinationAsset','genesis','vaultSpend'])hash(cfg[key]);
   for(const key of ['bridgeFee','networkFee','vaultEpoch'])decimal(cfg[key]);
+  assertErgoTokenAmount(BigInt(cfg.bridgeFee)+BigInt(cfg.networkFee),'fee');
   assert(BigInt(cfg.vaultEpoch)>0n);assert(/^[1-9A-HJ-NP-Za-km-z]{95}$/.test(cfg.vaultAddress));
   integer(cfg.minConfirmations);integer(cfg.maxObservationAge);
   // Ordinary outputs need ten blocks independently of the configurable bridge
@@ -148,6 +150,7 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
       },{bridgeFee:cfg.bridgeFee,networkFee:cfg.networkFee,sourceDecimals:12,destinationDecimals:12,remainder:'reject'},providers);
       assert.equal(decision.status,'accepted','Admission policy refused');
     }
+    assertErgoTokenAmount(decision.destinationAmount,'recipient');
     await current();
     // Stable across chain growth and across readers; source re-inclusion changes
     // the descriptor. Snapshot/reader identities are deliberately not preimages.

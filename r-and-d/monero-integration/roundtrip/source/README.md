@@ -167,7 +167,9 @@ database. Recovery requires three matching guard records for the same reward
 assignment, then checks the original candidate, snapshot, current source and
 signed transaction before restoring the owner record. It never starts a second
 signing session for an assigned reward. If fewer than three guards retained the
-same final bytes, automatic recovery stops without submission.
+same final bytes, automatic recovery stops without submission. Fresh submission
+and unconfirmed recovery both repeat source synchronization and guard assignment
+verification after the node transaction check and before broadcast.
 
 The minimum-fee reader reconstructs the configured NFT/asset fee box from complete
 node pagination and applies its historical row at the source height. New
@@ -176,6 +178,18 @@ approval. Underquoted deposits refuse rather than change their authenticated
 intent. Reward recovery accepts a successor fee box only when the retained
 historical fee policy remains identical. The live fixture exercises proportional
 fees; historical fee-box succession has focused regression coverage.
+
+The current credit order creates separate Ergo Asset outputs for the recipient
+and the combined deposit fees. Each output must contain between 1 and
+`9223372036854775807` units. Fresh V2 admission rejects an unrepresentable
+fee policy before observation and an unrepresentable net amount before creating
+backing or an event. Retained V2 backing and the earlier authenticated source
+apply the same output bounds. The baseline roundtrip rejects an unbuildable
+canonical intent before its durable admission, then checks the credit amounts
+again before creating an Ergo trigger. The gross Monero amount may exceed the signed
+limit when both Ergo outputs fit. Focused tests compare these bounds with the
+prepared Ergo WASM constructor and exercise the baseline admission database;
+this correction has not had a new native V2 roundtrip.
 
 Keep the source-reorganization campaign separate: `deposit-adapter` with
 `sourceResilience: true` and `v2Return: false` tests permanent quarantine of a

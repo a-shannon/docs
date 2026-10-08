@@ -19,6 +19,7 @@ import {issueBackingClaim} from '../consumer/backingClaim.mjs';
 import {verifyDeliveryMode} from '../consumer/depositDelivery.mjs';
 import {captureFreshCreditSource} from './fresh-credit-source.mjs';
 import {freshCreditConfigurations} from './credit-custody.mjs';
+import {assertErgoTokenAmount} from '../consumer/ergoTokenAmount.mjs';
 
 const require=createRequire(path.join(config.rosenRoot,'package.json'));
 const load=relative=>import(pathToFileURL(path.join(config.rosenRoot,relative)).href);
@@ -39,9 +40,11 @@ export function creditObservation(candidate,source){
 }
 export function creditOrder(candidate,deployment,wids){
   assert.equal(wids.length,2);assert.equal(new Set(wids).size,2);
+  const recipientAmount=assertErgoTokenAmount(candidate.destinationAmount,'recipient');
+  const feeAmount=assertErgoTokenAmount(candidate.bridgeFee+candidate.networkFee,'fee');
   return [...wids.map(WID=>({address:deployment.contracts.Permit.address,assets:{nativeToken:1000000n,tokens:[{id:deployment.tokens.RWT,value:10n}]},extra:WID})),
-    {address:candidate.recipient,assets:{nativeToken:10000000n,tokens:[{id:deployment.tokens.Asset,value:candidate.destinationAmount}]}},
-    {address:deployment.fundingAddress,assets:{nativeToken:1000000n,tokens:[{id:deployment.tokens.Asset,value:candidate.bridgeFee+candidate.networkFee}]},extra:''}];
+    {address:candidate.recipient,assets:{nativeToken:10000000n,tokens:[{id:deployment.tokens.Asset,value:recipientAmount}]}},
+    {address:deployment.fundingAddress,assets:{nativeToken:1000000n,tokens:[{id:deployment.tokens.Asset,value:feeAmount}]},extra:''}];
 }
 const orderKey=order=>text(order.map(row=>({...row,address:tree(row.address)})));
 

@@ -196,6 +196,9 @@ export async function settleReward(options,trustedPorts){
     const created=await verifier.create(directory);compareCreated(created,record,candidate);await rewardState(guards,context,anchor,record.assignment);await verifySigned(record,true);
     assert.equal(await api.rpc('/transactions/check',record.signedJson),record.txId,'Reward node check ID');
     await rewardState(guards,context,anchor,record.assignment);
+    await syncSource();const currentEvidence=(api.exportEvidence??exportRewardPaymentEvidence)(anchor);
+    const currentReward={anchor:structuredClone(anchor),context:structuredClone(context),evidence:structuredClone(currentEvidence),paymentTxId};
+    same(await guards.verifyReward(record.snapshot,currentReward),record.assignment,'Reward pre-broadcast guard assignment');
     if(!known){markSubmission(directory,record);assert.equal(await api.rpc('/transactions',record.signedJson),record.txId,'Reward submission ID');}
     const receipt=await verifyConfirmed(await waitConfirmed(api,record.txId),record);await rewardState(guards,context,anchor,record.assignment);retainConfirmation(directory,record,receipt);return finish(record,receipt,true,false,hadConfirmation);
   }
@@ -212,7 +215,12 @@ export async function settleReward(options,trustedPorts){
   const checked=api.verifySignedRecord?await api.verifySignedRecord({...provisional,signedJson:{}},snapshot,{fresh:true}):await nativeSigned(api,{...provisional,signedJson:JSON.parse(api.wasm.Transaction.sigma_parse_bytes(Buffer.from(signed.signedHex,'hex')).to_json())},snapshot,{fresh:true});
   provisional.signedJson=structuredClone(checked.signedJson);const body=encode(provisional);retainSignedRecord(signedFile,body);const record=readSigned(signedFile);
   verifyStatic(record,{candidate,contextDigest:ownerDigest,paymentTxId,settlement,verifier});
-  assert.equal(await api.rpc('/transactions/check',record.signedJson),record.txId,'Reward node check ID');await rewardState(guards,context,anchor,record.assignment);markSubmission(directory,record);
+  assert.equal(await api.rpc('/transactions/check',record.signedJson),record.txId,'Reward node check ID');
+  await rewardState(guards,context,anchor,record.assignment);
+  await syncSource();const currentEvidence=(api.exportEvidence??exportRewardPaymentEvidence)(anchor);
+  const currentReward={anchor:structuredClone(anchor),context:structuredClone(context),evidence:structuredClone(currentEvidence),paymentTxId};
+  same(await guards.verifyReward(record.snapshot,currentReward),record.assignment,'Reward pre-broadcast guard assignment');
+  markSubmission(directory,record);
   assert.equal(await api.rpc('/transactions',record.signedJson),record.txId,'Reward submission ID');
   if(simulateLostSubmissionReply)throw new RewardSubmissionReplyLostError(record.txId);
   const receipt=await verifyConfirmed(await waitConfirmed(api,record.txId),record);await rewardState(guards,context,anchor,record.assignment);retainConfirmation(directory,record,receipt);return finish(record,receipt,false,false,false);

@@ -78,6 +78,29 @@ function rewriteIntent(source, edit) {
   source.proofRequest.messageHex=source.decision.intentBytesHex;
 }
 
+test('legacy authenticated source bounds the two Ergo token outputs separately',()=>{
+  const max=9223372036854775807n;
+  function coherentAmounts(source,gross,bridgeFee,networkFee){
+    const amount=String(gross),bridge=String(bridgeFee),network=String(networkFee),net=gross-bridgeFee-networkFee;
+    source.context.feePolicy.bridgeFee=bridge;source.context.feePolicy.networkFee=network;
+    source.deposit.amountAtomic=source.observation.amountAtomic=source.publicScan.source.deposit.amountAtomic=amount;
+    Object.assign(source.decision,{amount:gross,bridgeFee,networkFee,netAmount:net,destinationAmount:net});
+    source.decision.outputs[0].amount=gross;
+    rewriteIntent(source,intent=>{intent.amount=amount;intent.bridge_fee=bridge;intent.network_fee=network;intent.outputs[0].amount=amount;});
+  }
+  for(const [gross,bridge,network,accepted] of [
+    [max+120n,100n,20n,true],
+    [max+121n,100n,20n,false],
+    [max+1n,max,0n,true],
+    [max+2n,max,1n,false],
+    [1n,0n,0n,false],
+  ]){
+    const {source,authority}=fixture();coherentAmounts(source,gross,bridge,network);
+    if(accepted)assert.equal(register(source,authority),source);
+    else assert.throws(()=>register(source,authority),/Ergo token (recipient|fee) amount/);
+  }
+});
+
 test('origin agrees across fresh verifier identities and independently registered equal sources',()=>{
   const first=fixture(),second=fixture();
   register(first.source,first.authority);register(second.source,second.authority);
