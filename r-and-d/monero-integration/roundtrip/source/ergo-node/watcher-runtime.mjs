@@ -147,12 +147,22 @@ export async function createWatcherParticipant({databasePath,deployment,watcher,
     assert.deepEqual(retained(requestId),{source,observation},'Watcher retained return drift');}
   // Keep deposit novelty checks synchronous and adjacent to queue/submission.
   function assertNew(requestId){current();if(returnMode)return currentReturn(requestId);credit.assertNew(retained(requestId).source.backing);}
+  async function currentDeposit(requestId){
+    const {source,observation}=retained(requestId);
+    const admitted=await inspect(structuredClone(source.raw),new AbortController().signal);current();
+    assert.equal(admitted.status,'accepted','Watcher source no longer accepted');
+    const fresh=structuredClone(admitted.observation);assert.equal(fresh.rawData,'');delete fresh.rawData;
+    fresh.height=admitted.backing.blockHeight;assertBacking(fresh,admitted.backing);
+    assert.deepEqual(fresh,observation,'Watcher source observation drift');
+    assert.deepEqual(admitted.backing,source.backing,'Watcher source backing drift');
+    assert.deepEqual(retained(requestId),{source,observation},'Watcher retained source drift');
+  }
   const serialized=json=>Buffer.from(closure.wasm.ErgoBox.from_json(stringify(json)).sigma_serialize_bytes()).toString('base64');
   async function knownUnspent(predicate){const known=[...watcher.permitBoxes,watcher.WIDBox,...(watcher.feeBoxes||[]),...store.confirmedOutputs()],unique=new Map(known.filter(predicate).map(b=>[b.boxId,b]));const live=[];for(const id of unique.keys()){try{live.push(await nodePort.rpc('/utxo/byId/'+id));}catch(e){if(!String(e).includes('404'))throw e;}}return live;}
   const database={getUnspentPermitBoxes:async WID=>{assert.equal(WID,watcher.WID);return (await knownUnspent(b=>b.ergoTree===deployment.contracts.Permit.tree)).filter(b=>Buffer.from(closure.wasm.ErgoBox.from_json(stringify(b)).register_value(4).to_byte_array()).toString('hex')===WID).map(b=>({boxSerialized:serialized(b)}));},getUnspentAddressBoxes:async()=>{const secret=typeof watcher.secretKey==='string'?closure.wasm.SecretKey.dlog_from_bytes(Buffer.from(watcher.secretKey,'hex')):watcher.secretKey;const addressTree=secret.get_address().to_ergo_tree().to_base16_bytes();return (await knownUnspent(b=>b.ergoTree===addressTree)).map(b=>({serialized:serialized(b)}));},trackTxQueue:async b=>b};
   try{closure=await loadWatcherRuntime({dependencyRoot,deployment,watcher,nodePort,database});}
   catch(error){credit?.close();store.close();throw error;}
-  async function reconcile(stage,checkpoint,confirmationCheckpoint=checkpoint+':before-confirmation'){current();const queued=store.readQueue(stage);assert(queued,'Missing signed transaction queue');if(queued.confirmed)return JSON.parse(queued.confirmed);let receipt;try{receipt=await nodePort.rpc('/blockchain/transaction/byId/'+queued.txId);}catch(e){if(!String(e).includes('404'))throw e;}if(!receipt){await pause(checkpoint);if(returnMode)await assertNew(queued.requestId);else assertNew(queued.requestId);const id=await nodePort.rpc('/transactions',JSON.parse(queued.signedJson));assert.equal(id,queued.txId,'Node transaction ID mismatch');}await pause(confirmationCheckpoint);receipt=await nodePort.confirmed(queued.txId);assert.equal(receipt.id,queued.txId);assert(receipt.numConfirmations>0,'Unconfirmed watcher spend');current();store.confirm(stage,receipt);return receipt;}
+  async function reconcile(stage,checkpoint,confirmationCheckpoint=checkpoint+':before-confirmation'){current();const queued=store.readQueue(stage);assert(queued,'Missing signed transaction queue');if(queued.confirmed)return JSON.parse(queued.confirmed);let receipt;try{receipt=await nodePort.rpc('/blockchain/transaction/byId/'+queued.txId);}catch(e){if(!String(e).includes('404'))throw e;}if(!receipt){await pause(checkpoint);if(returnMode)await assertNew(queued.requestId);else{await currentDeposit(queued.requestId);assertNew(queued.requestId);}const id=await nodePort.rpc('/transactions',JSON.parse(queued.signedJson));assert.equal(id,queued.txId,'Node transaction ID mismatch');}await pause(confirmationCheckpoint);receipt=await nodePort.confirmed(queued.txId);assert.equal(receipt.id,queued.txId);assert(receipt.numConfirmations>0,'Unconfirmed watcher spend');current();store.confirm(stage,receipt);return receipt;}
   async function observe(rawRequest){current();
     if(returnMode){const raw=structuredClone(rawRequest),observation=canonicalObservation(await observeReturn(structuredClone(raw)));current();assertReturn(observation,raw);
       const result=store.observe(raw,observation);store.source(result.requestId,raw,{kind:'ergo-return-v1',observation:result});return result;}

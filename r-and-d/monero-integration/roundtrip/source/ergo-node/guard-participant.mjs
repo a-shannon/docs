@@ -33,7 +33,8 @@ const sources=await Promise.all(Array.from({length:4},()=>openProcessSource(sele
 // Only new credit verification opens the fresh, unspent admission authority.
 let verifierPromise;
 const creditVerifier=()=>verifierPromise??=(openCreditVerifier({directory:path.join(selected.directory,'verification'),deployment:selected.deployment,
-  watcherReceipt:selected.watcherReceipt,freshAdmission:{readers:sources,candidate:selected.candidate}}).catch(error=>{verifierPromise=undefined;throw error;}));
+  watcherReceipt:selected.watcherReceipt,freshAdmission:{readers:sources,candidate:selected.candidate},
+  readClaim:obligationId=>ledger.readClaim(obligationId)}).catch(error=>{verifierPromise=undefined;throw error;}));
 const implementation=captureContributionPackage(config.contributionPackage);
 const {MultiSigHandler,MultiSigUtils}=await import(implementation.entry);implementation.verify();
 const require=createRequire(path.join(config.rosenRoot,'package.json')),wasm=require('ergo-lib-wasm-nodejs');

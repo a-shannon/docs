@@ -17,7 +17,7 @@ import {makeIndependentDepositProviders,independentlyDecideDeposit} from '../con
 import {captureAuthenticatedDepositSource,moneroCreditOrigin} from '../consumer/authenticatedDepositSource.mjs';
 import {issueBackingClaim} from '../consumer/backingClaim.mjs';
 import {verifyDeliveryMode} from '../consumer/depositDelivery.mjs';
-import {captureFreshCreditSource} from './fresh-credit-source.mjs';
+import {assertExactCreditClaim,captureFreshCreditSource,createInProcessClaimReader} from './fresh-credit-source.mjs';
 import {freshCreditConfigurations} from './credit-custody.mjs';
 import {assertErgoTokenAmount} from '../consumer/ergoTokenAmount.mjs';
 
@@ -49,19 +49,22 @@ export function creditOrder(candidate,deployment,wids){
 const orderKey=order=>text(order.map(row=>({...row,address:tree(row.address)})));
 
 /** Local raw-source -> actual trigger/order/reduction verifier for each guard. */
-async function prepareAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment,loadRequest,freshAdmission},verifierOnly=false){
+async function prepareAuthorizedCredit({directory,source,rawRequest,watcherReceipt,deployment,loadRequest,freshAdmission,readClaim},verifierOnly=false){
   const freshMode=freshAdmission!==undefined;
   let authenticatedSource,freshSource;
   if(!freshMode){
     verifyDeliveryMode(source.context?.configuration?.depositData,loadRequest);
     authenticatedSource=captureAuthenticatedDepositSource(source);
   }
+  if(!verifierOnly)assert(readClaim===undefined,'Credit claim override forbidden');
   assert(path.isAbsolute(directory));fs.mkdirSync(directory,{recursive:true});
+  if(freshMode&&!verifierOnly)
+    readClaim=createInProcessClaimReader({directory,deployment,freshAdmission});
   const request=freshMode?undefined:structuredClone(rawRequest),receipt=structuredClone(watcherReceipt);
   if(freshMode){
     assert.equal(source,undefined,'Fresh source cannot use legacy source');assert.equal(rawRequest,undefined,'Fresh source cannot use legacy request');
     assert.equal(loadRequest,undefined,'Fresh source cannot use legacy loader');
-    freshSource=await captureFreshCreditSource({freshAdmission,watcherReceipt:receipt});
+    freshSource=await captureFreshCreditSource({freshAdmission,watcherReceipt:receipt,readClaim});
   }
   const d=structuredClone({...deployment,guardSecrets:undefined,watchers:deployment.watchers.map(({secretKey,...watcher})=>watcher)});
   const {DefaultLogger,DummyLogger}=await load('node_modules/@rosen-bridge/abstract-logger/dist/index.js');DefaultLogger.init(new DummyLogger());
@@ -129,13 +132,16 @@ async function prepareAuthorizedCredit({directory,source,rawRequest,watcherRecei
     verifyCreditOutputs({unsigned:tx.unsigned_tx(),inputs,order:creditOrder(candidate,d,wids),lockTree:d.contracts.Lock.tree,feeTree:ErgoChain.feeBoxErgoTree,assetId:d.tokens.Asset});
     const recomputed=wasm.ReducedTransaction.from_unsigned_tx(tx.unsigned_tx(),boxes(inputs),boxes(data),await stateContext());
     assert.equal(hex(recomputed),snapshot.reducedHex,'Independent Ergo reduction');
-    if(freshMode)await freshSource.revalidate(index,freshRead);
+    if(freshMode){freshRead=await freshSource.revalidate(index,freshRead);
+      candidate=freshRead.decision;backing=freshRead.backing;}
     else {await source.current();authenticatedSource.current();}
     assert(live,'Closed source authority');
     const assignment=assignmentRequest(candidate,snapshot,backing);
+    if(freshMode)assertExactCreditClaim({readClaim,index,decision:freshRead.decision,assignment});
     const assertCurrent=()=>{if(freshMode)freshSource.current();else authenticatedSource.current();assert(live,'Closed source authority');};
     return {assignment,assertCurrent,...(freshMode?{async revalidate(){assertCurrent();const refreshed=await freshSource.revalidate(index,freshRead);assertCurrent();
-      return {assignment:assignmentRequest(refreshed.decision,snapshot,refreshed.backing),assertCurrent};}}:{})};
+      const assignment=assignmentRequest(refreshed.decision,snapshot,refreshed.backing);
+      assertExactCreditClaim({readClaim,index,decision:refreshed.decision,assignment});return {assignment,assertCurrent};}}:{})};
   }
   if(verifierOnly){
     assert(freshMode,'Process verifier requires fresh admission');

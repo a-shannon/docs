@@ -141,7 +141,12 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
         destinationNetwork:intent.destination_network,destinationAsset:intent.destination_asset,recipient:intent.to_address});
       const proof=await providers.proof.verify({messageBytes:request.intentBytes,proof:request.proof});
       assert(proof.value.good===true&&proof.value.received===amount,'Retained backing proof');
-      decision={intentHash:intentHash(request.intentBytes),recipient:intent.to_address,destinationAmount:amount-fees};
+      decision={status:'retained',authority:'assigned-claim-source-only',evidenceMode:'independent',
+        depositId:`monero:deposit:mainnet:${candidate.txId}`,intentHash:intentHash(request.intentBytes),
+        sourceNetwork:'mainnet',txid:candidate.txId,blockHash:candidate.sourceBlockId,blockHeight:BigInt(candidate.sourceHeight),
+        destinationNetwork:'ergo-testnet',destinationAsset:cfg.destinationAsset,recipient:intent.to_address,
+        amount,bridgeFee:BigInt(cfg.bridgeFee),networkFee:BigInt(cfg.networkFee),netAmount:amount-fees,
+        destinationAmount:amount-fees,retainedAtomicRemainder:0n,outputs:[{publicKey:output.outputKey}]};
     }else{
       decision=await verifyDeposit(request.intentBytes,request.proof,request.receiptEvidence,{
         version:2,domain:'rosen-monero-deposit',sourceNetwork:'mainnet',vaultEpoch:cfg.vaultEpoch,vaultAddress:cfg.vaultAddress,
@@ -159,11 +164,11 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
       blockHeight:candidate.sourceHeight,outputIndex,globalIndex:output.globalIndex,outputKey:output.outputKey,
       keyImage:output.keyImage,amountAtomic:output.amountAtomic,destinationNetwork:'ergo-testnet',destinationAsset:cfg.destinationAsset,
       recipient:decision.recipient,creditedAtomic:decision.destinationAmount.toString()});
-    if(retained)return Object.freeze({backing});
     const observation=Object.freeze({fromChain:'monero',toChain:'ergo',fromAddress:'rosen-monero-output:v2:'+digest('rosen-monero/credit-origin/v2',backing),
       toAddress:decision.recipient,amount:decision.amount.toString(),bridgeFee:cfg.bridgeFee,networkFee:cfg.networkFee,
       sourceChainTokenId:'XMR',targetChainTokenId:cfg.destinationAsset,sourceTxId:candidate.txId,sourceBlockId:candidate.sourceBlockId,
       requestId:Buffer.from(blake2b(candidate.txId,undefined,32)).toString('hex'),rawData:''});
+    if(retained)return Object.freeze({status:'retained',observation,backing,decision:Object.freeze(decision)});
     return Object.freeze({status:'accepted',observation,backing,decision});
   }
   const inspect=(candidate,signal)=>reconstruct(candidate,signal,false);
@@ -177,5 +182,5 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
   async function verify(candidate,signal){try{
     const result=await inspect(candidate,signal);return result.status==='accepted'?{status:'accepted',observation:result.observation}:result;
   }catch{return {status:'pending'};}}
-  return Object.freeze({scope,inspect,verify,readRetainedBacking});
+  return Object.freeze({scope,genesis:cfg.genesis,inspect,verify,readRetainedBacking});
 }

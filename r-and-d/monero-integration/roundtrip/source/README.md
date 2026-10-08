@@ -63,7 +63,10 @@ lost messages, guard death before a partial signature, config-directory drift,
 three-of-four signing with a non-coordinator offline, delayed duplicate messages,
 and recovery of the same confirmed credit. The three-of-four trial uses the node's
 transaction check endpoint without broadcasting; the final trial confirms one
-credit. The external `adapter-*/process-result.json` records the result and PIDs.
+credit. That trial first verifies four exact durable Guard claims, then lets
+three Guards sign while the fourth is offline. It does not demonstrate a return
+with a Guard permanently absent. The external `adapter-*/process-result.json`
+records the result and PIDs.
 
 The controller provisions the same four guard custody databases before starting
 watchers. Each watcher reads all four through a read-only view before retaining a
@@ -74,6 +77,11 @@ custody fails closed. The guard's atomic assignment remains necessary for races
 after a watcher read. Confirmed-event recovery returns the exact retained event;
 it does not grant new eligibility. The older in-process transport refuses V2
 observations and remains available only to older experiment profiles.
+Before submitting an unconfirmed V2 commitment or trigger, the watcher rereads
+its exact Monero request and backing after any queued pause, then checks guard
+custody again immediately before broadcast. A changed source leaves the queued
+transaction unconfirmed. A source change after broadcast cannot be made atomic
+with Ergo; guards independently verify the source before credit.
 
 For focused replay, set `WATCHER_DEPENDENCY_ROOT` to the prepared Rosen root:
 
@@ -117,6 +125,7 @@ Focused process checks need no running chain:
 
 ```text
 node --test tools/process-rpc.test.mjs tools/participant-config.test.mjs
+node --experimental-test-module-mocks --test ergo-node/quorum-credit-permit.test.mjs ergo-node/quorum-credit-process.test.mjs
 ```
 
 This profile uses controlled child processes under one OS account. It does not
@@ -141,7 +150,14 @@ the original V2 assignment, confirmed credit, recipient redemption, return event
 native request and selected output before retaining one permanent withdrawal
 reservation. Each fresh authorization reconstructs the same unspent Monero
 backing; expiry of the initial deposit-delivery window does not erase an existing
-credit liability. New deposit admission retains its expiry rules.
+credit liability. A guard with the exact assigned credit claim may continue its
+queued signing after that expiry only while its original block, output, key image
+and proof remain current and its trigger, reduced transaction and policy match
+the retained assignment. The in-process trial reads its four existing SQLite
+claims; each separate guard process reads its own custody. New deposit admission
+retains its expiry rules. Disposition of unclaimed expired deposits and
+post-event source reorganization remains an integration decision before
+activation.
 
 The existing Rust threshold CLSAG engine pays the recipient with two of four
 holders. The campaign checks competing reservations, proof loss before approval,

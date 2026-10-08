@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 472,
-  "aggregateSha256": "febadf7809c242407915fe99fe3a7fedff3f4d55873a4f264a04bdd1d26bf4b2",
+  "fileCount": 478,
+  "aggregateSha256": "698d15e17b504c5440f737589013ea6f3771d4ebd4c1e7de2550b68a4dab3003",
   "files": [
     {
       "path": "README.md",
-      "bytes": 28714,
-      "sha256": "d9deb29f5b4cde6f70f063e9d5232b70656dd884a357391cccc70e43b32a157a"
+      "bytes": 29892,
+      "sha256": "ec02fbf7b5b9224ea56e1ea4334ba7e63ad425618efe5154d9143127b8f2992f"
     },
     {
       "path": "consumer/adapter.ts",
@@ -211,8 +211,8 @@
     },
     {
       "path": "consumer/freshDepositAdmission.mjs",
-      "bytes": 14178,
-      "sha256": "1c35533eec9e28300077dfda0c9cbe227a6cad4c3b9429947b2ed8d5dbdbe0e7"
+      "bytes": 14797,
+      "sha256": "7f2f62753c8866deb37f2befd92ec5b8133f943402a272b206b93d8c81cb5820"
     },
     {
       "path": "consumer/freshDepositAdmission.test.mjs",
@@ -386,8 +386,8 @@
     },
     {
       "path": "consumer/processAdapterScenario.mjs",
-      "bytes": 20402,
-      "sha256": "f9bd99d36f64dc05114db31228226f04b8b68c769328dc6755a1cca98df62829"
+      "bytes": 20801,
+      "sha256": "f5b56fb11346753026e9c3fb702a98f712776ee130af9edd514dbdfdf8d06c29"
     },
     {
       "path": "consumer/projectionFixture.ts",
@@ -411,8 +411,8 @@
     },
     {
       "path": "consumer/retainedBackingSource.test.mjs",
-      "bytes": 10798,
-      "sha256": "b45f290d39185d34797996e0750b3d42d0627cf98134905e0de695b1dd5172d8"
+      "bytes": 11035,
+      "sha256": "13b23c52073fbc410539f26d851716c4cdd8b39565e1594c2d4935ab0cc77d19"
     },
     {
       "path": "consumer/retainedCodec.ts",
@@ -580,9 +580,14 @@
       "sha256": "3526b961e4fd42edb5e7ff7d1950dc918f5e98f967707b9b062909fa8310a71e"
     },
     {
+      "path": "ergo-node/authorized-credit-claim-port.test.mjs",
+      "bytes": 728,
+      "sha256": "33be8c155f650fa03c5085ae2dc8b35b98c64fcad4ef40682dd54c9896e14496"
+    },
+    {
       "path": "ergo-node/authorized-credit.mjs",
-      "bytes": 17185,
-      "sha256": "d3df59ce25158b60830309b8de370a381288df1cf15f8daa74a469e0844d5be0"
+      "bytes": 17729,
+      "sha256": "717d1e6ba7fd95def9f1d3e95ca99acfd21846cc923bf9e0c8918cbfaaee7ab4"
     },
     {
       "path": "ergo-node/bootstrap-devnet.mjs",
@@ -660,6 +665,11 @@
       "sha256": "c365d3cc7abaf4d6264b31e0ce832eb07195171f8ed15ad5fa0e7bcd404af150"
     },
     {
+      "path": "ergo-node/credit-expiry-continuation.test.mjs",
+      "bytes": 12070,
+      "sha256": "83f1aff66f4c032153dfe4a747d147bb72128b8e0a5284a77343dd9c31c722db"
+    },
+    {
       "path": "ergo-node/credit-output-policy.mjs",
       "bytes": 2936,
       "sha256": "a1df116b22479e3118790630d81f8336944f45e8205edf50976da66a736232a6"
@@ -701,8 +711,8 @@
     },
     {
       "path": "ergo-node/fresh-credit-source.mjs",
-      "bytes": 5398,
-      "sha256": "42ea8e77ebf6b803559cb13c8ddb6b6b2d9edd73f1394b2b7c4b7878af0ffcd8"
+      "bytes": 10072,
+      "sha256": "5f793b56a8737ef870db462b3f5dd804467f81a42f9bfd8f43f4f84d6c163da4"
     },
     {
       "path": "ergo-node/fresh-credit-source.test.mjs",
@@ -721,13 +731,18 @@
     },
     {
       "path": "ergo-node/guard-participant.mjs",
-      "bytes": 15672,
-      "sha256": "1243900471c77642bb61414def00ead6fcb703c9d692cf6d9b17c92d196d2df0"
+      "bytes": 15730,
+      "sha256": "f6d956435466da4e9beb6b851427dcdb75603c578e5afd79612a8fb5235b606d"
     },
     {
       "path": "ergo-node/guard-process-committee.mjs",
-      "bytes": 11787,
-      "sha256": "696800dd1e5a273462c607d3116a50dcc3b587341487376d6077f09818f1d39d"
+      "bytes": 13587,
+      "sha256": "8ceb2512510538bad2b0704248116dc274a3fe446c570c226b35420037a758ae"
+    },
+    {
+      "path": "ergo-node/in-process-claim-reader.test.mjs",
+      "bytes": 4504,
+      "sha256": "689c9a49d9533e8dc427c807b0aa33e4c359c56ecb4059e178596a6b491eb01a"
     },
     {
       "path": "ergo-node/loader.mjs",
@@ -753,6 +768,21 @@
       "path": "ergo-node/process-source.mjs",
       "bytes": 5594,
       "sha256": "79e4d640035d9f9c0b38d19c93edcb3f8c220ce16b349acd1cdd005fbe96137e"
+    },
+    {
+      "path": "ergo-node/quorum-credit-permit.mjs",
+      "bytes": 1931,
+      "sha256": "516616da8f7b37f3c392edcbc5d6ec3df819940c441db191fb52c162e3c0bc72"
+    },
+    {
+      "path": "ergo-node/quorum-credit-permit.test.mjs",
+      "bytes": 2945,
+      "sha256": "9ea4741e9daaeec1ec2bf27875a6e5e01a74c15d984120fb68fde69c9f619132"
+    },
+    {
+      "path": "ergo-node/quorum-credit-process.test.mjs",
+      "bytes": 7598,
+      "sha256": "22af74dd84ad8ef1e5a03cd0ffc03564a6d46eae831e2740fe3b2875f62ff92b"
     },
     {
       "path": "ergo-node/register.mjs",
@@ -851,8 +881,8 @@
     },
     {
       "path": "ergo-node/watcher-novelty-runtime.test.mjs",
-      "bytes": 14053,
-      "sha256": "9f9588c591765cf22369e81946394640cc9da25cd5bfdd810ec5014eac9ee258"
+      "bytes": 15706,
+      "sha256": "4b7a89aeeb98f2fb0e404123dd93b0a35bea95d3d3ff2d68fd8321fe8a719867"
     },
     {
       "path": "ergo-node/watcher-participant.mjs",
@@ -876,8 +906,8 @@
     },
     {
       "path": "ergo-node/watcher-runtime.mjs",
-      "bytes": 30179,
-      "sha256": "4e81a6b7ea290e4a42b1f567f6fadcdcae712e5066ad042407bf7e1ec74b3da2"
+      "bytes": 30953,
+      "sha256": "b0b3396394f11df9da69048a188f68ea8483ab89fc34d650a6860eb91c1c8089"
     },
     {
       "path": "ergo-node/watcher-runtime.test.mjs",
@@ -1426,8 +1456,8 @@
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.mjs",
-      "bytes": 26700,
-      "sha256": "aef96b7d623c44c65a5ca7eaa6a643617f904060556f54dbd808a54221df471d"
+      "bytes": 27368,
+      "sha256": "307b0605b4c8109584cea93b2d194c27f53f102b923afda16e4a620bee7c6a79"
     },
     {
       "path": "guard-service/src/db/moneroCreditAssignment.test.mjs",

@@ -250,6 +250,19 @@ export class MoneroCreditAssignment {
       return {status:output || image?'claimed':'new',checkpoint:this.#checkpoint(),identity:{...this.#identity}};
     });
   }
+  /** Read an exact retained claim without assigning or authorizing a signature. */
+  readClaim(obligationId) {
+    text(obligationId,'obligationId');
+    return this.#readTransaction(() => {
+      this.#verify();
+      const row=this.#db.prepare('SELECT status,request FROM claims WHERE obligationId=?').get(obligationId);
+      if(!row)return {status:'missing'};
+      const stored=JSON.parse(row.request);
+      const request={binding:stored.binding,outputs:stored.outputs.map(({sourceNetwork,publicKey})=>({sourceNetwork,publicKey})),
+        ...(Object.hasOwn(stored,'backing')?{backing:stored.backing}:{})};
+      return {status:row.status,request};
+    });
+  }
   #observe(r){
     const claim=this.#db.prepare('SELECT * FROM claims WHERE obligationId=?').get(r.binding.obligationId);
     if(!claim){
