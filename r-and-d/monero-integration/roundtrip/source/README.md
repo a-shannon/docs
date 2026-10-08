@@ -168,6 +168,13 @@ each occur once. The external `adapter-*/v2-return-result.json` records the payo
 and accounting at redemption, reservation, settlement and reward completion. Return watcher counters
 in that report are sampled after restart, not during initial observation.
 
+During one live native attempt, an acknowledgment lost after the withdrawal
+reservation commits is reconciled against its exact durable record. An
+acknowledgment lost after signing-journal preparation is read back against the
+exact anchor before the single signing transition. These checks do not restore
+a crashed native holder or complete a partial Guard settlement; full
+pre-signing crash recovery remains open.
+
 The return then uses the actual Rosen EventOrder and ErgoChain reward path.
 All four guards bind the confirmed Monero payment to the retained withdrawal,
 recheck its recipient, amount and confirmations, and atomically retain one reward

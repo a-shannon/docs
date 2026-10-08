@@ -1,13 +1,13 @@
 {
   "algorithm": "sha256",
   "aggregateRecipe": "UTF-8: path + NUL + sha256 + NUL + decimal bytes + LF; ordinal path order",
-  "fileCount": 478,
-  "aggregateSha256": "698d15e17b504c5440f737589013ea6f3771d4ebd4c1e7de2550b68a4dab3003",
+  "fileCount": 479,
+  "aggregateSha256": "6135dc27907cc44eaee1574ec5b0b6c32b2f9e639cc9979f7434b9de652ce049",
   "files": [
     {
       "path": "README.md",
-      "bytes": 29892,
-      "sha256": "ec02fbf7b5b9224ea56e1ea4334ba7e63ad425618efe5154d9143127b8f2992f"
+      "bytes": 30308,
+      "sha256": "2134bad68ba8fabbf4bd3ae6a0918e745e0f06499c5f9c7121a5d47ec3dc7d5b"
     },
     {
       "path": "consumer/adapter.ts",
@@ -166,8 +166,13 @@
     },
     {
       "path": "consumer/distributedIssuer.ts",
-      "bytes": 10916,
-      "sha256": "9f662158662ba0c81575603fd17b2ae8482b1dc774b24e37b38a80072803dd20"
+      "bytes": 12977,
+      "sha256": "11209a9ddc16566bcf1c31a4046cacd677303126d372e1bb5edf0aaf6fc4544a"
+    },
+    {
+      "path": "consumer/distributedIssuerRecovery.test.mjs",
+      "bytes": 10453,
+      "sha256": "dc39fa3d5afb5979c5440da09a812c56dbf74cd121068ef3f30f6c5d599c577c"
     },
     {
       "path": "consumer/distributedWithdrawal.spec.ts",
