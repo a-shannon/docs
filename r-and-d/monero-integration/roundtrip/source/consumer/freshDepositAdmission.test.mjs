@@ -11,21 +11,21 @@ import {NATIVE_SOURCE_PIN} from '../packages/monero-deposit/lib/evidence.ts';
 // Deterministic boundary tests; mocked ports do not establish native proof,
 // daemon consensus, destination validity, or backing-ledger qualification.
 const h=n=>n.toString(16).padStart(64,'0');
-function fixture(){
+function fixture({amount='10000',bridgeFee='100',networkFee='20'}={}){
   const dir=mkdtempSync(join(tmpdir(),'monero-fresh-admission-'));
   const configuration={genesis:h(1),committeeDigest:h(2),vaultSpend:h(3),vaultAddress:'4'.repeat(95),vaultEpoch:'1',
-    destinationAsset:h(4),bridgeFee:'100',networkFee:'20',minConfirmations:10,maxObservationAge:100};
+    destinationAsset:h(4),bridgeFee,networkFee,minConfirmations:10,maxObservationAge:100};
   const candidate={id:1,txId:h(5),sourceBlockId:h(6),sourceHeight:4097,transactionHex:'aabb',scope:''};
   const intent={version:2,domain:'rosen-monero-deposit',source_network:'mainnet',vault_epoch:'1',vault_address:configuration.vaultAddress,
-    destination_network:'ergo-testnet',destination_asset:h(4),bridge_fee:'100',network_fee:'20',txid:h(5),to_address:'test-recipient',
-    amount:'10000',expiry_height:4198n,outputs:[{output_index:1n,output_public_key:h(7),amount:'10000'}]};
+    destination_network:'ergo-testnet',destination_asset:h(4),bridge_fee:bridgeFee,network_fee:networkFee,txid:h(5),to_address:'test-recipient',
+    amount,expiry_height:4198n,outputs:[{output_index:1n,output_public_key:h(7),amount}]};
   const memo=encodeDepositMemo({genesis:h(1),vaultSpend:h(3),sourceNetwork:'mainnet',destinationNetwork:'ergo-testnet',vaultEpoch:'1',
-    destinationAsset:h(4),amount:'10000',bridgeFee:'100',networkFee:'20',expiryHeight:'4198',recipient:'test-recipient'}).toString('hex');
+    destinationAsset:h(4),amount,bridgeFee,networkFee,expiryHeight:'4198',recipient:'test-recipient'}).toString('hex');
   const output={version:1,committeeDigest:h(2),sourceBinding:h(8),genesis:h(1),vaultAddress:configuration.vaultAddress,txId:h(5),
-    blockHash:h(6),blockHeight:4097,outputIndex:1,globalIndex:8888,outputKey:h(7),commitment:h(9),amountAtomic:'10000',keyImage:h(10),depositData:[memo]};
+    blockHash:h(6),blockHeight:4097,outputIndex:1,globalIndex:8888,outputKey:h(7),commitment:h(9),amountAtomic:amount,keyImage:h(10),depositData:[memo]};
   const packet={blockHex:'bb',blockHash:h(6),height:4097,miner:{txId:h(11),transactionHex:'aa',outputIndices:[8886]},
     transactions:[{txId:h(5),transactionHex:'aabb',outputIndices:[8887,8888]}]};
-  const state={tip:4106,spent:0,unlocked:true,sourceHash:h(6),tipHash:h(12),proofGood:true,proofReceived:'10000',proofCalls:0,nativeCalls:0,
+  const state={tip:4106,spent:0,unlocked:true,sourceHash:h(6),tipHash:h(12),proofGood:true,proofReceived:amount,proofCalls:0,nativeCalls:0,
     outputPatch:{},nativePatch:{},beforeProof:()=>{}};
   const network={
     getBlockPacket:async()=>structuredClone(packet),getCurrentHeight:async()=>state.tip,
@@ -52,6 +52,27 @@ test('accepts the complete joined input at ten confirmations and preserves outpu
   assert.equal(result.backing.outputIndex,1);assert.equal(result.backing.globalIndex,8888);assert.equal(result.backing.creditedAtomic,'9880');
   assert.match(result.observation.fromAddress,/^rosen-monero-output:v2:[0-9a-f]{64}$/);
   assert.equal(result.observation.sourceBlockId,h(6));assert.equal(f.state.proofCalls,1);assert.equal(f.state.nativeCalls,1);
+});
+test('bounds each Ergo token output at the signed-long maximum',async()=>{
+  const max=9223372036854775807n;
+  const upper=fixture({amount:String(max+120n)});
+  assert.equal((await upper.inspect()).backing.creditedAtomic,String(max));
+  const feeUpper=fixture({amount:String(max+1n),bridgeFee:String(max),networkFee:'0'});
+  assert.equal((await feeUpper.inspect()).backing.creditedAtomic,'1');
+  const recipientOverflow=fixture({amount:String(max+121n)});
+  await assert.rejects(recipientOverflow.inspect(),/Ergo token recipient amount/);
+  assert.deepEqual(await recipientOverflow.verify(),{status:'pending'});
+  assert.equal(recipientOverflow.state.proofCalls,2);
+});
+test('rejects zero and overflowing combined Ergo token fees before observation',()=>{
+  const max=9223372036854775807n;
+  const f=fixture();
+  for(const [bridgeFee,networkFee] of [['0','0'],[String(max),'1']]){
+    assert.throws(()=>createFreshDepositAdmission({...f.options,
+      configuration:{...f.configuration,bridgeFee,networkFee}}),/Ergo token fee amount/);
+  }
+  assert.equal(f.state.proofCalls,0);
+  assert.equal(f.state.nativeCalls,0);
 });
 test('late delivery and ordinary growth rebuild authority while keeping the event descriptor stable',async()=>{
   const f=fixture();writeFileSync(f.proofFile,'malformed');assert.deepEqual(await f.verify(),{status:'pending'});

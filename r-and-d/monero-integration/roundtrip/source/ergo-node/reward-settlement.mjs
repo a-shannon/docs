@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
 import {snapshotCreditSigning} from '../guard-service/src/deposit/moneroCreditSigner.mjs';
@@ -9,6 +9,7 @@ import {retainCreditRecord} from './credit-recovery.mjs';
 import {openReturnRewardVerifier} from './return-reward.mjs';
 import {exportRewardPaymentEvidence} from './reward-payment-authority.mjs';
 import {rewardSettlement} from './reward-contribution.mjs';
+import {publishCreateOnlyRecord} from './reward-signed-custody.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
 const hex=value=>Buffer.from(value.sigma_serialize_bytes()).toString('hex');
@@ -110,6 +111,10 @@ function retainConfirmation(directory,record,receipt){
     blockId:receipt.blockId,inclusionHeight:receipt.inclusionHeight});
   if(fs.existsSync(file))assert.equal(readExact(file),body,'Reward retained confirmation conflict');else retainCreditRecord(file,body);
 }
+function retainSignedRecord(file,body){
+  const pending=`${file}.pending-${randomUUID()}`;retainCreditRecord(pending,body);publishCreateOnlyRecord(pending,file,body);
+  assert.equal(readExact(file),body,'Reward signed record publish');
+}
 function restarted(guards){const starts=guards.counts?.starts;return Array.isArray(starts)?starts.filter(value=>Number.isSafeInteger(value)&&value>1).length:0;}
 async function rewardState(guards,context,anchor,expected){
   const state=await guards.rewardState(structuredClone(context.assignment),structuredClone(anchor));
@@ -156,6 +161,29 @@ export async function settleReward(options,trustedPorts){
   const verifyConfirmed=async(found,record)=>api.verifyConfirmed?api.verifyConfirmed(found,record):canonicalConfirmed(api,found,record);
   const finish=(record,receipt,existing,knownBefore,hadConfirmation)=>result(api,verifier,record,receipt,{signCalls:record.signCalls,submissions:attempts(directory).length,
     recoveredLostReply:existing&&knownBefore&&!hadConfirmation&&attempts(directory).length>0,restartedGuards:restarted(guards),sameSignedBytes:true,noResignAfterConfirmed:existing&&knownBefore});
+  if(!fs.existsSync(signedFile)){
+    const opening=await rewardState(guards,context,anchor);
+    if(opening.status==='assigned'){
+      assert(opening.signed,'Reward signing outcome indeterminate');assert(fs.existsSync(candidateFile),'Reward recovery missing candidate');
+      const candidate=readCandidate(candidateFile),created=await verifier.create(directory),snapshot=compact(created.snapshot),signed=opening.signed;
+      assert.deepEqual(Object.keys(signed).sort(),['assignmentDigest','signedDigest','signedHex','snapshotDigest','txId'],'Reward recovered signed schema');
+      for(const value of [signed.assignmentDigest,signed.signedDigest,signed.snapshotDigest,signed.txId])id(value,'Reward recovered signed hash');
+      assert(typeof signed.signedHex==='string'&&/^(?:[0-9a-f]{2})+$/.test(signed.signedHex)&&signed.signedHex.length<=2_000_000,'Reward recovered signed encoding');
+      assert.equal(created.transaction.toJson(),candidate.transaction,'Reward candidate bytes');assert.equal(created.binding,candidate.binding,'Reward candidate binding');
+      assert.equal(signed.assignmentDigest,hash(canonicalAssignment(safe(opening.assignment))),'Reward recovered signed assignment');
+      assert.equal(signed.snapshotDigest,snapshot.digest,'Reward recovered signed snapshot');assert.equal(signed.txId,snapshot.txId,'Reward recovered signed transaction');
+      assert.equal(signed.signedDigest,hash(Buffer.from(signed.signedHex,'hex')),'Reward recovered signed bytes');
+      await syncSource();const evidence=(api.exportEvidence??exportRewardPaymentEvidence)(anchor);
+      const reward={anchor:structuredClone(anchor),context:structuredClone(context),evidence:structuredClone(evidence),paymentTxId};
+      const revalidated=await guards.verifyReward(snapshot,reward);same(revalidated,opening.assignment,'Reward recovered fresh guard assignment');
+      const provisional={version:1,binding:verifier.binding,contextDigest:ownerDigest,paymentTxId,settlement:structuredClone(settlement),policyDigest:verifier.policyDigest,
+        candidateText:candidate.text,snapshot,order:structuredClone(created.order),assignment:structuredClone(opening.assignment),txId:snapshot.txId,
+        signedHex:signed.signedHex,signedJson:null,signCalls:1};
+      const checked=api.verifySignedRecord?await api.verifySignedRecord({...provisional,signedJson:{}},snapshot,{fresh:true}):await nativeSigned(api,{...provisional,signedJson:JSON.parse(api.wasm.Transaction.sigma_parse_bytes(Buffer.from(signed.signedHex,'hex')).to_json())},snapshot,{fresh:true});
+      provisional.signedJson=structuredClone(checked.signedJson);verifyStatic(provisional,{candidate,contextDigest:ownerDigest,paymentTxId,settlement,verifier});
+      retainSignedRecord(signedFile,encode(provisional));
+    }
+  }
   if(fs.existsSync(signedFile)){
     assert(fs.existsSync(candidateFile),'Reward recovery missing candidate');const candidate=readCandidate(candidateFile),record=readSigned(signedFile),hadConfirmation=fs.existsSync(path.join(directory,confirmedName));
     verifyStatic(record,{candidate,contextDigest:ownerDigest,paymentTxId,settlement,verifier});await rewardState(guards,context,anchor,record.assignment);await verifySigned(record,false);
@@ -168,10 +196,13 @@ export async function settleReward(options,trustedPorts){
     const created=await verifier.create(directory);compareCreated(created,record,candidate);await rewardState(guards,context,anchor,record.assignment);await verifySigned(record,true);
     assert.equal(await api.rpc('/transactions/check',record.signedJson),record.txId,'Reward node check ID');
     await rewardState(guards,context,anchor,record.assignment);
+    await syncSource();const currentEvidence=(api.exportEvidence??exportRewardPaymentEvidence)(anchor);
+    const currentReward={anchor:structuredClone(anchor),context:structuredClone(context),evidence:structuredClone(currentEvidence),paymentTxId};
+    same(await guards.verifyReward(record.snapshot,currentReward),record.assignment,'Reward pre-broadcast guard assignment');
     if(!known){markSubmission(directory,record);assert.equal(await api.rpc('/transactions',record.signedJson),record.txId,'Reward submission ID');}
     const receipt=await verifyConfirmed(await waitConfirmed(api,record.txId),record);await rewardState(guards,context,anchor,record.assignment);retainConfirmation(directory,record,receipt);return finish(record,receipt,true,false,hadConfirmation);
   }
-  const opening=await rewardState(guards,context,anchor);assert.equal(opening.status,'unassigned','Reward guards assigned without signed record');
+  const opening=await rewardState(guards,context,anchor);assert.equal(opening.status,'unassigned','Reward signing outcome indeterminate');
   const created=await verifier.create(directory),candidate=readCandidate(candidateFile);assert.equal(candidate.binding,verifier.binding,'Reward candidate binding');
   assert.equal(created.transaction.toJson(),candidate.transaction,'Reward candidate bytes');const snapshot=compact(created.snapshot);
   await syncSource();const evidence=(api.exportEvidence??exportRewardPaymentEvidence)(anchor);
@@ -182,9 +213,14 @@ export async function settleReward(options,trustedPorts){
     candidateText:candidate.text,snapshot,order:structuredClone(created.order),assignment:structuredClone(assigned.assignment),txId:snapshot.txId,
     signedHex:signed.signedHex,signedJson:null,signCalls:1};
   const checked=api.verifySignedRecord?await api.verifySignedRecord({...provisional,signedJson:{}},snapshot,{fresh:true}):await nativeSigned(api,{...provisional,signedJson:JSON.parse(api.wasm.Transaction.sigma_parse_bytes(Buffer.from(signed.signedHex,'hex')).to_json())},snapshot,{fresh:true});
-  provisional.signedJson=structuredClone(checked.signedJson);const body=encode(provisional);retainCreditRecord(signedFile,body);const record=readSigned(signedFile);
+  provisional.signedJson=structuredClone(checked.signedJson);const body=encode(provisional);retainSignedRecord(signedFile,body);const record=readSigned(signedFile);
   verifyStatic(record,{candidate,contextDigest:ownerDigest,paymentTxId,settlement,verifier});
-  assert.equal(await api.rpc('/transactions/check',record.signedJson),record.txId,'Reward node check ID');await rewardState(guards,context,anchor,record.assignment);markSubmission(directory,record);
+  assert.equal(await api.rpc('/transactions/check',record.signedJson),record.txId,'Reward node check ID');
+  await rewardState(guards,context,anchor,record.assignment);
+  await syncSource();const currentEvidence=(api.exportEvidence??exportRewardPaymentEvidence)(anchor);
+  const currentReward={anchor:structuredClone(anchor),context:structuredClone(context),evidence:structuredClone(currentEvidence),paymentTxId};
+  same(await guards.verifyReward(record.snapshot,currentReward),record.assignment,'Reward pre-broadcast guard assignment');
+  markSubmission(directory,record);
   assert.equal(await api.rpc('/transactions',record.signedJson),record.txId,'Reward submission ID');
   if(simulateLostSubmissionReply)throw new RewardSubmissionReplyLostError(record.txId);
   const receipt=await verifyConfirmed(await waitConfirmed(api,record.txId),record);await rewardState(guards,context,anchor,record.assignment);retainConfirmation(directory,record,receipt);return finish(record,receipt,false,false,false);

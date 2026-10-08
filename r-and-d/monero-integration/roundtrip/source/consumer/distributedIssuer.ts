@@ -19,6 +19,30 @@ function boundedExpectation(path:string){
   }finally{closeSync(fd);}
 }
 
+export async function reconcileCompletedReservation(result:any,registry:any,expected:any){
+  const reservation=result?.status==='completed'?result.reservation:await registry.read(expected.reservationId);
+  if(!reservation||reservation.state!=='completed'||reservation.reservationId!==expected.reservationId||
+    reservation.reservationHash!==expected.reservationHash||reservation.requestJson!==expected.requestJson||
+    reservation.selectionBytes!==expected.selectionBytes||reservation.eventId!==expected.eventId||
+    reservation.sourceNetwork!==expected.sourceNetwork||reservation.network!==expected.network||
+    reservation.vaultSpend!==expected.vaultSpend||reservation.vaultView!==expected.vaultView||
+    JSON.stringify(reservation.receipt)!==JSON.stringify(expected.receipt))throw Error('distributed:reservation-recovery');
+  return reservation;
+}
+
+export async function beginDistributedSigning(journal:any,anchor:WithdrawalJournalAnchor){
+  const reservationId=anchor.reservation.reservationId;
+  let entry=await journal.readIfPresent(reservationId);
+  if(!entry){
+    try{entry=await journal.prepare(anchor);}
+    catch(error){entry=await journal.readIfPresent(reservationId);if(!entry)throw error;}
+  }
+  if(entry.state!=='prepared')throw Error('distributed:journal-state');
+  if(JSON.stringify(entry.anchor)!==JSON.stringify(anchor))throw Error('distributed:journal-anchor');
+  await journal.markSigning(reservationId);
+  return entry;
+}
+
 export async function openDistributedWithdrawal(vault:any,requestValue:unknown,setup:AuthorizedWithdrawalSetup,timestamp:number){
   const backingClaim=ownData(setup).backingClaim;
   if(backingClaim!==undefined)await revalidateBackingClaim(backingClaim);
@@ -48,16 +72,24 @@ export async function openDistributedWithdrawal(vault:any,requestValue:unknown,s
     registry=await MoneroWithdrawalReservation.open(setup.database,{sourceNetwork:projection.sourceNetwork,network:projection.network,
       vaultSpend:selection.vaultSpend,vaultView:selection.vaultView},setup.clock,setup.fault);live();
     const reserved=await registry.reserve(projection.request,selection.bytes);live();
-    if(reserved.status!=='created')throw Error('distributed:reservation-not-new');
-    const owner=randomBytes(32).toString('hex'),claimed=await registry.claim(reserved.reservation.reservationId,owner,setup.leaseDuration);live();
-    if(claimed.status!=='claimed')throw Error('distributed:claim');let callbacks=0;
-    const committed=await registry.construct(claimed.fence,async record=>{
-      live();if(++callbacks!==1||record.requestJson!==JSON.stringify(projection.request)||record.selectionBytes!==selection.bytes||
-        record.owner!==owner||record.reservationHash!==reserved.reservation.reservationHash||record.eventId!==projection.eventId)throw Error('distributed:reservation-binding');
-      return receipt;
-    });live();
-    if(committed.status!=='completed'||callbacks!==1)throw Error('distributed:reservation-commit');
-    const reservation=committed.reservation;await registry.close();registry=undefined;live();
+    if(reserved.status!=='created'&&reserved.status!=='existing')throw Error('distributed:reservation');
+    const expectedReservation=Object.freeze({reservationId:reserved.reservation.reservationId,reservationHash:reserved.reservation.reservationHash,
+      requestJson:JSON.stringify(projection.request),selectionBytes:selection.bytes,eventId:projection.eventId,sourceNetwork:projection.sourceNetwork,
+      network:selection.network,vaultSpend:selection.vaultSpend,vaultView:selection.vaultView,receipt});
+    let reservation;
+    if(reserved.status==='existing')reservation=await reconcileCompletedReservation({status:'completed',reservation:reserved.reservation},registry,expectedReservation);
+    else{
+      const owner=randomBytes(32).toString('hex'),claimed=await registry.claim(reserved.reservation.reservationId,owner,setup.leaseDuration);live();
+      if(claimed.status!=='claimed')throw Error('distributed:claim');let callbacks=0;
+      const committed=await registry.construct(claimed.fence,async record=>{
+        live();if(++callbacks!==1||record.requestJson!==expectedReservation.requestJson||record.selectionBytes!==selection.bytes||
+          record.owner!==owner||record.reservationHash!==reserved.reservation.reservationHash||record.eventId!==projection.eventId)throw Error('distributed:reservation-binding');
+        return receipt;
+      });live();
+      reservation=await reconcileCompletedReservation(committed,registry,expectedReservation);
+      if(callbacks!==1)throw Error('distributed:reservation-commit');
+    }
+    await registry.close();registry=undefined;live();
     // Native snapshots are immutable files. The independent journal retains this digest;
     // recovery never accepts a file's echoed digest as its own authority.
     for(const directory of held.directories){const bytes=boundedExpectation(join(directory,'expectation.private'));
@@ -84,7 +116,7 @@ export async function openDistributedWithdrawal(vault:any,requestValue:unknown,s
       if(!owned){await close();throw Error('distributed:unapproved');}
       let journal:WithdrawalJournal|undefined;
       try{await owned.current();journal=await WithdrawalJournal.open(setup.database,setup.journalFault);await owned.current();
-        await journal.prepare(anchor);await owned.current();await journal.markSigning(reservation.reservationId);await owned.current();
+        await beginDistributedSigning(journal,anchor);await owned.current();
         const final=await held.sign(owned.certificate,owned.current);await owned.current();
         const completed=await journal.complete(reservation.reservationId,{expectationDigest:final.expectationDigest,bindingDigest:final.binding,
           txId:final.txId,byteHash:final.byteDigest,bytesHex:final.bytesHex});await owned.current();return completed;

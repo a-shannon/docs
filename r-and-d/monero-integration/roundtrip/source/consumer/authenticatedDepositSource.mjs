@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {assertErgoTokenAmount} from './ergoTokenAmount.mjs';
 
 const registered=new WeakMap();
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -93,6 +94,8 @@ function backingFor(source,authority){
   equal(bigint(a.bridgeFee,'bridge-fee'),c.feePolicy.bridgeFee,'bridge-fee');equal(bigint(a.networkFee,'network-fee'),c.feePolicy.networkFee,'network-fee');
   equal(c.feePolicy.sourceDecimals,12,'source-decimals');equal(c.feePolicy.destinationDecimals,12,'destination-decimals');equal(c.feePolicy.remainder,'reject','remainder-policy');
   equal(a.netAmount,a.amount-a.bridgeFee-a.networkFee,'net-amount');equal(a.destinationAmount,a.netAmount,'credited-amount');equal(a.retainedAtomicRemainder,0n,'remainder');bigint(a.destinationAmount,'credited-amount',true);
+  assertErgoTokenAmount(a.destinationAmount,'recipient');
+  assertErgoTokenAmount(a.bridgeFee+a.networkFee,'fee');
   requireValue(r.intentBytes instanceof Uint8Array && r.intentBytes.length>0 && r.intentBytes.length<=4096,'intent-bytes');
   const intentHex=Buffer.from(r.intentBytes).toString('hex');equal(a.intentBytesHex,intentHex,'decision-intent-bytes');equal(a.intentHash,hash(r.intentBytes),'intent-hash');
   const expected={version:2,domain:k.domain,source_network:k.sourceNetwork,vault_epoch:k.vaultEpoch,vault_address:k.vaultAddress,destination_network:k.destinationNetwork,destination_asset:k.destinationAsset,bridge_fee:c.feePolicy.bridgeFee,network_fee:c.feePolicy.networkFee,txid:d.txId,to_address:a.recipient,amount:d.amountAtomic,expiry_height:a.expiresAtHeight.toString(),outputs:[{output_index:index,output_public_key:d.outputKey,amount:d.amountAtomic}]};

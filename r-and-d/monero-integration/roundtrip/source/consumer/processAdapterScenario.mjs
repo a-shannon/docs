@@ -117,6 +117,9 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
     const assignment=verifier.expectedAssignment(captured),checkpoints=rows=>rows.map(row=>row.checkpoint);
     function claimed(rows){for(const row of rows){assert.equal(row.claims,1);assert.equal(row.outputs,1);assert.equal(row.nullifiers,1);assert.equal(row.settlements,0);}}
 
+    await assert.rejects(()=>guards.authorizeQuorumCredit(assignment,snapshot,[0,1,2]),/assignment:missing/);
+    await assert.rejects(()=>guards.sign(snapshot,{indices:[0,1,2]}),/quorum credit authorization missing/);
+    assert.equal(sum(guards.counts.guardCommitments),0);assert.equal(sum(guards.counts.guardPartialSigns),0);
     await assert.rejects(()=>guards.sign(snapshot,{drop:[0,1,2,3],completionTimeoutMs:3000}),/transport timeout/);
     assert.equal(sum(guards.counts.guardPartialSigns),0);await guards.restartAll();
     const retained=checkpoints(await guards.stats());claimed(retained);await guards.assertAssigned(assignment);
@@ -164,7 +167,8 @@ export async function runProcessScenario({directory,deployment,candidate,sourceD
 
     const beforeQuorum=await guards.stats(),coordinator=beforeQuorum[0].coordinatorIndex;
     assert(beforeQuorum.every(row=>row.coordinatorIndex===coordinator));const offline=(coordinator+1)%4;
-    await guards.kill(offline);const selected=[0,1,2,3].filter(i=>i!==offline);
+    const selected=[0,1,2,3].filter(i=>i!==offline);
+    await guards.authorizeQuorumCredit(assignment,snapshot,selected);await guards.kill(offline);
     const quorum=await guards.sign(snapshot,{indices:selected});assert.equal(quorum.txId,snapshot.txId);
     assert.equal(guards.counts.completedGuards,3);assert.equal(sum(guards.counts.guardPartialSigns),3);
     const quorumSigned=wasm.Transaction.sigma_parse_bytes(Buffer.from(quorum.signedHex,'hex'));

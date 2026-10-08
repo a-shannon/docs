@@ -8,6 +8,8 @@ import {createRequire} from 'node:module';
 import {pathToFileURL} from 'node:url';
 import {wasm,rpc,confirmed,tree,recipient,runtime} from './rosen-node.mjs';
 import {producer} from './watcher-producer.mjs';
+import {decodeIntent,IntentCodecError} from '../packages/monero-deposit/lib/intentCodec.ts';
+import {checkedErgoCreditAmounts} from '../consumer/ergoTokenAmount.mjs';
 const base=config.rosenRoot;
 const require=createRequire(base+'/package.json');
 require('reflect-metadata');
@@ -127,6 +129,7 @@ export async function openDepositCredit({directory,context,providers,authorityPr
   async function execute(...args){try{return await executeUnchecked(...args);}catch(error){await hit('execute-error:'+error.message);throw error;}}
   async function executeUnchecked(job,observation,terms) {
     const d=deployment,c=d.contracts;
+    const {fee,net}=checkedErgoCreditAmounts(BigInt(observation.amount),BigInt(observation.bridgeFee),BigInt(observation.networkFee));
     const triggerStage=await stage(job,'trigger',async()=>{
       const encoder=await producer(d);const candidate=encoder.createTriggerEvent(2000000n,await network.getHeight(),[d.tokens.WID],observation,10n);
       const registers={};for(let i=4;i<=7;i++)registers['R'+i]=candidate.register_value(i).encode_to_base16();
@@ -139,7 +142,6 @@ export async function openDepositCredit({directory,context,providers,authorityPr
     const creditStage=await stage(job,'credit',async()=>{
       const keys=new wasm.SecretKeys();read('rosen-keys-private.json').slice(0,2).forEach(k=>keys.add(wasm.SecretKey.dlog_from_bytes(Buffer.from(k,'hex'))));const signer=wasm.Wallet.from_secrets(keys);
       const chain=new ErgoChain(network,{fee:1100000n,confirmations:{payment:1,cold:1,manual:1,arbitrary:1},addresses:{lock:c.Lock.address,permit:c.Permit.address,fraud:c.Fraud.address,cold:d.fundingAddress},rwtId:d.tokens.RWT,minBoxValue:1000000n,eventTxConfirmation:1},new TokenMap(),{isInSign:async()=>false,sign:async(reduced,required)=>{assert.equal(required,2);return signer.sign_reduced_transaction(reduced);}});
-      const fee=BigInt(observation.bridgeFee)+BigInt(observation.networkFee),net=BigInt(observation.amount)-fee;
       const order=[{address:c.Permit.address,assets:{nativeToken:2000000n,tokens:[{id:d.tokens.RWT,value:10n}]},extra:d.tokens.WID},{address:observation.toAddress,assets:{nativeToken:10000000n,tokens:[{id:d.tokens.Asset,value:net}]}},{address:d.fundingAddress,assets:{nativeToken:1000000n,tokens:[{id:d.tokens.Asset,value:fee}]},extra:''}];
       const guard=await rpc('/utxo/byId/'+d.guard.boxId);
       const payment=await chain.generateTransaction(event.eventId,TransactionType.payment,order,[],[],[hex(wasm.ErgoBox.from_json(JSON.stringify(trigger)))],[hex(wasm.ErgoBox.from_json(JSON.stringify(guard)))]);
@@ -147,7 +149,6 @@ export async function openDepositCredit({directory,context,providers,authorityPr
       const signed=await chain.signTransaction(payment,2),native=wasm.Transaction.sigma_parse_bytes(signed.txBytes);
       return {json:JSON.parse(native.to_json()),signedHex:hex(native),metadata:{order,event}};
     });
-    const net=BigInt(observation.amount)-BigInt(observation.bridgeFee)-BigInt(observation.networkFee);
     const creditBox=creditStage.tx.outputs.find(o=>o.ergoTree===tree(observation.toAddress)&&o.assets.some(a=>a.tokenId===d.tokens.Asset&&BigInt(a.amount)===net));assert(creditBox);
     const eventResult=extractor.extractEventResult(creditStage.tx);assert.equal(eventResult.result,'successful');
     const redemptionStage=await stage(job,'redemption',async()=>{
@@ -185,6 +186,11 @@ export async function openDepositCredit({directory,context,providers,authorityPr
   let tail=Promise.resolve();
   async function run(input) {
     const {request,observation,redemptionTerms}=structuredClone(input);
+    // Invalid intent bytes retain the ordinary admission rejection result.
+    // A valid but unbuildable intent must never become a durable obligation.
+    let intent;
+    try{intent=decodeIntent(request?.intentBytes);}catch(error){if(!(error instanceof IntentCodecError))throw error;}
+    if(intent)checkedErgoCreditAmounts(BigInt(intent.amount),BigInt(intent.bridge_fee),BigInt(intent.network_fee));
     const admission=await admitDeposit(request,{registry,contextId:context.id,providers,authority:{profile:authorityProfile,authorize:async(_bytes,decisionDigest)=>({mode:'synthetic',profile:authorityProfile,decisionDigest})}});
     if(!['created','existing'].includes(admission.status))return {admission};
     await isolatedNode();

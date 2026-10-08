@@ -29,7 +29,9 @@ async function fixture(t,{backing=initialBacking,pause=async()=>{}}={}){
   const observation={sourceTxId:backing.txId,fromChain:'monero',toChain:'ergo',fromAddress:'rosen-monero-output:v2:'+origin,toAddress:backing.recipient,amount:'1000',bridgeFee:'50',networkFee:'50',sourceChainTokenId:'XMR',targetChainTokenId:backing.destinationAsset,sourceBlockId:backing.blockHash,height:backing.blockHeight,requestId};
   const raw={txId:backing.txId,intentHash:backing.intentHash},calls={rpc:[],submits:0,confirmations:0,inspections:0},responses=new Map();
   const nodePort={async rpc(route,payload){calls.rpc.push(route);if(route==='/transactions'){calls.submits++;return payload.id;}if(route.startsWith('/blockchain/transaction/byId/'))throw Error('404');throw Error('Unexpected node access: '+route);},async confirmed(id){calls.confirmations++;assert(responses.has(id),'Missing test receipt');return responses.get(id);},async getStateContext(){throw Error('Unexpected signing');}};
-  const inspect=async()=>{calls.inspections++;return {status:'accepted',observation:{...observation,rawData:''},backing:structuredClone(backing)};};
+  let sourceError,sourceResult;
+  const inspect=async()=>{calls.inspections++;if(sourceError)throw sourceError;
+    return structuredClone(sourceResult??{status:'accepted',observation:{...observation,rawData:''},backing});};
   const args={databasePath,deployment,watcher,nodePort,inspect,dependencyRoot,creditEntries,pause};
   const open=async()=>{const actor=await createWatcherParticipant(args);actors.push(actor);return actor;};
   const actor=await open();
@@ -37,7 +39,8 @@ async function fixture(t,{backing=initialBacking,pause=async()=>{}}={}){
   const withStore=fn=>{const store=openWatcherStore(databasePath);try{return fn(store);}finally{store.close();}};
   const queue=(stage,id=h(70))=>withStore(store=>store.queue(stage+':'+requestId,requestId,fakeTransaction(id)));
   const commitments=deployment.watchers.map((w,i)=>({WID:w.WID,boxId:h(80+i),requestId,commitment:h(82+i),rwtCount:'10'}));
-  return {actor,open,args,assign,raw,backing,observation,requestId,commitments,calls,queue,withStore,responses,wasm};
+  return {actor,open,args,assign,raw,backing,observation,requestId,commitments,calls,queue,withStore,responses,wasm,
+    invalidateSource(){sourceError=Error('Watcher source changed');},replaceSource(value){sourceResult=structuredClone(value);}};
 }
 
 test('actual watcher rejects existing P under a new transaction before retaining an observation or submitting',enabled,async t=>{
@@ -66,6 +69,24 @@ for(const stage of ['commitment','trigger'])test('claim inserted during '+stage+
   await assert.rejects(()=>stage==='commitment'?f.actor.commitment(f.raw):f.actor.reveal(f.requestId,f.commitments),/Watcher backing already claimed/);
   assert.equal(paused,1);assert.equal(f.calls.submits,0);assert.equal(f.calls.confirmations,0);
   assert.equal(f.withStore(s=>s.readQueue(stage+':'+f.requestId)).confirmed,null);
+});
+
+for(const stage of ['commitment','trigger'])test('source changed during '+stage+' broadcast pause stops the pending submission',enabled,async t=>{
+  let f;const checkpoint=stage==='commitment'?'beforeCommitmentBroadcast':'beforeRevealBroadcast';
+  f=await fixture(t,{pause:async value=>{if(value===checkpoint)f.invalidateSource();}});
+  await f.actor.observe(f.raw);f.queue(stage);
+  await assert.rejects(()=>stage==='commitment'?f.actor.commitment(f.raw):f.actor.reveal(f.requestId,f.commitments),/Watcher source changed/);
+  assert.equal(f.calls.submits,0);assert.equal(f.calls.confirmations,0);
+  assert.equal(f.withStore(s=>s.readQueue(stage+':'+f.requestId)).confirmed,null);
+});
+
+test('new accepted backing cannot replace the retained watcher origin before trigger broadcast',enabled,async t=>{
+  const f=await fixture(t);await f.actor.observe(f.raw);f.queue('trigger');
+  const backing={...f.backing,globalIndex:f.backing.globalIndex+1};
+  const origin=createHash('sha256').update('rosen-monero/credit-origin/v2').update('\0').update(canonicalAssignment(backing)).digest('hex');
+  f.replaceSource({status:'accepted',backing,observation:{...f.observation,fromAddress:'rosen-monero-output:v2:'+origin,rawData:''}});
+  await assert.rejects(()=>f.actor.reveal(f.requestId,f.commitments),/Watcher source observation drift/);
+  assert.equal(f.calls.submits,0);assert.equal(f.withStore(s=>s.readQueue('trigger:'+f.requestId)).confirmed,null);
 });
 
 test('restarted watcher cannot publish a retained trigger queue after a guard claim',enabled,async t=>{

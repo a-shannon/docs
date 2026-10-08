@@ -8,6 +8,7 @@ import {readParticipantConfig} from '../tools/participant-config.mjs';
 import {auditCreditBacking} from './credit-backing-audit.mjs';
 import {openGuardCustody,freshCreditConfigurations} from './credit-custody.mjs';
 import {canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
+import {observeRewardSigned,retainRewardSigned} from './reward-signed-custody.mjs';
 
 const file=process.env.PARTICIPANT_CONFIG;
 assert(path.isAbsolute(file??''),'Absolute participant configuration required');
@@ -32,7 +33,8 @@ const sources=await Promise.all(Array.from({length:4},()=>openProcessSource(sele
 // Only new credit verification opens the fresh, unspent admission authority.
 let verifierPromise;
 const creditVerifier=()=>verifierPromise??=(openCreditVerifier({directory:path.join(selected.directory,'verification'),deployment:selected.deployment,
-  watcherReceipt:selected.watcherReceipt,freshAdmission:{readers:sources,candidate:selected.candidate}}).catch(error=>{verifierPromise=undefined;throw error;}));
+  watcherReceipt:selected.watcherReceipt,freshAdmission:{readers:sources,candidate:selected.candidate},
+  readClaim:obligationId=>ledger.readClaim(obligationId)}).catch(error=>{verifierPromise=undefined;throw error;}));
 const implementation=captureContributionPackage(config.contributionPackage);
 const {MultiSigHandler,MultiSigUtils}=await import(implementation.entry);implementation.verify();
 const require=createRequire(path.join(config.rosenRoot,'package.json')),wasm=require('ergo-lib-wasm-nodejs');
@@ -40,7 +42,7 @@ const {ECDSA}=await import('@rosen-bridge/encryption'),{DefaultLogger,DummyLogge
 DefaultLogger.init(new DummyLogger());
 const index=selected.index,keys=[...selected.deployment.guardPublicKeys],peerIds=keys.map((_,i)=>'process-credit-guard-'+i);
 const configuration=freshCreditConfigurations({deployment:selected.deployment,scope:sources[0].scope,genesis:selected.source.genesis})[index];
-const {ledger,bootstrap,custody}=openGuardCustody({directory:selected.directory,index,configuration,contributionPackageSha256:implementation.sha256});
+const {ledger,bootstrap,database,custody}=openGuardCustody({directory:selected.directory,index,configuration,contributionPackageSha256:implementation.sha256});
 let active,closed=false,auditing=false,facade;const gates=new Map(),counts={commitments:0,partialSigns:0,completed:0,messagesSent:0,messagesReceived:0};
 const current=()=>{assert(!closed,'Closed guard process');return active;};
 const stats=()=>({index,pid:process.pid,counts:{...counts},checkpoint:ledger.checkpoint(),proofCalls:sources.reduce((n,s)=>n+s.proofCalls,0),
@@ -118,9 +120,14 @@ await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configu
     assert(indices.every(i=>Number.isInteger(i)&&i>=0&&i<4)&&indices.includes(index));assert.equal(typeof pausePartials,'boolean');
     const captured=snapshotFrom(snapshot);active={session,txId:captured.txId,indices:[...indices],pausePartials,queued:false,settled:false,seen:new Set()};
     try{if(reward!==undefined){await prepareWithdrawalPorts();const {openRewardContribution}=await import('./reward-contribution.mjs');
-        active.reward=await openRewardContribution({input:reward,selected,configuration:config,ledger,current});}
+        active.rewardInput=structuredClone(reward);active.reward=await openRewardContribution({input:active.rewardInput,selected,configuration:config,ledger,current});}
       const signed=await facade.sign(captured.reduced,3,captured.inputs,captured.dataInputs);counts.completed++;
-      active.settled=true;return {signedHex:Buffer.from(signed.sigma_serialize_bytes()).toString('hex'),txId:signed.id().to_str(),stats:stats()};}
+      const signedHex=Buffer.from(signed.sigma_serialize_bytes()).toString('hex'),txId=signed.id().to_str();assert.equal(txId,captured.txId,'Guard signed reward transaction');
+      if(active.reward){const original=active.rewardInput.context.assignment,tuple=settlement(active.rewardInput.anchor),retained=ledger.observeReward(original,tuple);
+        assert.equal(retained.status,'assigned','Guard signed reward assignment missing');ledger.assertReward(original,tuple,retained.assignment);
+        retainRewardSigned({database,custodyDigest:ledger.configDigest,assignment:retained.assignment,
+          snapshotDigest:captured.digest,txId,signedHex});}
+      active.settled=true;return {signedHex,txId,stats:stats()};}
     catch(error){active.settled=true;facade.close();throw error;}
   },
   async turn({session}){const run=current();assert(run?.session===session&&run.queued&&!run.settled,'Unready guard turn');await turn(run.txId);return null;},
@@ -143,7 +150,8 @@ await serveProcessRpc({ready:{index,pid:process.pid,guardKey:keys[index],configu
   rewardState({request,anchor}){current();assert(!auditing&&(!active||active.settled),'Active signing session or backing audit');
     const original=structuredClone(request),tuple=settlement(structuredClone(anchor));
     ledger.assertAssigned(original);ledger.assertSettlement(original,tuple);const reward=ledger.observeReward(original,tuple);
-    if(reward.status==='assigned')ledger.assertReward(original,tuple,reward.assignment);return reward;},
+    if(reward.status==='assigned'){ledger.assertReward(original,tuple,reward.assignment);const signed=observeRewardSigned({database,custodyDigest:ledger.configDigest,assignment:reward.assignment});
+      return signed?{...reward,signed}:reward;}return reward;},
   async verifyReward({snapshot,reward}){current();assert(!auditing&&(!active||active.settled),'Active signing session or backing audit');auditing=true;
     try{await prepareWithdrawalPorts();const {openRewardContribution}=await import('./reward-contribution.mjs');
       const contribution=await openRewardContribution({input:structuredClone(reward),selected,configuration:config,ledger,current});

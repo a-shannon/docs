@@ -5,6 +5,8 @@ import {randomUUID} from 'node:crypto';
 import {launchProcessRpc} from '../tools/process-rpc.mjs';
 import {pinParticipantConfig} from '../tools/participant-config.mjs';
 import {committeeConfigDigest,canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
+import {aggregateRewardStates} from './reward-signed-custody.mjs';
+import {createQuorumCreditPermit} from './quorum-credit-permit.mjs';
 
 const entry=fileURLToPath(new URL('./guard-participant.mjs',import.meta.url));
 const custodyHandles=new WeakMap();
@@ -18,6 +20,7 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
   const pins=configFiles.map(pinParticipantConfig),identities=new Array(4);
   const actors=new Array(4),counts={starts:[0,0,0,0],messagesSubmitted:0,messagesDelivered:0,
     guardCommitments:[0,0,0,0],guardPartialSigns:[0,0,0,0],completedGuards:0};
+  const quorumCredit=createQuorumCreditPermit();
   let closed=false,run,draining=false,auditing=false;const pending=[];
   function fail(error){if(run&&!run.failed){run.failed=true;run.reject(error);}}
   async function drain(){
@@ -69,11 +72,13 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
   catch(error){await Promise.allSettled(actors.filter(Boolean).map(a=>a.close()));throw error;}
   const handle={
     async sign(snapshot,{indices=[0,1,2,3],pausePartials=false,delayMs=0,duplicate=false,drop=[],completionTimeoutMs=60000,reward}={}){
-      assert(!closed&&!run&&!auditing,'Committee unavailable');assert(Array.isArray(indices)&&indices.length>=3&&indices.length<=4&&new Set(indices).size===indices.length);
+      assert(!closed&&!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');assert(Array.isArray(indices)&&indices.length>=3&&indices.length<=4&&new Set(indices).size===indices.length);
       assert(indices.every(i=>Number.isInteger(i)&&i>=0&&i<4&&!actors[i].closed));
       assert(Number.isSafeInteger(delayMs)&&delayMs>=0&&delayMs<=1000);assert.equal(typeof duplicate,'boolean');
       assert(Array.isArray(drop)&&drop.every(i=>indices.includes(i)));
       assert(Number.isSafeInteger(completionTimeoutMs)&&completionTimeoutMs>=250&&completionTimeoutMs<=60000);
+      if(indices.length===3){assert(reward===undefined,'Quorum credit permit excludes reward signing');quorumCredit.consume(snapshot,indices);}
+      else quorumCredit.clear();
       const session=randomUUID();let reject;const failed=new Promise((_,r)=>{reject=r;});
       run={session,snapshot:structuredClone(snapshot),indices:[...indices],queued:new Set(),started:false,failed:false,reject,
         delayMs,duplicate,drop:new Set(drop),completionTimeoutMs,timer:undefined};
@@ -87,33 +92,48 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
       }catch(error){run.failed=true;await Promise.allSettled(actors.filter(Boolean).map(a=>a.close()));throw error;}
       finally{clearTimeout(run?.timer);pending.length=0;run=undefined;}
     },
+    async authorizeQuorumCredit(request,snapshot,indices){
+      assert(!closed&&!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');current();
+      await quorumCredit.authorize(request,snapshot,indices,async exact=>{
+        const rows=await Promise.allSettled(actors.map(actor=>actor.request('assertAssigned',exact,{timeoutMs})));
+        const failure=rows.find(row=>row.status==='rejected');if(failure)throw failure.reason;
+        current();matching(rows.map(row=>row.value));
+      });
+    },
     configurations:()=>actors.map(a=>structuredClone(a.ready.configuration)),
-    async stats(indices=[0,1,2,3]){return Promise.all(indices.map(i=>actors[i].request('stats',null,{timeoutMs})));},
-    async observeAssignment(request){return Promise.all(actors.map(a=>a.request('observe',request,{timeoutMs})));},
-    async assertAssigned(request){return Promise.all(actors.map(a=>a.request('assertAssigned',request,{timeoutMs})));},
-    rewardState(request,anchor){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+    async stats(indices=[0,1,2,3]){try{return await Promise.all(indices.map(i=>actors[i].request('stats',null,{timeoutMs})));}
+      catch(error){quorumCredit.clear();throw error;}},
+    async observeAssignment(request){try{return await Promise.all(actors.map(a=>a.request('observe',request,{timeoutMs})));}
+      catch(error){quorumCredit.clear();throw error;}},
+    async assertAssigned(request){try{return await Promise.all(actors.map(a=>a.request('assertAssigned',request,{timeoutMs})));}
+      catch(error){quorumCredit.clear();throw error;}},
+    rewardState(request,anchor){quorumCredit.clear();return serialized(async()=>{current();assert(!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');auditing=true;
       try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('rewardState',{request,anchor},{timeoutMs})));
         const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
-        current();return matching(rows.map(row=>row.value));}finally{auditing=false;}});},
-    verifyReward(snapshot,reward){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+        current();return aggregateRewardStates(rows.map(row=>row.value));}finally{auditing=false;}});},
+    verifyReward(snapshot,reward){quorumCredit.clear();return serialized(async()=>{current();assert(!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');auditing=true;
       try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('verifyReward',{snapshot,reward},{timeoutMs})));
         const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
         current();return matching(rows.map(row=>row.value));}finally{auditing=false;}});},
-    async verifyFresh(snapshot){return Promise.all(actors.map(a=>a.request('verify',snapshot,{timeoutMs})));},
-    async auditBacking(snapshot,assignment){assert(!closed&&!run&&!auditing,'Committee unavailable');auditing=true;
+    async verifyFresh(snapshot){try{return await Promise.all(actors.map(a=>a.request('verify',snapshot,{timeoutMs})));}
+      catch(error){quorumCredit.clear();throw error;}},
+    async auditBacking(snapshot,assignment){quorumCredit.clear();assert(!closed&&!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');auditing=true;
       try{const results=await Promise.allSettled(actors.map(a=>a.request('audit',{snapshot,assignment},{timeoutMs})));
         const failure=results.find(row=>row.status==='rejected');if(failure)throw failure.reason;
         return results.map(row=>row.value);}finally{auditing=false;}},
-    async invalidate(obligationId,reason){return Promise.all(actors.map(a=>a.request('invalidate',{obligationId,reason},{timeoutMs})));},
-    async resume(index,checkpoint){return actors[index].request('resume',{checkpoint},{timeoutMs});},
-    async kill(index){assert(Number.isInteger(index)&&index>=0&&index<4);await actors[index].kill();},
-    async restart(index){assert(!run,'Finish the signing attempt before restarting');await actors[index].close();return start(index);},
-    async restartAll(){assert(!run,'Finish the signing attempt before restarting');await Promise.allSettled(actors.map(a=>a.close()));
+    async invalidate(obligationId,reason){quorumCredit.clear();assert(!closed&&!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');
+      return Promise.all(actors.map(a=>a.request('invalidate',{obligationId,reason},{timeoutMs})));},
+    async resume(index,checkpoint){try{return await actors[index].request('resume',{checkpoint},{timeoutMs});}
+      catch(error){quorumCredit.clear();throw error;}},
+    async kill(index){assert(!quorumCredit.authorizing&&!auditing,'Committee unavailable');assert(Number.isInteger(index)&&index>=0&&index<4);
+      quorumCredit.preserveOnlyForKill(index);try{await actors[index].kill();}catch(error){quorumCredit.clear();throw error;}},
+    async restart(index){quorumCredit.clear();assert(!run&&!quorumCredit.authorizing,'Finish the signing attempt before restarting');await actors[index].close();return start(index);},
+    async restartAll(){quorumCredit.clear();assert(!run&&!quorumCredit.authorizing,'Finish the signing attempt before restarting');await Promise.allSettled(actors.map(a=>a.close()));
       counts.guardCommitments.fill(0);counts.guardPartialSigns.fill(0);counts.completedGuards=0;
       const results=await Promise.allSettled([0,1,2,3].map(start));const failure=results.find(r=>r.status==='rejected');
       if(failure){await Promise.allSettled(actors.map(a=>a.close()));throw failure.reason;}return results.map(r=>r.value);},
     get pids(){return actors.map(a=>a?.pid);},get counts(){return structuredClone(counts);},
-    async close(){closed=true;fail(Error('Process committee closed'));await Promise.allSettled(actors.filter(Boolean).map(a=>a.close()));}
+    async close(){quorumCredit.clear();closed=true;fail(Error('Process committee closed'));await Promise.allSettled(actors.filter(Boolean).map(a=>a.close()));}
   };
   const current=()=>{assert(!closed&&actors.every(a=>a&&!a.closed),'backing:process-committee-unavailable');};
   const configs=handle.configurations(),committeeDigest=committeeConfigDigest(configs[0]);
@@ -123,10 +143,10 @@ export async function createGuardProcessCommittee({configFiles,guardKeys,timeout
   const serialized=action=>{const result=custodyQueue.then(action);custodyQueue=result.catch(()=>{});return result;};
   custodyHandles.set(handle,Object.freeze({current,backingPolicy:'single-deposit-v2',committeeDigest,
     async assertAssigned(request){current();const rows=await handle.assertAssigned(request);current();return matching(rows);},
-    reserveSettlement(request,anchor,context){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+    reserveSettlement(request,anchor,context){quorumCredit.clear();return serialized(async()=>{current();assert(!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');auditing=true;
       try{const rows=[];for(const actor of actors)rows.push(await actor.request('reserveWithdrawal',{request,anchor,context},{timeoutMs}));
         current();return matching(rows);}finally{auditing=false;}});},
-    assertSettlement(request,anchor,context,{fresh=false}={}){return serialized(async()=>{current();assert(!run&&!auditing,'Committee unavailable');auditing=true;
+    assertSettlement(request,anchor,context,{fresh=false}={}){quorumCredit.clear();return serialized(async()=>{current();assert(!run&&!auditing&&!quorumCredit.authorizing,'Committee unavailable');auditing=true;
       try{const rows=await Promise.allSettled(actors.map(actor=>actor.request('assertWithdrawal',{request,anchor,context,fresh},{timeoutMs})));
         const failed=rows.find(row=>row.status==='rejected');if(failed)throw failed.reason;
         current();return matching(rows.map(row=>row.value));}finally{auditing=false;}});}

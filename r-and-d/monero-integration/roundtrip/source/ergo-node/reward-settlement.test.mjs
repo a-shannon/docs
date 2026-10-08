@@ -5,12 +5,13 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {RewardSubmissionReplyLostError,settleReward} from './reward-settlement.mjs';
+import {canonicalAssignment} from '../guard-service/src/db/moneroCreditAssignment.mjs';
 
 const h=n=>n.toString(16).padStart(64,'0');
 const clone=value=>structuredClone(value);
 const hash=value=>createHash('sha256').update(value).digest('hex');
 
-function fixture(t,{lostReply=false,lostBeforeEffect=false}={}){
+function fixture(t,{lostReply=false,lostBeforeEffect=false,failAfterSigned=false,retainSigned=false}={}){
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'reward-settlement-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
   const anchor={reservation:{reservationId:h(1),reservationHash:h(2),selectionBytes:'selection',requestJson:JSON.stringify({requestDigest:h(3),canonicalRequest:'{}'})},
     requestDigest:h(3),bindingDigest:h(4),expectationDigest:h(5),nativeDirectory:path.join(directory,'private-native')};
@@ -23,9 +24,11 @@ function fixture(t,{lostReply=false,lostBeforeEffect=false}={}){
   const rewardAssignment={binding:{creditTransactionDigest:snapshot.digest},domain:'rosen-monero-reward-assignment-v1',creditAssignmentDigest:h(17),
     settlement:{reservationId:h(1),reservationHash:h(2),requestDigest:h(3),selectionDigest:hash('selection'),bindingDigest:h(4),expectationDigest:h(5)},
     paymentTxId,paymentByteDigest:h(19),rewardTransactionId:snapshot.txId,rewardPolicyDigest:policyDigest};
+  const signedEvidence={assignmentDigest:hash(canonicalAssignment(rewardAssignment)),snapshotDigest:snapshot.digest,txId:snapshot.txId,
+    signedHex,signedDigest:hash(Buffer.from(signedHex,'hex'))};
   const state={createCalls:0,verifyRawCalls:0,signCalls:0,guardVerifyCalls:0,syncCalls:0,checks:0,submits:0,
-    lookupError:undefined,confirmationError:undefined,sourceConflict:false,invalidateDuringCheck:false,
-    assignment:undefined,chain:undefined,starts:[1,1,1,1],lostReply,lostBeforeEffect};
+    lookupError:undefined,confirmationError:undefined,sourceConflict:false,sourceConflictDuringCheck:false,sourceConflictAtStateCheckCount:0,invalidateDuringCheck:false,
+    assignment:undefined,signed:undefined,chain:undefined,starts:[1,1,1,1],lostReply,lostBeforeEffect,failAfterSigned,retainSigned};
   const transaction={eventId:h(8),txId:snapshot.txId,txType:'reward',txBytes:Buffer.from('aa','hex'),inputBoxes:[Buffer.from('bb','hex')],dataInputs:[Buffer.from('cc','hex')],toJson:()=>candidateTransaction};
   const verifier={policyDigest,binding,chain:{id:'reward-chain'},async create(target){
     state.createCalls++;state.verifyRawCalls++;if(state.sourceConflict)throw Error('controlled-source-proof-conflict');
@@ -35,12 +38,14 @@ function fixture(t,{lostReply=false,lostBeforeEffect=false}={}){
   const guards={
     get counts(){return {starts:[...state.starts]};},
     async rewardState(request,supplied){assert.deepEqual(request,context.assignment);assert.deepEqual(supplied,anchor);
-      return state.assignment?{status:'assigned',assignment:clone(state.assignment)}:{status:'unassigned'};},
+      if(state.sourceConflictAtStateCheckCount>0&&state.checks>=state.sourceConflictAtStateCheckCount)state.sourceConflict=true;
+      return state.assignment?{status:'assigned',assignment:clone(state.assignment),...(state.signed?{signed:clone(state.signed)}:{})}:{status:'unassigned'};},
     async verifyReward(received,reward){state.guardVerifyCalls++;assert.deepEqual(received,snapshot);
       assert.deepEqual(reward,{anchor,context,evidence:{sealed:'evidence'},paymentTxId});
       if(state.sourceConflict)throw Error('controlled-source-proof-conflict');return clone(state.assignment);},
     async sign(received,{reward}){state.signCalls++;assert.deepEqual(received,snapshot);assert.deepEqual(reward,{anchor,context,evidence:{sealed:'evidence'},paymentTxId});
-      state.assignment=clone(rewardAssignment);return {txId:snapshot.txId,signedHex};},
+      state.assignment=clone(rewardAssignment);if(state.retainSigned)state.signed=clone(signedEvidence);
+      if(state.failAfterSigned)throw Error('controlled-after-guard-signed-quorum');return {txId:snapshot.txId,signedHex};},
     async restartAll(){state.starts.fill(2);}
   };
   const receipt=()=>({id:snapshot.txId,signedHex,blockId:h(20),inclusionHeight:100,numConfirmations:2});
@@ -51,7 +56,7 @@ function fixture(t,{lostReply=false,lostBeforeEffect=false}={}){
     async verifyConfirmed(found,record){assert.equal(found.id,record.txId);assert.equal(found.signedHex,record.signedHex);return clone(found);},
     async rpc(route){
       if(route==='/blockchain/transaction/byId/'+snapshot.txId){if(state.lookupError)throw state.lookupError;if(!state.chain){const e=Error('Ergo HTTP 404 at '+route);e.status=404;throw e;}return clone(state.chain);}
-      if(route==='/transactions/check'){state.checks++;if(state.invalidateDuringCheck)state.assignment={...rewardAssignment,paymentByteDigest:h(99)};return snapshot.txId;}
+      if(route==='/transactions/check'){state.checks++;if(state.invalidateDuringCheck)state.assignment={...rewardAssignment,paymentByteDigest:h(99)};if(state.sourceConflictDuringCheck)state.sourceConflict=true;return snapshot.txId;}
       if(route==='/transactions'){state.submits++;const suppress=state.lostReply&&state.lostBeforeEffect;if(!suppress)state.chain=receipt();
         if(state.lostReply&&state.lostBeforeEffect){state.lostReply=false;throw Error('controlled-lost-submission-reply');}return snapshot.txId;}
       throw Error('Unexpected RPC '+route);
@@ -70,7 +75,7 @@ test('signs once with four fresh guard checks, submits exact bytes, and confirme
   assert.deepEqual(first.chain,{id:'reward-chain'});assert.equal(first.verifier.chain,first.chain);
   assert.deepEqual({...first.controls},{signCalls:1,submissions:1,recoveredLostReply:false,restartedGuards:0,sameSignedBytes:true,noResignAfterConfirmed:false});
   const reopened=await settleReward(f.options,f.ports);
-  assert.equal(f.state.createCalls,1);assert.equal(f.state.verifyRawCalls,1);assert.equal(f.state.signCalls,1);assert.equal(f.state.syncCalls,1);
+  assert.equal(f.state.createCalls,1);assert.equal(f.state.verifyRawCalls,1);assert.equal(f.state.signCalls,1);assert.equal(f.state.syncCalls,2);
   assert.equal(f.state.checks,1);assert.equal(f.state.submits,1);assert.equal(reopened.controls.noResignAfterConfirmed,true);assert.equal(reopened.controls.recoveredLostReply,false);
 });
 
@@ -85,8 +90,36 @@ test('lost submission reply recovers the exact confirmed record after all guards
 test('unconfirmed retained recovery fresh-verifies and may resubmit, but never signs a replacement',async t=>{
   const f=fixture(t,{lostReply:true,lostBeforeEffect:true});await assert.rejects(settleReward(f.options,f.ports),/lost-submission-reply/);
   await f.guards.restartAll();const recovered=await settleReward(f.options,f.ports);
-  assert.equal(f.state.createCalls,2);assert.equal(f.state.verifyRawCalls,2);assert.equal(f.state.signCalls,1);assert.equal(f.state.syncCalls,2);
+  assert.equal(f.state.createCalls,2);assert.equal(f.state.verifyRawCalls,2);assert.equal(f.state.signCalls,1);assert.equal(f.state.syncCalls,4);
   assert.equal(f.state.submits,2);assert.equal(recovered.controls.submissions,2);assert.equal(recovered.controls.noResignAfterConfirmed,false);
+});
+
+test('missing owner record recovers a retained signed guard quorum without another signing call',async t=>{
+  const f=fixture(t,{failAfterSigned:true,retainSigned:true});
+  await assert.rejects(settleReward(f.options,f.ports),/controlled-after-guard-signed-quorum/);
+  assert.equal(fs.existsSync(path.join(f.directory,'reward-signed.json')),false);await f.guards.restartAll();
+  const recovered=await settleReward(f.options,f.ports);assert.equal(recovered.transaction.txId,f.snapshot.txId);
+  assert.equal(f.state.signCalls,1);assert.equal(f.state.submits,1);assert.equal(f.state.guardVerifyCalls,3);
+  assert.equal(f.state.createCalls,3);assert.equal(f.state.syncCalls,4);assert.equal(recovered.controls.restartedGuards,4);
+});
+
+test('assigned reward without a signed quorum remains fail-closed and never signs again',async t=>{
+  const f=fixture(t,{failAfterSigned:true});await assert.rejects(settleReward(f.options,f.ports),/controlled-after-guard-signed-quorum/);
+  await f.guards.restartAll();await assert.rejects(settleReward(f.options,f.ports),/Reward signing outcome indeterminate/);
+  assert.equal(f.state.signCalls,1);assert.equal(f.state.submits,0);assert.equal(fs.existsSync(path.join(f.directory,'reward-signed.json')),false);
+});
+
+test('guard-quorum recovery refuses every changed signed binding without resigning or submitting',async t=>{
+  for(const mutation of ['assignment','snapshot','transaction','digest','bytes']){
+    const f=fixture(t,{failAfterSigned:true,retainSigned:true});await assert.rejects(settleReward(f.options,f.ports),/controlled-after-guard-signed-quorum/);
+    if(mutation==='assignment')f.state.signed.assignmentDigest=h(90);
+    if(mutation==='snapshot')f.state.signed.snapshotDigest=h(90);
+    if(mutation==='transaction')f.state.signed.txId=h(90);
+    if(mutation==='digest')f.state.signed.signedDigest=h(90);
+    if(mutation==='bytes'){f.state.signed.signedHex='00';f.state.signed.signedDigest=hash(Buffer.from('00','hex'));}
+    await assert.rejects(settleReward(f.options,f.ports),undefined,mutation);
+    assert.equal(f.state.signCalls,1,mutation);assert.equal(f.state.submits,0,mutation);assert.equal(fs.existsSync(path.join(f.directory,'reward-signed.json')),false,mutation);
+  }
 });
 
 test('retained recovery refuses changed context, signed bytes, guard assignment, payout, and absent candidate',async t=>{
@@ -111,13 +144,41 @@ test('only an explicit RPC 404 enters unconfirmed recovery; other lookup failure
 test('source-proof conflict during retained fresh verification refuses before resubmission',async t=>{
   const f=fixture(t,{lostReply:true,lostBeforeEffect:true});await assert.rejects(settleReward(f.options,f.ports),/lost-submission-reply/);
   f.state.sourceConflict=true;await assert.rejects(settleReward(f.options,f.ports),/source-proof-conflict/);
-  assert.equal(f.state.guardVerifyCalls,1);assert.equal(f.state.createCalls,1);assert.equal(f.state.signCalls,1);assert.equal(f.state.submits,1);
+  assert.equal(f.state.guardVerifyCalls,2);assert.equal(f.state.createCalls,1);assert.equal(f.state.signCalls,1);assert.equal(f.state.submits,1);
 });
 
 test('assignment invalidated during node check is refused by the gate adjacent to broadcast',async t=>{
   const f=fixture(t);f.state.invalidateDuringCheck=true;
   await assert.rejects(settleReward(f.options,f.ports),/Reward guard assignment changed/);
   assert.equal(f.state.checks,1);assert.equal(f.state.submits,0);assert.equal(f.state.signCalls,1);
+});
+
+test('source conflict during node check is refused before fresh reward broadcast',async t=>{
+  const f=fixture(t);f.state.sourceConflictDuringCheck=true;
+  await assert.rejects(settleReward(f.options,f.ports),/source-proof-conflict/);
+  assert.equal(f.state.checks,1);assert.equal(f.state.submits,0);assert.equal(f.state.signCalls,1);
+});
+
+test('source conflict during node check is refused before retained reward resubmission',async t=>{
+  const f=fixture(t,{lostReply:true,lostBeforeEffect:true});
+  await assert.rejects(settleReward(f.options,f.ports),/lost-submission-reply/);
+  f.state.sourceConflictDuringCheck=true;
+  await assert.rejects(settleReward(f.options,f.ports),/source-proof-conflict/);
+  assert.equal(f.state.checks,2);assert.equal(f.state.submits,1);assert.equal(f.state.signCalls,1);
+});
+
+test('source conflict during the last state wait is refused before fresh reward broadcast',async t=>{
+  const f=fixture(t);f.state.sourceConflictAtStateCheckCount=1;
+  await assert.rejects(settleReward(f.options,f.ports),/source-proof-conflict/);
+  assert.equal(f.state.checks,1);assert.equal(f.state.submits,0);assert.equal(f.state.signCalls,1);
+});
+
+test('source conflict during the last state wait is refused before retained reward resubmission',async t=>{
+  const f=fixture(t,{lostReply:true,lostBeforeEffect:true});
+  await assert.rejects(settleReward(f.options,f.ports),/lost-submission-reply/);
+  f.state.sourceConflictAtStateCheckCount=2;
+  await assert.rejects(settleReward(f.options,f.ports),/source-proof-conflict/);
+  assert.equal(f.state.checks,2);assert.equal(f.state.submits,1);assert.equal(f.state.signCalls,1);
 });
 
 test('confirmation polling propagates a non-404 response even when its body mentions 404',async t=>{

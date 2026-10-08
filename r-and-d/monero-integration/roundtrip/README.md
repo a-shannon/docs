@@ -19,6 +19,12 @@ one reward assignment per withdrawal and recovers the confirmed reward after a
 lost reply and four-guard restart. See the
 [current qualification](adapter-qualification.md#complete-local-v2-roundtrip).
 
+**Current source corrections.** Deposit admission now bounds the recipient
+credit and combined fee output to the positive signed 64-bit range required by
+the configured Ergo builder. Reward submission rechecks current source evidence
+and guard assignment after the node check. The corrected source has focused
+boundary tests; its native V2 roundtrip remains to be rerun.
+
 **Explicit output and intent agreement.** Read the
 [output agreement report](output-agreement.md) for the watcher/guard binding,
 isolated negative tests and exact replay results.

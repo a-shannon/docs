@@ -63,7 +63,10 @@ lost messages, guard death before a partial signature, config-directory drift,
 three-of-four signing with a non-coordinator offline, delayed duplicate messages,
 and recovery of the same confirmed credit. The three-of-four trial uses the node's
 transaction check endpoint without broadcasting; the final trial confirms one
-credit. The external `adapter-*/process-result.json` records the result and PIDs.
+credit. That trial first verifies four exact durable Guard claims, then lets
+three Guards sign while the fourth is offline. It does not demonstrate a return
+with a Guard permanently absent. The external `adapter-*/process-result.json`
+records the result and PIDs.
 
 The controller provisions the same four guard custody databases before starting
 watchers. Each watcher reads all four through a read-only view before retaining a
@@ -74,6 +77,11 @@ custody fails closed. The guard's atomic assignment remains necessary for races
 after a watcher read. Confirmed-event recovery returns the exact retained event;
 it does not grant new eligibility. The older in-process transport refuses V2
 observations and remains available only to older experiment profiles.
+Before submitting an unconfirmed V2 commitment or trigger, the watcher rereads
+its exact Monero request and backing after any queued pause, then checks guard
+custody again immediately before broadcast. A changed source leaves the queued
+transaction unconfirmed. A source change after broadcast cannot be made atomic
+with Ergo; guards independently verify the source before credit.
 
 For focused replay, set `WATCHER_DEPENDENCY_ROOT` to the prepared Rosen root:
 
@@ -117,6 +125,7 @@ Focused process checks need no running chain:
 
 ```text
 node --test tools/process-rpc.test.mjs tools/participant-config.test.mjs
+node --experimental-test-module-mocks --test ergo-node/quorum-credit-permit.test.mjs ergo-node/quorum-credit-process.test.mjs
 ```
 
 This profile uses controlled child processes under one OS account. It does not
@@ -141,7 +150,14 @@ the original V2 assignment, confirmed credit, recipient redemption, return event
 native request and selected output before retaining one permanent withdrawal
 reservation. Each fresh authorization reconstructs the same unspent Monero
 backing; expiry of the initial deposit-delivery window does not erase an existing
-credit liability. New deposit admission retains its expiry rules.
+credit liability. A guard with the exact assigned credit claim may continue its
+queued signing after that expiry only while its original block, output, key image
+and proof remain current and its trigger, reduced transaction and policy match
+the retained assignment. The in-process trial reads its four existing SQLite
+claims; each separate guard process reads its own custody. New deposit admission
+retains its expiry rules. Disposition of unclaimed expired deposits and
+post-event source reorganization remains an integration decision before
+activation.
 
 The existing Rust threshold CLSAG engine pays the recipient with two of four
 holders. The campaign checks competing reservations, proof loss before approval,
@@ -152,6 +168,13 @@ each occur once. The external `adapter-*/v2-return-result.json` records the payo
 and accounting at redemption, reservation, settlement and reward completion. Return watcher counters
 in that report are sampled after restart, not during initial observation.
 
+During one live native attempt, an acknowledgment lost after the withdrawal
+reservation commits is reconciled against its exact durable record. An
+acknowledgment lost after signing-journal preparation is read back against the
+exact anchor before the single signing transition. These checks do not restore
+a crashed native holder or complete a partial Guard settlement; full
+pre-signing crash recovery remains open.
+
 The return then uses the actual Rosen EventOrder and ErgoChain reward path.
 All four guards bind the confirmed Monero payment to the retained withdrawal,
 recheck its recipient, amount and confirmations, and atomically retain one reward
@@ -161,6 +184,16 @@ reply, restarts all four guards and recovers the same bytes without another
 signature. Rosen's TransactionProcessor completes the reward transaction and
 event. Ledger schema 3 is required; older schemas are refused without migration.
 
+If the owner stops after guard signing but before writing its signed record,
+each guard can retain the final public transaction bytes next to its custody
+database. Recovery requires three matching guard records for the same reward
+assignment, then checks the original candidate, snapshot, current source and
+signed transaction before restoring the owner record. It never starts a second
+signing session for an assigned reward. If fewer than three guards retained the
+same final bytes, automatic recovery stops without submission. Fresh submission
+and unconfirmed recovery both repeat source synchronization and guard assignment
+verification after the node transaction check and before broadcast.
+
 The minimum-fee reader reconstructs the configured NFT/asset fee box from complete
 node pagination and applies its historical row at the source height. New
 withdrawals use the maximum of declared, minimum and proportional fees before
@@ -168,6 +201,18 @@ approval. Underquoted deposits refuse rather than change their authenticated
 intent. Reward recovery accepts a successor fee box only when the retained
 historical fee policy remains identical. The live fixture exercises proportional
 fees; historical fee-box succession has focused regression coverage.
+
+The current credit order creates separate Ergo Asset outputs for the recipient
+and the combined deposit fees. Each output must contain between 1 and
+`9223372036854775807` units. Fresh V2 admission rejects an unrepresentable
+fee policy before observation and an unrepresentable net amount before creating
+backing or an event. Retained V2 backing and the earlier authenticated source
+apply the same output bounds. The baseline roundtrip rejects an unbuildable
+canonical intent before its durable admission, then checks the credit amounts
+again before creating an Ergo trigger. The gross Monero amount may exceed the signed
+limit when both Ergo outputs fit. Focused tests compare these bounds with the
+prepared Ergo WASM constructor and exercise the baseline admission database;
+this correction has not had a new native V2 roundtrip.
 
 Keep the source-reorganization campaign separate: `deposit-adapter` with
 `sourceResilience: true` and `v2Return: false` tests permanent quarantine of a

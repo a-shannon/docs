@@ -55,18 +55,29 @@ test('expired new admission remains refused while retained backing is reconstruc
   const f=fixture();f.state.tip=4300;
   assert.deepEqual(await f.adapter.inspect(f.candidate,new AbortController().signal),{status:'expired'});
   assert.equal(f.state.proofCalls,0);
-  const result=await f.read();assert.deepEqual(result,{backing:f.backing});
+  const result=await f.read();assert.equal(result.status,'retained');assert.deepEqual(result.backing,f.backing);
+  assert.equal(result.decision.status,'retained');assert.equal(result.decision.amount,10000n);
+  assert.equal(result.decision.destinationAmount,9880n);assert.equal(result.observation.amount,'10000');
   assert(Object.isFrozen(result));assert(Object.isFrozen(result.backing));
   assert.equal(f.state.proofCalls,1);assert.equal(f.state.recipientCalls,1);assert.equal(f.state.nativeCalls,2);
   assert(f.state.imageReads.length>=2);assert(f.state.imageReads.every(image=>image===f.backing.keyImage));
 });
 test('retained currentness permits growth across original expiry during proof verification',async()=>{
   const f=fixture();f.state.beforeProof=()=>{f.state.tip=4300;};
-  assert.deepEqual(await f.read(),{backing:f.backing});
+  assert.deepEqual((await f.read()).backing,f.backing);
 });
 test('fresh and retained entry points reconstruct the same full descriptor',async()=>{
   const f=fixture(),fresh=await f.adapter.inspect(f.candidate,new AbortController().signal);
   assert.deepEqual(fresh.backing,f.backing);assert.deepEqual((await f.read()).backing,fresh.backing);
+});
+test('retained backing refuses an unrepresentable Ergo recipient output',async()=>{
+  const f=fixture(),amount=String(9223372036854775808n+120n);
+  f.intent.amount=amount;f.intent.outputs[0].amount=amount;f.memo.amount=amount;
+  f.output.amountAtomic=amount;f.output.depositData=[encodeDepositMemo(f.memo).toString('hex')];
+  f.state.proofReceived=amount;f.backing.amountAtomic=amount;
+  f.backing.creditedAtomic='9223372036854775808';
+  f.backing.intentHash=intentHash(encodeIntent(f.intent));f.deliver();
+  await assert.rejects(f.read(),/Ergo token recipient amount/);
 });
 for(const field of ['version','genesis','committeeDigest','vaultSpend','vaultAddress','intentHash','txId','blockHash',
   'blockHeight','outputIndex','globalIndex','outputKey','keyImage','amountAtomic','destinationNetwork','destinationAsset',
@@ -117,7 +128,7 @@ test('retained destination is independently parsed even with matching memo, proo
 });
 test('retained read snapshots the expected descriptor before asynchronous evidence reads',async()=>{
   const f=fixture(),expected=structuredClone(f.backing);f.state.beforeProof=()=>{f.backing.recipient='changed';};
-  assert.deepEqual(await f.read(),{backing:expected});
+  assert.deepEqual((await f.read()).backing,expected);
 });
 test('retained source aborts without interpreting unavailable evidence as current',async()=>{
   const f=fixture(),abort=new AbortController();abort.abort();

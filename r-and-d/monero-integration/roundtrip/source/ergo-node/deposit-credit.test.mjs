@@ -19,6 +19,28 @@ test('actual migrated registry rejects malformed request without an obligation o
  const journal=new DatabaseSync(path.join(directory,'execution.sqlite'));assert.equal(journal.prepare('SELECT COUNT(*) AS n FROM stages').get().n,0);journal.close();
  const reopened=await openDepositCredit({directory,context,providers:undefined});await reopened.close();
 });
+test('baseline roundtrip refuses unbuildable outputs before durable admission',async()=>{
+ const fixture=syntheticSource(),directory=fs.mkdtempSync(path.join(parent,'amount-bound-'));
+ const owner=await openDepositCredit({directory,context:fixture.context,providers:fixture.providers});
+ try{
+  for(const [amount,bridgeFee,networkFee,role] of [
+    ['9223372036854775928','100','20','recipient'],
+    ['1000','0','0','fee'],
+    ['9223372036854775809','9223372036854775808','0','fee'],
+  ]){
+   const intent={...fixture.intent,amount,bridge_fee:bridgeFee,network_fee:networkFee,
+    outputs:[{...fixture.intent.outputs[0],amount}]};
+   await assert.rejects(owner.run({...fixture.input,request:{...fixture.input.request,intentBytes:encodeIntent(intent)}}),
+    new RegExp('Ergo token '+role+' amount'));
+  }
+  assert.equal(fixture.calls(),0,'No source provider should run for an impossible credit');
+ }finally{await owner.close();}
+ const db=new DatabaseSync(path.join(directory,'deposits.sqlite'));
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM monero_deposit_decision').get().n,0);
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM monero_credit_outbox').get().n,0);db.close();
+ const journal=new DatabaseSync(path.join(directory,'execution.sqlite'));
+ assert.equal(journal.prepare('SELECT COUNT(*) AS n FROM stages').get().n,0);journal.close();
+});
 function syntheticSource() {
  const random=()=>crypto.randomBytes(32).toString('hex');
  const deployment=JSON.parse(fs.readFileSync(runtime+'/rosen-deployment.json'));

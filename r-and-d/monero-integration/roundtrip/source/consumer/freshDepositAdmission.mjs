@@ -7,6 +7,7 @@ import {decodeIntent,intentHash} from '../packages/monero-deposit/lib/intentCode
 import {verifyDeposit} from '../packages/monero-deposit/lib/depositPolicy.ts';
 import {NATIVE_SOURCE_PIN} from '../packages/monero-deposit/lib/evidence.ts';
 import {decodeDepositData,decodeDepositEnvelope} from './depositDelivery.mjs';
+import {assertErgoTokenAmount} from './ergoTokenAmount.mjs';
 
 const canonical=value=>JSON.stringify(value,(_,item)=>item&&Object.getPrototypeOf(item)===Object.prototype
   ?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
@@ -39,6 +40,7 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
     'maxObservationAge','minConfirmations','networkFee','vaultAddress','vaultEpoch','vaultSpend'].sort(),'Admission configuration');
   for(const key of ['committeeDigest','destinationAsset','genesis','vaultSpend'])hash(cfg[key]);
   for(const key of ['bridgeFee','networkFee','vaultEpoch'])decimal(cfg[key]);
+  assertErgoTokenAmount(BigInt(cfg.bridgeFee)+BigInt(cfg.networkFee),'fee');
   assert(BigInt(cfg.vaultEpoch)>0n);assert(/^[1-9A-HJ-NP-Za-km-z]{95}$/.test(cfg.vaultAddress));
   integer(cfg.minConfirmations);integer(cfg.maxObservationAge);
   // Ordinary outputs need ten blocks independently of the configurable bridge
@@ -139,7 +141,12 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
         destinationNetwork:intent.destination_network,destinationAsset:intent.destination_asset,recipient:intent.to_address});
       const proof=await providers.proof.verify({messageBytes:request.intentBytes,proof:request.proof});
       assert(proof.value.good===true&&proof.value.received===amount,'Retained backing proof');
-      decision={intentHash:intentHash(request.intentBytes),recipient:intent.to_address,destinationAmount:amount-fees};
+      decision={status:'retained',authority:'assigned-claim-source-only',evidenceMode:'independent',
+        depositId:`monero:deposit:mainnet:${candidate.txId}`,intentHash:intentHash(request.intentBytes),
+        sourceNetwork:'mainnet',txid:candidate.txId,blockHash:candidate.sourceBlockId,blockHeight:BigInt(candidate.sourceHeight),
+        destinationNetwork:'ergo-testnet',destinationAsset:cfg.destinationAsset,recipient:intent.to_address,
+        amount,bridgeFee:BigInt(cfg.bridgeFee),networkFee:BigInt(cfg.networkFee),netAmount:amount-fees,
+        destinationAmount:amount-fees,retainedAtomicRemainder:0n,outputs:[{publicKey:output.outputKey}]};
     }else{
       decision=await verifyDeposit(request.intentBytes,request.proof,request.receiptEvidence,{
         version:2,domain:'rosen-monero-deposit',sourceNetwork:'mainnet',vaultEpoch:cfg.vaultEpoch,vaultAddress:cfg.vaultAddress,
@@ -148,6 +155,7 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
       },{bridgeFee:cfg.bridgeFee,networkFee:cfg.networkFee,sourceDecimals:12,destinationDecimals:12,remainder:'reject'},providers);
       assert.equal(decision.status,'accepted','Admission policy refused');
     }
+    assertErgoTokenAmount(decision.destinationAmount,'recipient');
     await current();
     // Stable across chain growth and across readers; source re-inclusion changes
     // the descriptor. Snapshot/reader identities are deliberately not preimages.
@@ -156,11 +164,11 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
       blockHeight:candidate.sourceHeight,outputIndex,globalIndex:output.globalIndex,outputKey:output.outputKey,
       keyImage:output.keyImage,amountAtomic:output.amountAtomic,destinationNetwork:'ergo-testnet',destinationAsset:cfg.destinationAsset,
       recipient:decision.recipient,creditedAtomic:decision.destinationAmount.toString()});
-    if(retained)return Object.freeze({backing});
     const observation=Object.freeze({fromChain:'monero',toChain:'ergo',fromAddress:'rosen-monero-output:v2:'+digest('rosen-monero/credit-origin/v2',backing),
       toAddress:decision.recipient,amount:decision.amount.toString(),bridgeFee:cfg.bridgeFee,networkFee:cfg.networkFee,
       sourceChainTokenId:'XMR',targetChainTokenId:cfg.destinationAsset,sourceTxId:candidate.txId,sourceBlockId:candidate.sourceBlockId,
       requestId:Buffer.from(blake2b(candidate.txId,undefined,32)).toString('hex'),rawData:''});
+    if(retained)return Object.freeze({status:'retained',observation,backing,decision:Object.freeze(decision)});
     return Object.freeze({status:'accepted',observation,backing,decision});
   }
   const inspect=(candidate,signal)=>reconstruct(candidate,signal,false);
@@ -174,5 +182,5 @@ export function createFreshDepositAdmission({network,observer,configuration,deli
   async function verify(candidate,signal){try{
     const result=await inspect(candidate,signal);return result.status==='accepted'?{status:'accepted',observation:result.observation}:result;
   }catch{return {status:'pending'};}}
-  return Object.freeze({scope,inspect,verify,readRetainedBacking});
+  return Object.freeze({scope,genesis:cfg.genesis,inspect,verify,readRetainedBacking});
 }
