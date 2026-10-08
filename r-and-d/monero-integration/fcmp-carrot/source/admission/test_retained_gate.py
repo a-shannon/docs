@@ -119,6 +119,27 @@ class RetainedGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.gate.submitted(digest, recovered[2], "08" * 32)
 
+    def test_confirmation_is_separate_from_submission_and_reorg_reconfirmation(self):
+        digest = self.gate.admit(self.text, self.cert, self.policy)
+        self.gate.begin(digest)
+        self.gate.retain_sal(digest, b"s" * 416)
+        transaction, txid = b"Core-validated-transaction-fixture", "07" * 32
+        self.gate.finalize(digest, transaction, txid, b"r" * 284)
+        self.assertIsNone(self.gate.confirmation(digest))
+        with self.assertRaisesRegex(ValueError, "submitted"):
+            self.gate.confirm(digest, transaction, txid, 90, "08" * 32)
+        self.gate.submitted(digest, transaction, txid)
+        self.assertIsNone(self.gate.confirmation(digest))
+        self.gate.confirm(digest, transaction, txid, 90, "08" * 32)
+        self.gate.close()
+        self.gate = Gate(self.path)
+        self.assertEqual(self.gate.confirmation(digest), (txid, 90, "08" * 32))
+        self.gate.confirm(digest, transaction, txid, 90, "08" * 32)
+        self.gate.confirm(digest, transaction, txid, 91, "09" * 32)
+        self.assertEqual(self.gate.confirmation(digest), (txid, 90, "08" * 32))
+        with self.assertRaisesRegex(ValueError, "submitted"):
+            self.gate.confirm(digest, transaction, "09" * 32, 91, "09" * 32)
+
     def test_intent_and_input_cannot_be_reassigned_to_second_candidate(self):
         self.gate.admit(self.text, self.cert, self.policy)
         for field in ("proposal", "intent"):

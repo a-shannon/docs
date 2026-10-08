@@ -106,11 +106,30 @@ class Policy:
 def candidate(tx_json):
     value = strict_json(tx_json)
     expected = ("domain", "genesis", "intent", "network", "proposal", "request")
-    if isinstance(value, dict) and "backing_event" in value:
-        expected += ("backing_event",)
-        unhex(value["backing_event"], 32)
+    if not isinstance(value, dict):
+        raise ValueError("candidate must be an object")
+    if value.get("domain") == "rosen-monero/fcmp-candidate/v1":
+        if "backing_event" in value:
+            expected += ("backing_event",)
+            unhex(value["backing_event"], 32)
+    elif value.get("domain") == "rosen-monero/fcmp-candidate/v2":
+        expected += ("backing_event", "backing_ledger_id", "backing_credit_id",
+                     "backing_credit_block_height", "backing_credit_block_hash",
+                     "backing_credit_global_output_index")
+        fields(value, expected)
+        for field in ("backing_event", "backing_ledger_id", "backing_credit_id",
+                      "backing_credit_block_hash"):
+            unhex(value[field], 32)
+        for field in ("backing_credit_block_height", "backing_credit_global_output_index"):
+            number = value[field]
+            if type(number) is not int or not 0 <= number <= 0x7fffffffffffffff:
+                raise ValueError("invalid backing credit anchor")
+        if value["backing_credit_block_height"] == 0:
+            raise ValueError("unconfirmed backing credit anchor")
+    else:
+        raise ValueError("unsupported candidate domain")
     fields(value, expected)
-    if canonical(value) != tx_json or value["domain"] != "rosen-monero/fcmp-candidate/v1":
+    if canonical(value) != tx_json:
         raise ValueError("noncanonical candidate")
     if value["network"] != "regtest-fcmp-beta3":
         raise ValueError("local synthetic network required")
@@ -140,6 +159,10 @@ class Gate:
             CREATE TABLE IF NOT EXISTS attempts(
                 candidate TEXT PRIMARY KEY REFERENCES candidates(digest),
                 sal BLOB);
+            CREATE TABLE IF NOT EXISTS confirmations(
+                candidate TEXT PRIMARY KEY REFERENCES candidates(digest),
+                txid TEXT NOT NULL, block_height INTEGER NOT NULL,
+                block_hash TEXT NOT NULL);
         """)
 
     def close(self):
@@ -170,8 +193,12 @@ class Gate:
     def begin(self, digest):
         """Commit consumption BEFORE any threshold nonce/preprocessing exists."""
         with self.write():
-            if not self.db.execute("SELECT 1 FROM candidates WHERE digest=?", (digest,)).fetchone():
+            row = self.db.execute("SELECT candidate FROM candidates WHERE digest=?", (digest,)).fetchone()
+            if row is None:
                 raise ValueError("candidate was not admitted")
+            value = strict_json(row[0])
+            if "backing_event" in value and value["domain"] != "rosen-monero/fcmp-candidate/v2":
+                raise ValueError("legacy backed candidate requires a new v2 certificate")
             self.db.execute("INSERT INTO attempts(candidate) VALUES(?)", (digest,))
 
     def retain_sal(self, digest, sal):
@@ -214,3 +241,35 @@ class Gate:
             if row is None or row != (tx_blob, core_txid):
                 raise ValueError("submission differs from retained final transaction")
             self.db.execute("UPDATE candidates SET submitted=1 WHERE digest=?", (digest,))
+
+    def confirm(self, digest, tx_blob, core_txid, block_height, block_hash):
+        unhex(core_txid, 32)
+        unhex(block_hash, 32)
+        if type(block_height) is not int or block_height < 1:
+            raise ValueError("invalid confirmed return height")
+        with self.write():
+            row = self.db.execute("""
+                SELECT final_tx,final_txid,submitted FROM candidates WHERE digest=?
+            """, (digest,)).fetchone()
+            if row != (tx_blob, core_txid, 1):
+                raise ValueError("confirmation differs from submitted final transaction")
+            previous = self.db.execute("""
+                SELECT txid,block_height,block_hash FROM confirmations WHERE candidate=?
+            """, (digest,)).fetchone()
+            authority = (core_txid, block_height, block_hash)
+            # Keep the first durable inclusion as the replay authority. The
+            # same exact transaction may confirm in a different block after a
+            # reorg; this current inclusion was independently checked by the
+            # caller and must not overwrite the historical proof.
+            if previous is not None and previous[0] != core_txid:
+                raise ValueError("confirmed return transaction changed")
+            if previous is None:
+                self.db.execute("""
+                    INSERT INTO confirmations(candidate,txid,block_height,block_hash)
+                    VALUES(?,?,?,?)
+                """, (digest, *authority))
+
+    def confirmation(self, digest):
+        return self.db.execute("""
+            SELECT txid,block_height,block_hash FROM confirmations WHERE candidate=?
+        """, (digest,)).fetchone()

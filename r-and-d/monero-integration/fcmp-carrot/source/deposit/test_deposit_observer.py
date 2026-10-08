@@ -1,7 +1,10 @@
 import dataclasses
+import io
+import json
 import sqlite3
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -33,6 +36,19 @@ def deposit(receipt_bytes=None, intent="04" * 32):
                    intent, "48cNbRvGyrb43yGQYLWKxshBnnq8nRkFfPcUwfqpihwJWcrHzKy8pyk9Ai1fXeg2Gf49S2CrTyPYJG9ru2hQcTWoLYsYWMG",
                    200_000_000_000, b"full-tx", receipt_bytes or b"r" * 284,
                    90, "03" * 32, 6, "http://127.0.0.1:18081")
+
+
+def database_state(path):
+    connection = sqlite3.connect(path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
+    try:
+        return (
+            connection.execute("PRAGMA user_version").fetchone()[0],
+            tuple(connection.execute(
+                "SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name"
+            )),
+        )
+    finally:
+        connection.close()
 
 
 class DepositObserverTests(unittest.TestCase):
@@ -97,9 +113,20 @@ class DepositObserverTests(unittest.TestCase):
     def test_replay_and_restart_never_second_credit(self):
         item = deposit()
         self.assertEqual(self.ledger.observe(item, view(), 0, True, None), "credited")
+        first = self.ledger.credit_state(item.genesis, item.txid, item.output_index)
         self.assertEqual(self.ledger.observe(item, view(), 0, True, None), "idempotent")
         self.restart()
         self.assertEqual(self.ledger.observe(item, view(), 0, True, None), "idempotent")
+        restarted = self.ledger.credit_state(item.genesis, item.txid, item.output_index)
+        self.assertEqual(restarted, first)
+        self.assertRegex(first["ledger_id"], r"^[0-9a-f]{64}$")
+        self.assertRegex(first["credit_id"], r"^[0-9a-f]{64}$")
+        self.assertEqual(first["credit_block_height"], item.block_height)
+        self.assertEqual(first["credit_block_hash"], item.block_hash)
+        self.assertEqual(first["credit_global_output_index"], item.global_output_index)
+        self.assertEqual(first["credit_status"], "active")
+        self.assertEqual(first["credited"], 1)
+        self.assertEqual(first["credit_count"], 1)
         row = self.ledger.db.execute(
             "SELECT status,credited,credit_count FROM deposits").fetchone()
         self.assertEqual(row, ("active", 1, 1))
@@ -237,10 +264,32 @@ class DepositObserverTests(unittest.TestCase):
         )
         core_result = (item.txid, item.output_index, item.k_o, item.amount,
                        item.key_image, item.destination, item.intent)
+        output = io.StringIO()
         with patch("deposit_observer.DaemonClient", AdvancingClient), \
                 patch("deposit_observer.chain_view", side_effect=(first, second)), \
-                patch("deposit_observer.verify_core", return_value=core_result):
+                patch("deposit_observer.verify_core", return_value=core_result), \
+                redirect_stdout(output):
             self.assertEqual(observe_command(args), 0)
+        observed = json.loads(output.getvalue())
+        self.assertEqual(set(observed), {
+            "decision", "genesis", "txid", "output_index", "K_o", "key_image",
+            "intent", "destination", "amount", "confirmations", "block_height",
+            "block_hash", "tip_height", "tip_hash", "event_origin", "endpoint_scope",
+            "ledger_id", "credit_id", "credit_block_height", "credit_block_hash",
+            "credit_global_output_index", "status", "credited", "credit_count",
+            "spent_status", "in_pool", "global_output_index", "chain_qualified",
+        })
+        self.assertRegex(observed["ledger_id"], r"^[0-9a-f]{64}$")
+        self.assertRegex(observed["credit_id"], r"^[0-9a-f]{64}$")
+        self.assertEqual(observed["credit_block_height"], item.block_height)
+        self.assertEqual(observed["credit_block_hash"], item.block_hash)
+        self.assertEqual(observed["credit_global_output_index"], item.global_output_index)
+        self.assertEqual(observed["spent_status"], 0)
+        self.assertIs(observed["in_pool"], False)
+        self.assertEqual(observed["global_output_index"], item.global_output_index)
+        self.assertIs(observed["chain_qualified"], True)
+        self.assertEqual((observed["status"], observed["credited"], observed["credit_count"]),
+                         ("active", 1, 1))
         self.ledger = Ledger(self.path)
         self.assertEqual(self.ledger.db.execute(
             "SELECT status,credited,credit_count FROM deposits").fetchone(),
@@ -381,6 +430,11 @@ class DepositObserverTests(unittest.TestCase):
         self.assertEqual(self.ledger.db.execute(
             "SELECT block_height,block_hash,global_output_index,status,credit_count FROM deposits"
         ).fetchone(), (90, "03" * 32, 6, "suspended", 1))
+        state = self.ledger.credit_state(item.genesis, item.txid, item.output_index)
+        self.assertEqual(state["credit_block_height"], 90)
+        self.assertEqual(state["credit_block_hash"], "03" * 32)
+        self.assertEqual(state["credit_global_output_index"], 6)
+        self.assertEqual(state["credit_status"], "suspended")
 
     def test_sqlite_constraints_exist_independently(self):
         item = deposit()
@@ -393,6 +447,271 @@ class DepositObserverTests(unittest.TestCase):
                     SELECT genesis,txid,output_index,?, ?,intent,destination,amount,tx_blob,receipt,
                     first_endpoint,status,credited,credit_count,created_at,last_seen FROM deposits
                 """, ("31" * 32, "32" * 32))
+
+    def test_ledger_and_credit_identities_are_immutable(self):
+        item = deposit()
+        self.ledger.observe(item, view(), 0, True, None)
+        state = self.ledger.credit_state(item.genesis, item.txid, item.output_index)
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.ledger.db.execute(
+                "UPDATE deposits SET credit_id=? WHERE credit_id=?",
+                ("31" * 32, state["credit_id"]),
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.ledger.db.execute(
+                "UPDATE ledger_meta SET ledger_id=? WHERE singleton=1",
+                ("32" * 32,),
+            )
+
+    def test_expected_ledger_id_rejects_missing_database_before_connect(self):
+        missing = Path(self.temp.name) / "missing" / "deposits.sqlite3"
+        intent_path = Path(self.temp.name) / "missing-intent.bin"
+        receipt_path = Path(self.temp.name) / "missing-receipt.bin"
+        item = deposit()
+        intent_path.write_bytes(bytes.fromhex(item.intent))
+        receipt_path.write_bytes(receipt(intent=bytes.fromhex(item.intent),
+                                         txid=bytes.fromhex(item.txid),
+                                         index=item.output_index, amount=item.amount))
+        args = SimpleNamespace(
+            runtime=str(missing.parent), receipt=str(receipt_path), intent=str(intent_path),
+            url=item.endpoint, core="core", profile="user", min_confirmations=10,
+            expected_ledger_id="31" * 32,
+        )
+        with patch("deposit_observer.sqlite3.connect",
+                   side_effect=AssertionError("must refuse before sqlite connect")), \
+                patch("deposit_observer.DaemonClient",
+                      side_effect=AssertionError("must refuse before network")):
+            self.assertEqual(observe_command(args), 2)
+        self.assertFalse(missing.exists())
+
+    def test_expected_ledger_id_mismatch_refuses_before_network_or_credit(self):
+        item = deposit()
+        observer_path = Path(self.temp.name) / "deposits.sqlite3"
+        observer_ledger = Ledger(observer_path)
+        actual_ledger_id = observer_ledger.ledger_id
+        observer_ledger.close()
+        before_bytes = observer_path.read_bytes()
+        before_state = database_state(observer_path)
+        wrong_ledger_id = "31" * 32 if actual_ledger_id != "31" * 32 else "32" * 32
+        intent_path = Path(self.temp.name) / "wrong-id-intent.bin"
+        receipt_path = Path(self.temp.name) / "wrong-id-receipt.bin"
+        intent_path.write_bytes(bytes.fromhex(item.intent))
+        receipt_path.write_bytes(receipt(intent=bytes.fromhex(item.intent),
+                                         txid=bytes.fromhex(item.txid),
+                                         index=item.output_index, amount=item.amount))
+        args = SimpleNamespace(
+            runtime=self.temp.name, receipt=str(receipt_path), intent=str(intent_path),
+            url=item.endpoint, core="core", profile="user", min_confirmations=10,
+            expected_ledger_id=wrong_ledger_id,
+        )
+        with patch.object(Ledger, "_migrate",
+                          side_effect=AssertionError("must refuse before migration")), \
+                patch("deposit_observer.DaemonClient",
+                      side_effect=AssertionError("must refuse before network")):
+            self.assertEqual(observe_command(args), 2)
+        self.assertEqual(observer_path.read_bytes(), before_bytes)
+        self.assertEqual(database_state(observer_path), before_state)
+        connection = sqlite3.connect(observer_path)
+        try:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM deposits").fetchone()[0], 0)
+            self.assertEqual(connection.execute(
+                "SELECT ledger_id FROM ledger_meta WHERE singleton=1").fetchone()[0],
+                actual_ledger_id)
+        finally:
+            connection.close()
+
+    def test_matching_expected_identity_reports_chain_state_before_sticky_suspension(self):
+        base = deposit()
+        receipt_bytes = receipt(
+            intent=bytes.fromhex(base.intent), txid=bytes.fromhex(base.txid),
+            index=base.output_index, amount=base.amount,
+        )
+        item = deposit(receipt_bytes=receipt_bytes)
+        observer_path = Path(self.temp.name) / "deposits.sqlite3"
+        observer_ledger = Ledger(observer_path)
+        observer_ledger.observe(item, view(), 0, True, None)
+        observer_ledger.observe(
+            item, view(2), 0, False, "insufficient confirmations"
+        )
+        expected_ledger_id = observer_ledger.ledger_id
+        observer_ledger.close()
+        intent_path = Path(self.temp.name) / "resume-intent.bin"
+        receipt_path = Path(self.temp.name) / "resume-receipt.bin"
+        intent_path.write_bytes(bytes.fromhex(item.intent))
+        receipt_path.write_bytes(receipt_bytes)
+
+        class StableClient:
+            url = item.endpoint
+
+            def __init__(self, _url):
+                pass
+
+            def identity(self):
+                return view().tip_height, view().tip_hash
+
+            def header(self, height):
+                self.assert_genesis_height = height
+                return {"hash": item.genesis, "orphan_status": False}
+
+            def spent(self, _key_image):
+                return 0
+
+        args = SimpleNamespace(
+            runtime=self.temp.name, receipt=str(receipt_path), intent=str(intent_path),
+            url=item.endpoint, core="core", profile="user", min_confirmations=10,
+            expected_ledger_id=expected_ledger_id,
+        )
+        core_result = (item.txid, item.output_index, item.k_o, item.amount,
+                       item.key_image, item.destination, item.intent)
+        output = io.StringIO()
+        with patch("deposit_observer.DaemonClient", StableClient), \
+                patch("deposit_observer.retry_chain_view", side_effect=(view(), view())), \
+                patch("deposit_observer.tip_extends", return_value=True), \
+                patch("deposit_observer.verify_core", return_value=core_result), \
+                redirect_stdout(output):
+            self.assertEqual(observe_command(args), 2)
+        observed = json.loads(output.getvalue())
+        self.assertEqual(observed["ledger_id"], expected_ledger_id)
+        self.assertIs(observed["chain_qualified"], True)
+        self.assertEqual((observed["decision"], observed["status"], observed["credit_count"]),
+                         ("suspended", "suspended", 1))
+
+
+class LedgerMigrationTests(unittest.TestCase):
+    LEGACY_SCHEMA = """
+        CREATE TABLE deposits(
+            id INTEGER PRIMARY KEY,
+            genesis TEXT NOT NULL,
+            txid TEXT NOT NULL,
+            output_index INTEGER NOT NULL,
+            k_o TEXT NOT NULL,
+            key_image TEXT NOT NULL,
+            intent TEXT NOT NULL,
+            destination TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            tx_blob BLOB NOT NULL,
+            receipt BLOB NOT NULL,
+            block_height INTEGER,
+            block_hash TEXT,
+            global_output_index INTEGER,
+            first_endpoint TEXT NOT NULL,
+            status TEXT NOT NULL,
+            credited INTEGER NOT NULL,
+            credit_count INTEGER NOT NULL,
+            suspension_reason TEXT,
+            created_at INTEGER NOT NULL,
+            last_seen INTEGER NOT NULL,
+            UNIQUE(genesis,txid,output_index),
+            UNIQUE(genesis,k_o),
+            UNIQUE(genesis,key_image));
+    """
+
+    @staticmethod
+    def insert_legacy(connection, item, origin_column=False, origin=None):
+        columns = (
+            "genesis,txid,output_index,k_o,key_image,intent,destination,amount,"
+            "tx_blob,receipt,block_height,block_hash,global_output_index,first_endpoint,"
+            "status,credited,credit_count,suspension_reason,created_at,last_seen"
+        )
+        values = (
+            item.genesis, item.txid, item.output_index, item.k_o, item.key_image,
+            item.intent, item.destination, item.amount, item.tx_blob, item.receipt,
+            item.block_height, item.block_hash, item.global_output_index, item.endpoint,
+            "active", 1, 1, None, 1, 1,
+        )
+        if origin_column:
+            columns += ",event_origin"
+            values += (origin,)
+        placeholders = ",".join("?" for _ in values)
+        connection.execute(f"INSERT INTO deposits({columns}) VALUES({placeholders})", values)
+
+    def make_legacy(self, path, version, origin_column, origin=None):
+        connection = sqlite3.connect(path)
+        try:
+            connection.executescript(self.LEGACY_SCHEMA)
+            if origin_column:
+                connection.execute("ALTER TABLE deposits ADD COLUMN event_origin TEXT")
+            self.insert_legacy(connection, deposit(), origin_column, origin)
+            connection.execute(f"PRAGMA user_version={version}")
+            connection.commit()
+        finally:
+            connection.close()
+
+    def test_v1_v2_interrupted_states_backfill_atomically(self):
+        cases = ((1, False), (1, True), (2, True))
+        for version, origin_column in cases:
+            with self.subTest(version=version, origin_column=origin_column), \
+                    tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "legacy.sqlite3"
+                self.make_legacy(path, version, origin_column)
+                ledger = Ledger(path)
+                try:
+                    state = ledger.credit_state("01" * 32, "05" * 32, 1)
+                    self.assertEqual(ledger.db.execute("PRAGMA user_version").fetchone()[0], 3)
+                    self.assertEqual(state["event_origin"], event_origin(
+                        *self._event_fields(deposit())))
+                    self.assertRegex(state["ledger_id"], r"^[0-9a-f]{64}$")
+                    self.assertRegex(state["credit_id"], r"^[0-9a-f]{64}$")
+                    self.assertEqual(ledger.db.execute(
+                        "SELECT COUNT(*) FROM deposits WHERE event_origin IS NULL OR credit_id IS NULL"
+                    ).fetchone()[0], 0)
+                finally:
+                    ledger.close()
+
+    def test_existing_wrong_origin_fails_without_promoting_schema(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "wrong.sqlite3"
+            self.make_legacy(path, 2, True, "ff" * 32)
+            with self.assertRaisesRegex(ObservationError, "event origin"):
+                Ledger(path)
+            connection = sqlite3.connect(path)
+            try:
+                self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
+                self.assertNotIn("credit_id", {
+                    row[1] for row in connection.execute("PRAGMA table_info(deposits)")
+                })
+                self.assertEqual(connection.execute(
+                    "SELECT event_origin FROM deposits").fetchone()[0], "ff" * 32)
+            finally:
+                connection.close()
+
+    def test_expected_identity_refuses_old_or_empty_database_without_mutation(self):
+        item = deposit()
+        for case in ("v2", "empty"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                runtime = Path(directory)
+                path = runtime / "deposits.sqlite3"
+                if case == "v2":
+                    self.make_legacy(path, 2, True)
+                else:
+                    sqlite3.connect(path).close()
+                before_bytes = path.read_bytes()
+                before_state = database_state(path)
+                intent_path = runtime / "intent.bin"
+                receipt_path = runtime / "receipt.bin"
+                intent_path.write_bytes(bytes.fromhex(item.intent))
+                receipt_path.write_bytes(receipt(
+                    intent=bytes.fromhex(item.intent), txid=bytes.fromhex(item.txid),
+                    index=item.output_index, amount=item.amount,
+                ))
+                args = SimpleNamespace(
+                    runtime=str(runtime), receipt=str(receipt_path), intent=str(intent_path),
+                    url=item.endpoint, core="core", profile="user", min_confirmations=10,
+                    expected_ledger_id="31" * 32,
+                )
+                with patch.object(
+                        Ledger, "_migrate",
+                        side_effect=AssertionError("must refuse before migration")), \
+                        patch("deposit_observer.DaemonClient",
+                              side_effect=AssertionError("must refuse before network")):
+                    self.assertEqual(observe_command(args), 2)
+                self.assertEqual(path.read_bytes(), before_bytes)
+                self.assertEqual(database_state(path), before_state)
+
+    @staticmethod
+    def _event_fields(item):
+        return (item.genesis, item.txid, item.output_index, item.k_o, item.key_image,
+                item.intent, item.destination, item.amount)
 
 
 if __name__ == "__main__":
