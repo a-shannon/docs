@@ -309,6 +309,19 @@ def recovery_state(database: Path, digest: str) -> tuple[int, int]:
     return attempts, rows[0][0]
 
 
+def confirmation_state(database: Path, digest: str) -> tuple[str, int, str]:
+    connection = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=10)
+    try:
+        connection.execute("PRAGMA query_only=ON")
+        rows = connection.execute("""
+            SELECT txid,block_height,block_hash FROM confirmations WHERE candidate=?
+        """, (digest,)).fetchall()
+    finally:
+        connection.close()
+    require(len(rows) == 1, "return confirmation was not retained exactly once")
+    return rows[0]
+
+
 def confirmed_retained(node_url: str, txid: str, transaction: Path) -> int:
     blob = transaction.read_bytes()
     require(retained_on_daemon(node_url, txid, blob), "retained transaction is absent from daemon")
@@ -494,6 +507,20 @@ def execute(args: argparse.Namespace) -> int:
         require((attempts, submitted) == (1, 1),
                 "recovery regenerated a signing attempt or failed to persist submission")
 
+        run_logged(logs, "06b-return-confirmation", [
+            sys.executable, campaign_cli, "--core", core, "--signer", signer,
+            "--node", node_url, "--runtime", return_runtime, "--era", "carrot",
+            "--profile", "return", "--input-key", observed_a["K_o"],
+            "--deposit-observer", observer_cli, "--deposit-runtime", reader_a,
+            "--deposit-receipt", deposit_receipt, "--deposit-intent", deposit_intent,
+            "--deposit-confirmations", "10", "--confirm",
+        ])
+        confirmation = confirmation_state(return_runtime / "gate.db", return_digest)
+        require(confirmation[0] == return_txid and type(confirmation[1]) is int
+                and confirmation[1] > observed_a["block_height"]
+                and isinstance(confirmation[2], str) and HEX64.fullmatch(confirmation[2]),
+                "retained return confirmation differs from the fixture return")
+
         _, spent_out, _ = run_logged(logs, "07-reader-a-spent", [
             *observer_base, reader_a, deposit_receipt, deposit_intent,
             "--min-confirmations", "10",
@@ -503,6 +530,76 @@ def execute(args: argparse.Namespace) -> int:
                 "spent deposit observer did not return suspended")
         require(ledger_state(reader_a, genesis, deposit_txid) == ("suspended", 1, 1),
                 "spent deposit changed credit ownership or count")
+
+        if args.return_only_reorg:
+            height = strict_fixture_info(node_url)["height"]
+            deposit_height = observed_a.get("block_height")
+            require(type(deposit_height) is int and deposit_height < height - return_confirmations,
+                    "return-only rollback would remove the credited deposit")
+            popped = post(node_url, "/pop_blocks", {
+                "nblocks": return_confirmations, "keep_txs": False,
+            })
+            require(popped.get("status") == "OK"
+                    and popped.get("height") == height - return_confirmations,
+                    "return-only pop_blocks returned the wrong height")
+            require(not retained_on_daemon(
+                node_url, return_txid, (return_runtime / "transaction.bin").read_bytes()),
+                "popped return remains on the daemon")
+            require(retained_on_daemon(
+                node_url, deposit_txid, (deposit_runtime / "transaction.bin").read_bytes()),
+                "return-only rollback removed the credited deposit")
+            _, suspended_out, _ = run_logged(logs, "08-reader-a-return-only-reorg", [
+                *observer_base, reader_a, deposit_receipt, deposit_intent,
+                "--min-confirmations", "10",
+            ], expected=(2,))
+            require(observer_result(suspended_out).get("decision") == "suspended"
+                    and ledger_state(reader_a, genesis, deposit_txid) == ("suspended", 1, 1),
+                    "return-only reorg reactivated or recredited the deposit")
+            _, replay_out, _ = run_logged(logs, "09-return-only-replay", [
+                sys.executable, campaign_cli, "--core", core, "--signer", signer,
+                "--node", node_url, "--runtime", return_runtime, "--era", "carrot",
+                "--profile", "return", "--input-key", observed_a["K_o"],
+                "--deposit-observer", observer_cli, "--deposit-runtime", reader_a,
+                "--deposit-receipt", deposit_receipt, "--deposit-intent", deposit_intent,
+                "--deposit-confirmations", "10", "--submit",
+            ])
+            require(campaign_result(replay_out) == (return_digest, return_txid),
+                    "return-only replay changed the retained candidate or transaction")
+            require(all(digest_file(retained_paths[name]) == retained_hashes[name]
+                        for name in retained_paths),
+                    "return-only replay changed retained source or payment bytes")
+            attempts, submitted = recovery_state(return_runtime / "gate.db", return_digest)
+            require((attempts, submitted) == (1, 1)
+                    and ledger_state(reader_a, genesis, deposit_txid) == ("suspended", 1, 1),
+                    "return-only replay changed signing or credit ownership")
+            mine(node_url, 12)
+            replay_confirmations = confirmed_retained(
+                node_url, return_txid, return_runtime / "transaction.bin")
+            run_logged(logs, "10-return-only-reconfirmation", [
+                sys.executable, campaign_cli, "--core", core, "--signer", signer,
+                "--node", node_url, "--runtime", return_runtime, "--era", "carrot",
+                "--profile", "return", "--input-key", observed_a["K_o"],
+                "--deposit-observer", observer_cli, "--deposit-runtime", reader_a,
+                "--deposit-receipt", deposit_receipt, "--deposit-intent", deposit_intent,
+                "--deposit-confirmations", "10", "--confirm",
+            ])
+            require(confirmation_state(return_runtime / "gate.db", return_digest) == confirmation,
+                    "return replay replaced the first durable confirmation")
+            write_result(runtime, {
+                "scope": {"fixture_only": True, "network": "offline fakechain",
+                          "endpoint_scope": "single", "rosen_acceptance": False,
+                          "production_readiness": False},
+                "txids": {"carrot_deposit": deposit_txid, "carrot_return": return_txid},
+                "return_only_reorg": {"removed_blocks": return_confirmations,
+                                      "deposit_remained": True, "return_removed": True,
+                                      "confirmed_before_removal": True,
+                                      "same_retained_bytes": True,
+                                      "replay_confirmations": replay_confirmations,
+                                      "reconfirmed_after_replay": True,
+                                      "credit_status": "suspended", "credit_count": 1,
+                                      "signing_attempts": attempts, "submitted": submitted},
+            })
+            return 0
 
         height = strict_fixture_info(node_url)["height"]
         deposit_height = observed_a.get("block_height")
@@ -583,6 +680,7 @@ def execute(args: argparse.Namespace) -> int:
                 "seven_files_sha256": retained_hashes,
                 "attempts": attempts,
                 "submitted": submitted,
+                "confirmed_before_rollback": True,
                 "identical": True,
             },
             "rollback": {
@@ -622,6 +720,8 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--runtime", required=True, metavar="NEW_ABSOLUTE")
     value.add_argument("--rpc-port", required=True, type=port)
     value.add_argument("--p2p-port", required=True, type=port)
+    value.add_argument("--return-only-reorg", action="store_true",
+                       help="exercise disappearance and exact replay of only the return")
     return value
 
 

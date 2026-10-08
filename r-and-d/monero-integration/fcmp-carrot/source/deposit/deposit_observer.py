@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import sqlite3
 import subprocess
 import sys
@@ -327,16 +328,52 @@ def verify_core(core: Path, profile: str, tx_blob: bytes, receipt_path: Path,
 
 
 class Ledger:
-    def __init__(self, path: Path):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(path, isolation_level=None, timeout=30)
-        self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA synchronous=FULL")
-        self.db.execute("PRAGMA foreign_keys=ON")
-        version = self.db.execute("PRAGMA user_version").fetchone()[0]
-        if version not in (0, 1, 2):
-            raise ObservationError("unsupported deposit ledger schema")
-        self.db.executescript("""
+    def __init__(self, path: Path, *, expected_ledger_id: str | None = None):
+        if expected_ledger_id is not None:
+            if not path.is_file():
+                raise ObservationError("expected deposit ledger does not exist")
+            self.db = sqlite3.connect(
+                path.resolve().as_uri() + "?mode=rw", uri=True,
+                isolation_level=None, timeout=30,
+            )
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self.db = sqlite3.connect(path, isolation_level=None, timeout=30)
+        try:
+            if expected_ledger_id is not None:
+                self._require_existing_identity(expected_ledger_id)
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA synchronous=FULL")
+            self.db.execute("PRAGMA foreign_keys=ON")
+            self._migrate()
+            self.ledger_id = self.db.execute(
+                "SELECT ledger_id FROM ledger_meta WHERE singleton=1"
+            ).fetchone()[0]
+        except BaseException:
+            self.db.close()
+            raise
+
+    def _require_existing_identity(self, expected_ledger_id: str) -> None:
+        if self.db.execute("PRAGMA user_version").fetchone()[0] != 3:
+            raise ObservationError("expected deposit ledger is not schema v3")
+        if not self._table_exists("ledger_meta"):
+            raise ObservationError("expected deposit ledger metadata is missing")
+        meta = self.db.execute(
+            "SELECT singleton,ledger_id FROM ledger_meta ORDER BY singleton"
+        ).fetchall()
+        if len(meta) != 1 or meta[0][0] != 1:
+            raise ObservationError("expected deposit ledger identity is ambiguous")
+        ledger_id = _hex64(meta[0][1], "ledger identity")
+        if ledger_id != expected_ledger_id:
+            raise ObservationError("deposit ledger identity differs from expected ledger")
+
+    def _table_exists(self, name: str) -> bool:
+        return self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+        ).fetchone() is not None
+
+    def _create_tables(self) -> None:
+        self.db.execute("""
             CREATE TABLE IF NOT EXISTS deposits(
                 id INTEGER PRIMARY KEY,
                 genesis TEXT NOT NULL,
@@ -347,7 +384,8 @@ class Ledger:
                 intent TEXT NOT NULL,
                 destination TEXT NOT NULL,
                 amount INTEGER NOT NULL,
-                event_origin TEXT NOT NULL UNIQUE,
+                event_origin TEXT NOT NULL,
+                credit_id TEXT NOT NULL,
                 tx_blob BLOB NOT NULL,
                 receipt BLOB NOT NULL,
                 block_height INTEGER,
@@ -363,6 +401,8 @@ class Ledger:
                 UNIQUE(genesis,txid,output_index),
                 UNIQUE(genesis,k_o),
                 UNIQUE(genesis,key_image));
+        """)
+        self.db.execute("""
             CREATE TABLE IF NOT EXISTS observations(
                 id INTEGER PRIMARY KEY,
                 deposit_id INTEGER NOT NULL REFERENCES deposits(id),
@@ -376,21 +416,138 @@ class Ledger:
                 spent_status INTEGER NOT NULL,
                 tx_blob_sha256 TEXT NOT NULL);
         """)
-        columns = {row[1] for row in self.db.execute("PRAGMA table_info(deposits)")}
-        if "event_origin" not in columns:
-            self.db.execute("ALTER TABLE deposits ADD COLUMN event_origin TEXT")
+        self.db.execute("""
+            CREATE TABLE IF NOT EXISTS ledger_meta(
+                singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+                ledger_id TEXT NOT NULL UNIQUE);
+        """)
+
+    def _migrate(self) -> None:
+        version = self.db.execute("PRAGMA user_version").fetchone()[0]
+        if version not in (0, 1, 2, 3):
+            raise ObservationError("unsupported deposit ledger schema")
+        deposits_existed = self._table_exists("deposits")
+        meta_existed = self._table_exists("ledger_meta")
+        if version != 0 and not deposits_existed:
+            raise ObservationError("declared deposit ledger schema is missing")
+        with self.write():
+            self._create_tables()
+            columns = {row[1] for row in self.db.execute("PRAGMA table_info(deposits)")}
+            if "event_origin" not in columns:
+                if version == 3:
+                    raise ObservationError("v3 ledger is missing event origin")
+                self.db.execute("ALTER TABLE deposits ADD COLUMN event_origin TEXT")
+            if "credit_id" not in columns:
+                if version == 3:
+                    raise ObservationError("v3 ledger is missing credit identity")
+                self.db.execute("ALTER TABLE deposits ADD COLUMN credit_id TEXT")
+
             rows = self.db.execute("""
-                SELECT id,genesis,txid,output_index,k_o,key_image,intent,destination,amount FROM deposits
+                SELECT id,genesis,txid,output_index,k_o,key_image,intent,destination,amount,
+                       event_origin,credit_id FROM deposits ORDER BY id
             """).fetchall()
-            with self.write():
-                for row in rows:
-                    origin = event_origin(*row[1:])
-                    self.db.execute("UPDATE deposits SET event_origin=? WHERE id=?", (origin, row[0]))
-        self.db.execute("CREATE UNIQUE INDEX IF NOT EXISTS deposit_event_origin_unique ON deposits(event_origin)")
-        self.db.execute("PRAGMA user_version=2")
+            for row in rows:
+                expected_origin = event_origin(*row[1:9])
+                if row[9] is None:
+                    if version == 3:
+                        raise ObservationError("v3 ledger contains null event origin")
+                    self.db.execute(
+                        "UPDATE deposits SET event_origin=? WHERE id=?", (expected_origin, row[0])
+                    )
+                elif row[9] != expected_origin:
+                    raise ObservationError("stored event origin differs from deposit identity")
+                if row[10] is None:
+                    if version == 3:
+                        raise ObservationError("v3 ledger contains null credit identity")
+                    self.db.execute(
+                        "UPDATE deposits SET credit_id=? WHERE id=?", (secrets.token_hex(32), row[0])
+                    )
+                else:
+                    _hex64(row[10], "credit identity")
+
+            if self.db.execute(
+                    "SELECT 1 FROM deposits WHERE event_origin IS NULL OR credit_id IS NULL LIMIT 1"
+            ).fetchone() is not None:
+                raise ObservationError("deposit identity backfill is incomplete")
+            if self.db.execute("""
+                    SELECT 1 FROM deposits GROUP BY event_origin HAVING COUNT(*) > 1 LIMIT 1
+            """).fetchone() is not None:
+                raise ObservationError("duplicate event origin during migration")
+            if self.db.execute("""
+                    SELECT 1 FROM deposits GROUP BY credit_id HAVING COUNT(*) > 1 LIMIT 1
+            """).fetchone() is not None:
+                raise ObservationError("duplicate credit identity during migration")
+
+            self.db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS deposit_event_origin_unique ON deposits(event_origin)"
+            )
+            self.db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS deposit_credit_id_unique ON deposits(credit_id)"
+            )
+            meta = self.db.execute(
+                "SELECT singleton,ledger_id FROM ledger_meta ORDER BY singleton"
+            ).fetchall()
+            if not meta:
+                if version == 3 and meta_existed:
+                    raise ObservationError("v3 ledger identity is missing")
+                if version == 3 and not meta_existed:
+                    raise ObservationError("v3 ledger metadata is missing")
+                self.db.execute(
+                    "INSERT INTO ledger_meta(singleton,ledger_id) VALUES(1,?)",
+                    (secrets.token_hex(32),),
+                )
+            elif len(meta) != 1 or meta[0][0] != 1:
+                raise ObservationError("ledger metadata is ambiguous")
+            else:
+                _hex64(meta[0][1], "ledger identity")
+
+            self.db.execute("""
+                CREATE TRIGGER IF NOT EXISTS deposits_identity_insert
+                BEFORE INSERT ON deposits
+                WHEN NEW.event_origin IS NULL OR NEW.credit_id IS NULL
+                BEGIN SELECT RAISE(ABORT, 'deposit identity is required'); END;
+            """)
+            self.db.execute("""
+                CREATE TRIGGER IF NOT EXISTS deposits_identity_update
+                BEFORE UPDATE OF event_origin,credit_id ON deposits
+                WHEN NEW.event_origin IS NULL OR NEW.credit_id IS NULL
+                     OR NEW.event_origin != OLD.event_origin OR NEW.credit_id != OLD.credit_id
+                BEGIN SELECT RAISE(ABORT, 'deposit identity is immutable'); END;
+            """)
+            self.db.execute("""
+                CREATE TRIGGER IF NOT EXISTS ledger_identity_update
+                BEFORE UPDATE ON ledger_meta
+                BEGIN SELECT RAISE(ABORT, 'ledger identity is immutable'); END;
+            """)
+            self.db.execute("""
+                CREATE TRIGGER IF NOT EXISTS ledger_identity_delete
+                BEFORE DELETE ON ledger_meta
+                BEGIN SELECT RAISE(ABORT, 'ledger identity is immutable'); END;
+            """)
+            self.db.execute("PRAGMA user_version=3")
 
     def close(self) -> None:
         self.db.close()
+
+    def credit_state(self, genesis: str, txid: str, output_index: int) -> dict[str, Any]:
+        row = self.db.execute("""
+            SELECT credit_id,event_origin,block_height,block_hash,global_output_index,
+                   status,credited,credit_count
+            FROM deposits WHERE genesis=? AND txid=? AND output_index=?
+        """, (genesis, txid, output_index)).fetchone()
+        if row is None:
+            raise ObservationError("credited deposit record is missing")
+        return {
+            "ledger_id": self.ledger_id,
+            "credit_id": row[0],
+            "event_origin": row[1],
+            "credit_block_height": row[2],
+            "credit_block_hash": row[3],
+            "credit_global_output_index": row[4],
+            "credit_status": row[5],
+            "credited": row[6],
+            "credit_count": row[7],
+        }
 
     @contextmanager
     def write(self):
@@ -411,12 +568,22 @@ class Ledger:
                 deposit.tx_blob, deposit.receipt)
 
     def observe(self, deposit: Deposit, view: ChainView, spent_status: int,
-                qualified: bool, reason: str | None) -> str:
+                qualified: bool, reason: str | None,
+                stable_observation: bool | None = None) -> str:
+        # The CLI supplies the independently checked daemon stability result.
+        # Direct callers retain the qualified-only default used by local tests.
+        if stable_observation is None:
+            stable_observation = qualified
+        if qualified and (deposit.block_height is None or deposit.block_hash is None):
+            raise ObservationError("qualified deposit lacks block anchor")
+        if stable_observation and not view.in_pool and (
+                deposit.block_height is None or deposit.block_hash is None):
+            raise ObservationError("stable mined deposit lacks block anchor")
         now = int(time.time())
         with self.write():
             rows = self.db.execute("""
                 SELECT id,genesis,txid,output_index,k_o,key_image,intent,destination,amount,event_origin,
-                       tx_blob,receipt,block_height,block_hash,global_output_index,status,credited,
+                       tx_blob,receipt,credit_id,block_height,block_hash,global_output_index,status,credited,
                        credit_count,suspension_reason
                 FROM deposits WHERE genesis=? AND ((txid=? AND output_index=?) OR k_o=? OR key_image=?)
             """, (deposit.genesis, deposit.txid, deposit.output_index, deposit.k_o, deposit.key_image)).fetchall()
@@ -427,10 +594,10 @@ class Ledger:
                 status = "active" if qualified else "suspended"
                 cursor = self.db.execute("""
                     INSERT INTO deposits(genesis,txid,output_index,k_o,key_image,intent,destination,amount,event_origin,
-                        tx_blob,receipt,block_height,block_hash,global_output_index,first_endpoint,status,
+                        tx_blob,receipt,credit_id,block_height,block_hash,global_output_index,first_endpoint,status,
                         credited,credit_count,suspension_reason,created_at,last_seen)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, (*self._immutable(deposit), deposit.block_height, deposit.block_hash,
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (*self._immutable(deposit), secrets.token_hex(32), deposit.block_height, deposit.block_hash,
                     deposit.global_output_index, deposit.endpoint, status, credited, credited,
                     reason, now, now))
                 deposit_id = cursor.lastrowid
@@ -440,7 +607,7 @@ class Ledger:
                 deposit_id = row[0]
                 if row[1:12] != self._immutable(deposit):
                     raise ConflictError("same backing is already bound to different event data")
-                old_height, old_hash, old_global_index, old_status, credited, credit_count, old_reason = row[12:]
+                _credit_id, old_height, old_hash, old_global_index, old_status, credited, credit_count, old_reason = row[12:]
                 was_credited = bool(credited)
                 origin_changed = (old_height is not None and
                     (old_height != deposit.block_height or old_hash != deposit.block_hash))
@@ -477,6 +644,17 @@ class Ledger:
                         block_height=?,block_hash=?,global_output_index=? WHERE id=?
                 """, (status, credited, credit_count, reason, now, stored_height,
                     stored_hash, stored_global_index, deposit_id))
+            if stable_observation:
+                # A stable view of one transaction output also updates the
+                # credit state of its siblings. A re-mined transaction has one
+                # block anchor, even before it reaches the credit threshold.
+                self.db.execute("""
+                    UPDATE deposits SET status='suspended',suspension_reason='event origin changed',
+                        last_seen=? WHERE genesis=? AND txid=? AND output_index<>?
+                        AND credited=1 AND status='active'
+                        AND (? OR block_height IS NOT ? OR block_hash IS NOT ?)
+                """, (now, deposit.genesis, deposit.txid, deposit.output_index,
+                      view.in_pool, deposit.block_height, deposit.block_hash))
             self.db.execute("""
                 INSERT INTO observations(deposit_id,observed_at,endpoint,decision,reason,tip_height,
                     tip_hash,confirmations,spent_status,tx_blob_sha256) VALUES(?,?,?,?,?,?,?,?,?,?)
@@ -501,10 +679,17 @@ def observe(args: argparse.Namespace) -> int:
     receipt = receipt_path.read_bytes()
     intent = intent_path.read_bytes()
     txid, output_index, intent_hex, receipt_amount = receipt_selector(receipt, intent)
-    client = DaemonClient(args.url)
-    ledger = Ledger(runtime / "deposits.sqlite3")
+    ledger_path = runtime / "deposits.sqlite3"
+    expected_ledger_id = getattr(args, "expected_ledger_id", None)
+    ledger = None
     genesis = None
     try:
+        if expected_ledger_id is not None:
+            expected_ledger_id = _hex64(expected_ledger_id, "expected ledger identity")
+            if not ledger_path.is_file():
+                raise ObservationError("expected deposit ledger does not exist")
+        ledger = Ledger(ledger_path, expected_ledger_id=expected_ledger_id)
+        client = DaemonClient(args.url)
         identity_first = client.identity()
         genesis = client.header(0)["hash"]
         first = retry_chain_view(client, txid, output_index)
@@ -539,6 +724,7 @@ def observe(args: argparse.Namespace) -> int:
             reason = "receiver key image is spent"
         else:
             reason = None
+        chain_qualified = stable and reason is None
         global_index = (second.output_indices[output_index]
                         if not second.in_pool and output_index < len(second.output_indices) else None)
         deposit = Deposit(
@@ -547,7 +733,9 @@ def observe(args: argparse.Namespace) -> int:
             tx_blob=second.tx_blob, receipt=receipt, block_height=second.block_height,
             block_hash=second.block_hash, global_output_index=global_index, endpoint=client.url,
         )
-        decision = ledger.observe(deposit, second, spent_second, reason is None, reason)
+        decision = ledger.observe(deposit, second, spent_second, chain_qualified,
+                                  reason, stable_observation=stable)
+        credit = ledger.credit_state(second.genesis, txid, output_index)
         origin = event_origin(second.genesis, txid, output_index, k_o, key_image,
                               intent_hex, destination, amount)
         print(json.dumps({
@@ -557,6 +745,14 @@ def observe(args: argparse.Namespace) -> int:
             "confirmations": second.confirmations, "block_height": second.block_height,
             "block_hash": second.block_hash, "tip_height": second.tip_height,
             "tip_hash": second.tip_hash, "event_origin": origin, "endpoint_scope": "single",
+            "ledger_id": credit["ledger_id"], "credit_id": credit["credit_id"],
+            "credit_block_height": credit["credit_block_height"],
+            "credit_block_hash": credit["credit_block_hash"],
+            "credit_global_output_index": credit["credit_global_output_index"],
+            "status": credit["credit_status"], "credited": credit["credited"],
+            "credit_count": credit["credit_count"],
+            "spent_status": spent_second, "in_pool": second.in_pool,
+            "global_output_index": global_index, "chain_qualified": chain_qualified,
         }, sort_keys=True))
         return 0 if decision in ("credited", "idempotent") else 2
     except ChainStateError as error:
@@ -568,7 +764,8 @@ def observe(args: argparse.Namespace) -> int:
         print(str(error), file=sys.stderr)
         return 2
     finally:
-        ledger.close()
+        if ledger is not None:
+            ledger.close()
 
 
 def parser() -> argparse.ArgumentParser:
@@ -582,6 +779,8 @@ def parser() -> argparse.ArgumentParser:
     node.add_argument("intent")
     node.add_argument("--profile", choices=("user",), default="user")
     node.add_argument("--min-confirmations", type=int, default=10)
+    node.add_argument("--expected-ledger-id",
+                      help="require this exact existing 32-byte deposit ledger identity")
     node.set_defaults(run=observe)
     return value
 
