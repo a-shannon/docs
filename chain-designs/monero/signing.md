@@ -1,5 +1,9 @@
 # CLSAG threshold signing and Monero transaction construction
 
+Supporting material for the [Monero integration design](design.md). The design
+records the current proposals, integration gaps and evidence limits; this note
+explains the signing machines at the source pins below.
+
 This note explains the native withdrawal path in the source snapshot published at
 commit `60bc88a585e5bc8bcd230c69652cf12ac1fb4ec7`, for maintainers deciding which
 part can become a narrow Monero adapter and which parts are harness or custody code.
@@ -289,7 +293,7 @@ integration and multisig work. Those snapshots did not deliver a replacement for
 the CLSAG wallet path documented above.
 
 A separate [8 October corrected FCMP++/CARROT adapter](https://github.com/a-shannon/docs/tree/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot)
-now composes Core beta3 `d816367cb1aa405bfa68a20ac3e034d0759d968e` with threshold
+composes Core beta3 `d816367cb1aa405bfa68a20ac3e034d0759d968e` with threshold
 SAL at the node's Rust pin `31c26d96eaadbba910ffe3613ad8b4cf9c598a93`.
 The [Core spend-device adapter](https://github.com/a-shannon/docs/blob/5f5cf882178a3a9fded9df58e7fde628b82cc4fc/r-and-d/monero-integration/fcmp-carrot/source/core/threshold_spend_device.cpp)
 reconstructs the full request and requires authorization before invoking the
@@ -328,7 +332,7 @@ cross-version proof/certificate combinations and recovery across activation or
 rollback. The production certificate schema must authenticate a protocol/profile
 version and explicit migration rules; existing version/domain fields alone do
 not prove those rules. Until this gate passes, the integration needs an owned
-halt/drain plan as described in the [integration document](monero-integration-plan.md#fcmpcarrot-migration-gate).
+halt/drain plan as described in the [integration design](design.md#32-expiry-delayed-signing-and-protocol-upgrades).
 
 ## Limitations
 

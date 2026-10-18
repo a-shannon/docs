@@ -27,5 +27,9 @@
 ## 🛠️ r\&d
 
 * [Bringing Monero](r-and-d/bringing-monero.md)
-* [Monero Integration](r-and-d/monero-integration-plan.md)
-  * [CLSAG Signing and Transaction Construction](r-and-d/monero-signing.md)
+
+## Chain designs
+
+* [Chain integration designs](chain-designs/README.md)
+  * [Monero integration design](chain-designs/monero/design.md)
+    * [CLSAG Signing and Transaction Construction](chain-designs/monero/signing.md)
