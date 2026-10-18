@@ -27,3 +27,5 @@
 ## 🛠️ r\&d
 
 * [Bringing Monero](r-and-d/bringing-monero.md)
+* [Monero Integration](r-and-d/monero-integration-plan.md)
+  * [CLSAG Signing and Transaction Construction](r-and-d/monero-signing.md)
