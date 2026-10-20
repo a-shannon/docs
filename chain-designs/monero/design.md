@@ -65,6 +65,27 @@ messages and aggregates public contributions; it has no complete spend secret
 and no authority to change the approved payment. The exact transport attachment
 and custody deployment remain design-review items.
 
+**Signing-route qualification (proposed):** the earlier local CLSAG roundtrip
+demonstrated a bounded 2-of-4 path. It did not measure signing latency,
+resource cost or recovery for the proposed 3-of-4 Guard roster. Before
+selecting this pre-FCMP++ route, measure
+signing rounds, latency, message volume, CPU/memory use and restart behavior
+against a workload and budget agreed with Rosen.
+
+The FCMP++/CARROT threshold SAL adapter is a separate prototype. The published
+[FROSTLASS work](https://github.com/monero-oxide/monero-oxide/blob/731657ae3385be667abb556266369a497bc86f13/audits/FROSTLASS/README.md)
+concerns threshold CLSAG; the [16 September 2026 MRL audit discussion](https://github.com/monero-project/meta/issues/1458)
+excluded multisig from the cited FCMP++ review, and the [30 September 2026
+status](https://github.com/monero-project/meta/issues/1466) described ongoing
+FCMP++/CARROT multisig implementation work. No public independent review of
+both the exact proposed post-FCMP++ threshold scheme and implementation was
+identified in those sources; a newer or unpublished review may exist. Before
+selecting this route, pin the scheme and implementation, verify or obtain
+independent review of the scheme and an audit of the exact implementation and
+Rosen adapter, then qualify the 3-of-4 signing workload, migration and recovery.
+Neither route is selected for activation until its applicable gates and the
+custody design are agreed and passed.
+
 **Implemented locally:** four native holder processes run the imported DKG and
 select two spend signers. Separate software approval uses three of four Rosen
 votes. Two colluding holders can bypass that software approval; this is explicitly
@@ -843,6 +864,7 @@ do not mix optimizations, equivalent rewrites or other chains into Monero.
 | Guard availability | Focused claim/permit tests cover three approval participants after four durable claims. Native custody still uses two spend shares. | No latest-source native scenario with a permanently absent Guard; neither 3/4 availability nor 3/4 custody is established. Proposed repair: section 1.1. |
 | Uncredited custody and terminal payout | Source-mapped expiry/pre-credit invalidation and stopped observation after two-confirmation settlement; a synthetic SQLite invalidation transition supplements the source trace. | No demonstrated refund/re-anchor, pre-signing recovery or post-reward deep-reorg recovery. Contributor proposals are in sections 3.3–3.5; not implemented or accepted. |
 | FCMP++/CARROT | Separate old-output migration, CARROT deposit/return, exact-byte recovery and controlled reorg/reintroduction on fakechain; no Ergo credit/redemption/reward leg. Legacy address hierarchy, custom RCR1 receipt, public fixture keys and separate 2/4 SAL versus synthetic 3/4 approval. | [Fork draft](https://github.com/a-shannon/docs/pull/1) at `5a460f10f0a9dda275d39de9d8fd2b774781f55d`; new CARROT addresses, production proof/custody and Rosen service joins not qualified. |
+| Signing-route qualification | Neither 2/4 experiment measures the proposed 3/4 Guard workload. The cited public FCMP++ audit discussion excludes multisig; no review scoped to the exact proposed threshold scheme and implementation was identified. | Contributor: pin candidate scheme/code and review scope, define the representative workload, then measure cost and recovery for the agreed route and verify or obtain independent scheme and implementation review. Rosen: agree custody profile and performance budget. Neither route is qualified for activation (section 1.1). |
 | Public node feasibility | Three operator-attributed endpoints passed the stated read surface over validated TLS, with identical full/base/prunable type-5 transaction bytes. Cake/xmr.pub additionally supplied type-4/6 samples. No public submission; required historical coverage, rescan/rate behavior and operator release/retention arrangements remain open. | Section 1.3 names endpoints, primary attribution and exact sample. Neither sample success nor an open registry submission is an operator SLA or Rosen approval. |
 | Released-wallet lock | Native library supports arbitrary data; surveyed released user-wallet paths do not construct/approve RMD1. A concrete Core CLI producer/approval interface and acceptance campaign are proposed in section 2.2. | The proposed wallet extension is not implemented, released or agreed. No supported browser connector or complete normal-user journey is demonstrated. Contributor feasibility blocker. |
 | Public lock examples | Offline encoded vectors and prior local-node examples only. | Representative/max-size public non-mainnet deposits, valid destination and relay/inclusion evidence still missing. |
